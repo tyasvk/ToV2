@@ -51,4 +51,11 @@ public function examAttempts()
 {
     return $this->hasMany(ExamAttempt::class);
 }
+
+public function purchasedTryouts()
+{
+    return $this->belongsToMany(Tryout::class, 'purchases')
+                ->withPivot('status')
+                ->wherePivot('status', 'success');
+}
 }

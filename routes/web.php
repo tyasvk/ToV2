@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\TryoutManagerController;
 use App\Http\Controllers\Admin\QuestionManagerController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\User\TryoutController;
+use App\Http\Controllers\User\CheckoutController;
 
 // 1. Rute Publik (Landing Page)
 Route::get('/', function () {
@@ -25,8 +26,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/tryouts', [UserTryoutController::class, 'index'])->name('tryout.index');
         Route::get('/tryouts/{tryout}/show', [UserTryoutController::class, 'show'])->name('tryout.start');
         
+    
+        // Tambahkan ini
+    Route::get('/checkout/{tryout}', [CheckoutController::class, 'show'])->name('checkout.show');
+    Route::post('/checkout/{tryout}', [CheckoutController::class, 'store'])->name('checkout.store');
         // TAMBAHKAN RUTE INI (Halaman Lembar Ujian)
     Route::get('/tryouts/{tryout}/exam', [UserTryoutController::class, 'exam'])->name('tryout.exam');
+
+    Route::get('/tryouts/{tryout}', [TryoutController::class, 'show'])->name('tryout.show');
+
+    Route::get('/tryouts/{tryout}', [TryoutController::class, 'show'])
+    ->middleware('check.access') // Pakai middleware di sini
+    ->name('tryout.show');
 
     Route::get('/riwayat-tryout', [App\Http\Controllers\User\TryoutController::class, 'history'])->name('user.history');
     Route::get('/tryouts/{tryout}', [TryoutController::class, 'show'])->name('tryout.show');
@@ -66,5 +77,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
+// Tambahkan di LUAR middleware 'auth' karena Midtrans yang memanggil
+Route::post('/midtrans/callback', [CheckoutController::class, 'handleNotification']);
 
 require __DIR__.'/auth.php';

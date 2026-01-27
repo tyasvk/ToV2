@@ -14,14 +14,20 @@ class TryoutController extends Controller
     /**
      * Menampilkan daftar paket tryout yang tersedia.
      */
-    public function index()
-    {
-        $tryouts = Tryout::where('is_active', true)->get();
+public function index()
+{
+    $user = auth()->user();
+    $tryouts = Tryout::all()->map(function ($t) use ($user) {
+        // Cek apakah ini gratis atau sudah dibeli
+        $t->has_access = !$t->is_paid || $user->purchasedTryouts()->where('tryout_id', $t->id)->exists();
+        return $t;
+    });
 
-        return Inertia::render('Tryout/Index', [
-            'tryouts' => $tryouts
-        ]);
-    }
+    return Inertia::render('User/Tryout/Index', [
+        'tryouts' => $tryouts,
+        'stats' => [ /* stats pengerjaan seperti sebelumnya */ ]
+    ]);
+}
 
     /**
      * Inisialisasi sesi ujian dan mengambil soal.
@@ -97,4 +103,13 @@ public function submit(Request $request, ExamSession $session)
             'session' => $session->load('tryout')
         ]);
     }
+
+    public function show(Tryout $tryout) 
+{
+    // Jika sampai di sini, berarti data ditemukan.
+    // Jika 404, Laravel bahkan tidak akan pernah sampai ke baris ini.
+    return Inertia::render('User/Tryout/Show', [
+        'tryout' => $tryout->loadCount('questions')
+    ]);
+}
 }
