@@ -47,10 +47,8 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
-
-    public function attempts()
+public function examAttempts()
 {
-    // Mengasumsikan nama model percobaan Anda adalah Attempt
-    return $this->hasMany(Attempt::class)->orderBy('created_at', 'desc');
+    return $this->hasMany(ExamAttempt::class);
 }
 }

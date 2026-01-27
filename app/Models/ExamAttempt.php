@@ -18,10 +18,12 @@ class ExamAttempt extends Model
         'tkp_score',
         'total_score',
         'completed_at',
+        'answers', // Tambahkan ini
     ];
 
     protected $casts = [
         'completed_at' => 'datetime',
+        'answers' => 'array', // Tambahkan ini agar bisa diakses sebagai array
     ];
 
     public function user(): BelongsTo

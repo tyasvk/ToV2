@@ -15,20 +15,28 @@ class TryoutController extends Controller
 {
 public function index()
 {
-    $tryouts = Tryout::where('is_active', true)
-        ->where('published_at', '<=', now())
-        ->withCount('questions')
-        ->latest()
-        ->get();
+    $tryouts = Tryout::withCount('questions')->get();
+    
+    // Ambil semua attempt user yang sudah selesai
+    $attempts = auth()->user()->examAttempts()->whereNotNull('completed_at')->get();
 
     return Inertia::render('User/Tryout/Index', [
-        'tryouts' => $tryouts
+        'tryouts' => $tryouts->map(function($t) use ($attempts) {
+            // Cari skor terakhir untuk tryout ini
+            $lastAttempt = $attempts->where('tryout_id', $t->id)->first();
+            $t->last_score = $lastAttempt ? $lastAttempt->total_score : null;
+            return $t;
+        }),
+        'stats' => [
+            'total_completed' => $attempts->count(),
+            'average_score' => round($attempts->avg('total_score') ?? 0),
+        ]
     ]);
 }
 
 public function show(Tryout $tryout)
 {
-    // Hanya mengirim data paket dan jumlah soal untuk konfirmasi
+    // Jika sampai di sini, berarti data ID ditemukan
     return Inertia::render('User/Tryout/Show', [
         'tryout' => $tryout->loadCount('questions')
     ]);
@@ -45,41 +53,39 @@ public function exam(Tryout $tryout)
     ]);
 }
 
-    public function finish(Request $request, Tryout $tryout)
-    {
-        $userAnswers = $request->answers; // Ambil jawaban dari Vue [question_id => 'a']
-        $questions = $tryout->questions;
-        
-        $twk = 0; $tiu = 0; $tkp = 0;
+   public function finish(Request $request, Tryout $tryout)
+{
+    $userAnswers = $request->answers; 
+    $questions = $tryout->questions;
+    
+    $twk = 0; $tiu = 0; $tkp = 0;
 
-        foreach ($questions as $q) {
-            $answer = $userAnswers[$q->id] ?? null;
-
-            if ($q->type === 'TKP') {
-                // Ambil bobot dari JSON tkp_scores (misal: 'a' => 5)
-                $tkp += (int) ($q->tkp_scores[$answer] ?? 0);
-            } else {
-                // TWK & TIU: Benar +5, Salah 0
-                if ($answer === $q->correct_answer) {
-                    if ($q->type === 'TWK') $twk += 5;
-                    if ($q->type === 'TIU') $tiu += 5;
-                }
+    foreach ($questions as $q) {
+        $answer = $userAnswers[$q->id] ?? null;
+        if ($q->type === 'TKP') {
+            $tkp += (int) ($q->tkp_scores[$answer] ?? 0);
+        } else {
+            if ($answer === $q->correct_answer) {
+                if ($q->type === 'TWK') $twk += 5;
+                if ($q->type === 'TIU') $tiu += 5;
             }
         }
-
-        // Simpan hasil ke database
-        $attempt = ExamAttempt::create([
-            'user_id' => auth()->id(),
-            'tryout_id' => $tryout->id,
-            'twk_score' => $twk,
-            'tiu_score' => $tiu,
-            'tkp_score' => $tkp,
-            'total_score' => $twk + $tiu + $tkp,
-            'completed_at' => now(),
-        ]);
-
-        return redirect()->route('tryout.result', $attempt->id);
     }
+
+    // SIMPAN HASIL DENGAN JAWABANNYA
+    $attempt = ExamAttempt::create([
+        'user_id' => auth()->id(),
+        'tryout_id' => $tryout->id,
+        'answers' => $userAnswers, // <--- SANGAT PENTING: Simpan jawaban di sini
+        'twk_score' => $twk,
+        'tiu_score' => $tiu,
+        'tkp_score' => $tkp,
+        'total_score' => $twk + $tiu + $tkp,
+        'completed_at' => now(),
+    ]);
+
+    return redirect()->route('tryout.result', $attempt->id);
+}
 
     public function result(ExamAttempt $attempt)
     {
@@ -102,16 +108,6 @@ public function examBkn(Tryout $tryout)
         'tryout' => $tryout,
         'questions' => $questions,
         'user' => auth()->user()
-    ]);
-}
-
-public function review(ExamAttempt $examAttempt) 
-{
-    $questions = $examAttempt->tryout->questions()->orderBy('order', 'asc')->get();
-
-    return Inertia::render('User/Tryout/Review', [
-        'attempt' => $examAttempt,
-        'questions' => $questions
     ]);
 }
 
@@ -154,5 +150,47 @@ public function leaderboard(Tryout $tryout)
     ]);
 }
 
+// Tambahkan method ini di dalam class TryoutController
+public function history()
+{
+    $attempts = ExamAttempt::where('user_id', auth()->id())
+        ->with('tryout')
+        ->latest()
+        ->get();
+
+    return Inertia::render('User/Tryout/History', [
+        'attempts' => $attempts
+    ]);
+}
+
+public function review(ExamAttempt $attempt) 
+{
+    $attempt->load('tryout');
+    
+    // Ambil jawaban user dari kolom JSON yang sudah jadi array
+    $userAnswers = $attempt->answers ?? [];
+
+    $questions = $attempt->tryout->questions()
+        ->orderBy('order', 'asc')
+        ->get()
+        ->map(function ($question) use ($userAnswers) {
+            // Kita cari jawaban user berdasarkan ID soal
+            // Gunakan (string) pada ID untuk jaga-jaga jika JSON key-nya berupa string
+            $selected = $userAnswers[(string)$question->id] ?? $userAnswers[$question->id] ?? null;
+            
+            $question->user_selected_answer = $selected;
+            
+            // Logika pengecekan (Abaikan besar/kecil huruf)
+            $question->is_correct = strtolower((string)$selected) === strtolower((string)$question->correct_answer);
+            $question->is_answered = !is_null($selected);
+            
+            return $question;
+        });
+
+    return Inertia::render('User/Tryout/Review', [
+        'attempt' => $attempt,
+        'questions' => $questions
+    ]);
+}
 
 }

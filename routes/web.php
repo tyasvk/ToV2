@@ -6,6 +6,7 @@ use App\Http\Controllers\User\TryoutController as UserTryoutController;
 use App\Http\Controllers\Admin\TryoutManagerController;
 use App\Http\Controllers\Admin\QuestionManagerController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\User\TryoutController;
 
 // 1. Rute Publik (Landing Page)
 Route::get('/', function () {
@@ -27,7 +28,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // TAMBAHKAN RUTE INI (Halaman Lembar Ujian)
     Route::get('/tryouts/{tryout}/exam', [UserTryoutController::class, 'exam'])->name('tryout.exam');
 
-    Route::get('/riwayat-tryout', [UserDashboardController::class, 'history'])->name('user.history');
+    Route::get('/riwayat-tryout', [App\Http\Controllers\User\TryoutController::class, 'history'])->name('user.history');
+    Route::get('/tryouts/{tryout}', [TryoutController::class, 'show'])->name('tryout.show');
 
     // Rute Baru untuk Fitur Hasil & Review
     Route::get('/results/{attempt}/review', [UserTryoutController::class, 'review'])->name('tryout.review');

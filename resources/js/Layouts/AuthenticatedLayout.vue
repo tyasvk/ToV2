@@ -81,6 +81,11 @@ onMounted(() => {
                         <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Katalog Tryout</span>
                     </Link>
 
+                    <Link :href="route('user.history')" :class="[route().current('user.history') ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
+                        <span class="text-xl">📜</span> 
+                        <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Riwayat Tryout</span>
+                    </Link>
+
                     <Link :href="route('profile.edit')" :class="[route().current('profile.*') ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
                         <span class="text-xl">👤</span> 
                         <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Profil Saya</span>
