@@ -6,6 +6,7 @@ use App\Http\Controllers\User\TryoutController as UserTryoutController;
 use App\Http\Controllers\Admin\TryoutManagerController;
 use App\Http\Controllers\Admin\QuestionManagerController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\UserManagerController; // TAMBAHKAN BARIS INI
 
 // 1. Rute Publik (Landing Page)
 Route::get('/', function () {
@@ -42,7 +43,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('/questions/reorder', [QuestionManagerController::class, 'reorder'])->name('questions.reorder');
 
         // Kelola Pengguna
-        Route::get('/users', function() { return inertia('Admin/Users/Index'); })->name('users.index');
+        // Cari di dalam grup admin, ganti baris users.index menjadi:
+Route::get('/users', [UserManagerController::class, 'index'])->name('users.index');
+Route::delete('/users/{user}', [UserManagerController::class, 'destroy'])->name('users.destroy');
+Route::patch('/users/{user}', [UserManagerController::class, 'update'])->name('users.update');
     });
 
     // Profil (Bisa diakses Admin & User)

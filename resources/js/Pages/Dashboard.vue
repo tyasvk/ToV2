@@ -1,10 +1,32 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
-defineProps({
+const props = defineProps({
     availableTryouts: Array,
     stats: Object
+});
+
+const formatDate = (dateString) => {
+    const date = dateString ? new Date(dateString) : new Date();
+    return date.toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+    });
+};
+
+const getInitials = (name) => {
+    return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+};
+
+const motivation = "Masa depan adalah milik mereka yang menyiapkan diri hari ini. Konsistensi adalah kunci kemenangan.";
+
+// Kalkulasi Lingkaran Progres (Keliling lingkaran r=34 adalah 213.6)
+const strokeDashoffset = computed(() => {
+    const score = props.stats.average_score || 0;
+    return 213.6 - (score / 100) * 213.6;
 });
 </script>
 
@@ -12,67 +34,124 @@ defineProps({
     <Head title="Dashboard Peserta" />
 
     <AuthenticatedLayout>
-        <template #header>
-            <div class="flex flex-col gap-1">
-                <h2 class="font-black text-3xl text-gray-900 tracking-tighter uppercase italic">
-                    Selamat Datang, {{ $page.props.auth.user.name }}!
-                </h2>
-                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em]">Panel Kontrol Progres Belajar</p>
-            </div>
-        </template>
+        <div class="mb-10 animate-in fade-in slide-in-from-top-4 duration-700">
+            <div class="bg-gradient-to-br from-gray-900 via-gray-800 to-indigo-950 rounded-[3.5rem] shadow-2xl shadow-indigo-200/20 overflow-hidden relative border border-white/5">
+                
+                <div class="absolute top-0 right-0 w-1/2 h-full bg-white/5 -skew-x-12 translate-x-20"></div>
+                <div class="absolute -bottom-20 -left-20 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl"></div>
 
-        <div class="space-y-10">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
-                    <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">Simulasi Selesai</p>
-                    <div class="flex items-end gap-2">
-                        <span class="text-4xl font-black text-gray-900">{{ stats.completed_count }}</span>
-                        <span class="text-[10px] font-bold text-green-500 mb-1.5 uppercase tracking-widest">Paket</span>
+                <div class="p-10 md:p-14 flex flex-col md:flex-row items-center gap-10 relative z-10">
+                    <div class="w-28 h-28 bg-white rounded-[2.5rem] flex items-center justify-center text-indigo-900 text-4xl font-black shadow-2xl shrink-0 border-4 border-white/10">
+                        {{ getInitials($page.props.auth.user.name) }}
                     </div>
-                </div>
 
-                <div class="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm border-l-4 border-l-indigo-600">
-                    <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">Rata-rata Skor</p>
-                    <div class="flex items-end gap-2">
-                        <span class="text-4xl font-black text-indigo-600">{{ stats.average_score }}</span>
-                        <span class="text-[10px] font-bold text-indigo-400 mb-1.5 uppercase tracking-widest">Poin</span>
+                    <div class="flex-1 text-center md:text-left space-y-4">
+                        <div class="space-y-1">
+                            <div class="flex flex-col md:flex-row md:items-center gap-4 justify-center md:justify-start">
+                                <h2 class="text-4xl font-black text-white tracking-tighter uppercase leading-none">
+                                    {{ $page.props.auth.user.name }}
+                                </h2>
+                                <span class="px-4 py-1.5 bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-[9px] font-black uppercase tracking-[0.2em] rounded-full self-center">
+                                    Akun Terverifikasi
+                                </span>
+                            </div>
+                            <p class="text-[10px] font-bold text-indigo-300/60 uppercase tracking-[0.3em]">
+                                ID Peserta: #{{ String($page.props.auth.user.id).padStart(5, '0') }} — Bergabung {{ formatDate($page.props.auth.user.created_at) }}
+                            </p>
+                        </div>
+
+                        <div class="bg-white/5 backdrop-blur-sm border border-white/10 p-5 rounded-2xl inline-block max-w-2xl">
+                            <p class="text-[11px] font-bold text-white uppercase tracking-widest leading-relaxed">
+                                <span class="text-indigo-400 mr-2">"</span>
+                                {{ motivation }}
+                                <span class="text-indigo-400 ml-1">"</span>
+                            </p>
+                        </div>
                     </div>
-                </div>
 
-                <div class="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm border-l-4 border-l-amber-500">
-                    <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">Ranking Global</p>
-                    <div class="flex items-end gap-2">
-                        <span class="text-4xl font-black text-amber-600">{{ stats.global_rank }}</span>
-                        <span class="text-[10px] font-bold text-amber-400 mb-1.5 uppercase tracking-widest">Siswa</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="space-y-6">
-                <div class="flex justify-between items-center px-4">
-                    <h3 class="font-black text-sm text-gray-900 uppercase tracking-widest">Lanjutkan Simulasi</h3>
-                    <Link :href="route('tryout.index')" class="text-[9px] font-black text-indigo-600 uppercase border-b-2 border-indigo-100 hover:border-indigo-600 transition">Lihat Semua ➜</Link>
-                </div>
-
-                <div class="grid grid-cols-1 gap-4">
-                    <div v-for="tryout in availableTryouts" :key="tryout.id" 
-                        class="bg-white p-6 rounded-[2.2rem] border border-gray-100 shadow-sm flex flex-col md:flex-row justify-between items-center group hover:border-indigo-200 transition-all">
-                        <div class="flex items-center gap-6">
-                            <div class="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-3xl group-hover:scale-110 transition duration-500">🎯</div>
-                            <div>
-                                <h4 class="font-black text-gray-900 uppercase tracking-tight text-base">{{ tryout.title }}</h4>
-                                <div class="flex gap-4 mt-1.5">
-                                    <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">⏱️ {{ tryout.duration_minutes }} Menit</span>
-                                    <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">📄 {{ tryout.questions_count }} Soal</span>
-                                </div>
+                    <div class="hidden lg:flex items-center gap-6 bg-white/5 p-6 pr-8 rounded-[3rem] border border-white/10 backdrop-blur-md group hover:bg-white/10 transition-all duration-500">
+                        <div class="relative w-20 h-20 flex items-center justify-center">
+                            <svg class="w-full h-full transform -rotate-90 transition-all duration-1000">
+                                <circle cx="40" cy="40" r="34" stroke="currentColor" stroke-width="6" fill="transparent" class="text-white/5" />
+                                <circle 
+                                    cx="40" cy="40" r="34" 
+                                    stroke="currentColor" 
+                                    stroke-width="6" 
+                                    fill="transparent" 
+                                    stroke-dasharray="213.6" 
+                                    :stroke-dashoffset="strokeDashoffset" 
+                                    class="text-indigo-500 transition-all duration-1000 ease-out" 
+                                />
+                            </svg>
+                            <span class="absolute text-sm font-black text-white uppercase tracking-tighter">
+                                {{ stats.average_score }}%
+                            </span>
+                        </div>
+                        <div class="flex flex-col">
+                            <p class="text-[9px] font-black text-indigo-300 uppercase tracking-[0.2em] mb-1">Status Kesiapan</p>
+                            <p class="text-xs font-black text-white uppercase tracking-widest leading-none">Siap Ujian</p>
+                            <div class="mt-2 flex gap-1">
+                                <div class="w-1 h-1 rounded-full bg-green-500 animate-pulse"></div>
+                                <div class="w-1 h-1 rounded-full bg-green-500 animate-pulse delay-75"></div>
+                                <div class="w-1 h-1 rounded-full bg-green-500 animate-pulse delay-150"></div>
                             </div>
                         </div>
-                        <Link :href="route('tryout.start', tryout.id)" class="mt-4 md:mt-0 bg-gray-900 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 transition shadow-xl active:scale-95">Mulai Ujian</Link>
                     </div>
+                </div>
+            </div>
+        </div>
 
-                    <div v-if="availableTryouts.length === 0" class="py-20 text-center bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-100">
-                        <p class="text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">Belum ada tryout aktif yang tersedia.</p>
-                    </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+            <div class="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:translate-y-[-4px] transition-all duration-300">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-xl">📝</div>
+                    <span class="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Total Ujian</span>
+                </div>
+                <p class="text-4xl font-black text-gray-900 tracking-tighter mb-1">{{ stats.completed_count }}</p>
+                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pengerjaan Selesai</p>
+            </div>
+
+            <div class="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:translate-y-[-4px] transition-all duration-300">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 bg-green-50 rounded-2xl flex items-center justify-center text-xl">📈</div>
+                    <span class="text-[9px] font-black text-green-400 uppercase tracking-widest">Skor Rata-Rata</span>
+                </div>
+                <p class="text-4xl font-black text-gray-900 tracking-tighter mb-1">{{ stats.average_score }}</p>
+                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Nilai Akumulasi</p>
+            </div>
+
+            <div class="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:translate-y-[-4px] transition-all duration-300">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-xl">🕒</div>
+                    <span class="text-[9px] font-black text-amber-400 uppercase tracking-widest">Aktivitas</span>
+                </div>
+                <p class="text-lg font-black text-gray-900 tracking-tight mb-1 uppercase truncate">{{ stats.last_activity }}</p>
+                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Sesi Terakhir</p>
+            </div>
+        </div>
+
+        <div class="mb-8 flex items-center justify-between px-4">
+            <h3 class="font-black text-sm text-gray-900 uppercase tracking-[0.2em]">Rekomendasi Paket Ujian</h3>
+            <Link :href="route('tryout.index')" class="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:text-gray-900 transition">
+                Lihat Semua →
+            </Link>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div v-for="tryout in availableTryouts" :key="tryout.id" 
+                class="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 group">
+                <div class="h-24 bg-gray-50 p-8 flex items-center justify-between border-b border-gray-100">
+                    <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-xs">P</div>
+                    <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest group-hover:text-indigo-600 transition-colors">Premium Tryout</span>
+                </div>
+                <div class="p-8">
+                    <h4 class="font-black text-lg text-gray-900 leading-tight uppercase mb-8 tracking-tighter h-12 overflow-hidden">
+                        {{ tryout.title }}
+                    </h4>
+                    <Link :href="route('tryout.start', tryout.id)" 
+                        class="block w-full text-center bg-gray-900 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-indigo-600 transition-all shadow-lg shadow-gray-200">
+                        Mulai Ujian Sekarang
+                    </Link>
                 </div>
             </div>
         </div>
