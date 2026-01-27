@@ -13,14 +13,13 @@ const isAdmin = computed(() => roles.value.includes('admin'));
 const isUser = computed(() => roles.value.includes('user'));
 
 // --- DYNAMIC LOGO ROUTE ---
-// Memastikan logo mengarah ke dashboard yang relevan dengan role
 const logoRoute = computed(() => {
     return isAdmin.value ? route('admin.dashboard') : route('dashboard');
 });
 
 const isSidebarOpen = ref(true);
 
-// Debug Role (Bisa dicek di F12 Console)
+// Debug Role
 onMounted(() => {
     console.log("Current Roles:", roles.value);
     console.log("Is Admin?", isAdmin.value);
@@ -62,6 +61,11 @@ onMounted(() => {
                         <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Kelola Tryout</span>
                     </Link>
 
+                    <Link :href="route('admin.transactions.index')" :class="[route().current('admin.transactions.*') ? 'bg-red-50 text-red-600' : 'text-gray-500 hover:bg-red-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
+                        <span class="text-xl">💰</span> 
+                        <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Transaksi</span>
+                    </Link>
+
                     <Link :href="route('admin.users.index')" :class="[route().current('admin.users.*') ? 'bg-red-50 text-red-600' : 'text-gray-500 hover:bg-red-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
                         <span class="text-xl">👥</span> 
                         <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Kelola User</span>
@@ -101,7 +105,6 @@ onMounted(() => {
         </aside>
 
         <div class="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-            
             <header class="h-20 bg-white border-b border-gray-200 flex items-center justify-between px-8 shrink-0 z-30">
                 <div class="flex items-center gap-4">
                     <button 

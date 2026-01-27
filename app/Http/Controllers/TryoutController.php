@@ -28,6 +28,47 @@ public function index()
         'stats' => [ /* stats pengerjaan seperti sebelumnya */ ]
     ]);
 }
+// Tambahkan/Update method ini di dalam TryoutController.php
+
+public function store(Request $request)
+{
+    $validated = $request->validate([
+        'title' => 'required|string|max:255',
+        'description' => 'nullable|string',
+        'duration_minutes' => 'required|integer|min:1',
+        'is_paid' => 'required|boolean',
+        // Validasi: harga wajib ada jika is_paid bernilai true
+        'price' => 'required_if:is_paid,true|numeric|min:0',
+    ]);
+
+    // Jika is_paid false, paksa harga jadi 0
+    if (!$validated['is_paid']) {
+        $validated['price'] = 0;
+    }
+
+    Tryout::create($validated);
+
+    return redirect()->back()->with('success', 'Tryout berhasil dibuat.');
+}
+
+public function update(Request $request, Tryout $tryout)
+{
+    $validated = $request->validate([
+        'title' => 'required|string|max:255',
+        'description' => 'nullable|string',
+        'duration_minutes' => 'required|integer|min:1',
+        'is_paid' => 'required|boolean',
+        'price' => 'required_if:is_paid,true|numeric|min:0',
+    ]);
+
+    if (!$validated['is_paid']) {
+        $validated['price'] = 0;
+    }
+
+    $tryout->update($validated);
+
+    return redirect()->back()->with('success', 'Tryout berhasil diperbarui.');
+}
 
     /**
      * Inisialisasi sesi ujian dan mengambil soal.

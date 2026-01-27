@@ -15,22 +15,17 @@ class TryoutController extends Controller
 {
 public function index()
 {
-    $tryouts = Tryout::withCount('questions')->get();
-    
-    // Ambil semua attempt user yang sudah selesai
-    $attempts = auth()->user()->examAttempts()->whereNotNull('completed_at')->get();
+    // Mengambil tryout yang statusnya Published DAN tanggal publish sudah lewat (atau NULL)
+    $tryouts = Tryout::where('is_published', true)
+        ->where(function ($query) {
+            $query->where('published_at', '<=', now())
+                  ->orWhereNull('published_at');
+        })
+        ->orderBy('created_at', 'desc')
+        ->get();
 
     return Inertia::render('User/Tryout/Index', [
-        'tryouts' => $tryouts->map(function($t) use ($attempts) {
-            // Cari skor terakhir untuk tryout ini
-            $lastAttempt = $attempts->where('tryout_id', $t->id)->first();
-            $t->last_score = $lastAttempt ? $lastAttempt->total_score : null;
-            return $t;
-        }),
-        'stats' => [
-            'total_completed' => $attempts->count(),
-            'average_score' => round($attempts->avg('total_score') ?? 0),
-        ]
+        'tryouts' => $tryouts
     ]);
 }
 

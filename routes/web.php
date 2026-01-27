@@ -70,6 +70,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Kelola Pengguna
         Route::get('/users', function() { return inertia('Admin/Users/Index'); })->name('users.index');
+        // Tambahkan rute ini:
+    Route::get('/transactions', [App\Http\Controllers\Admin\TransactionController::class, 'index'])->name('transactions.index');
     });
 
     // Profil (Bisa diakses Admin & User)

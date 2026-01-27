@@ -8,9 +8,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany; // Import class ini
 class Tryout extends Model
 {
     protected $fillable = [
-    'title', 'description', 'duration_minutes', 'is_active', 'published_at', 'started_at',
+    'title', 'description', 
+    'duration_minutes', 
+    'is_active', 
     'price', // Pastikan ini ada
     'is_paid',      // Tambahkan ini
+    'is_published', // Pastikan ada
+    'published_at', // Pastikan ada
+    'started_at'    // Pastikan ada
 ];
 
 protected $casts = [
