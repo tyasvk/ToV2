@@ -6,115 +6,115 @@ const props = defineProps({
     tryout: Object
 });
 
-// Tata tertib pengerjaan (Tegak & Tegas)
 const instructions = [
-    "SISTEM AKAN MENGUNCI JAWABAN ANDA SECARA OTOMATIS SAAT WAKTU BERAKHIR.",
-    "DILARANG MENYALIN ATAU MENYEBARLUASKAN SOAL DALAM BENTUK APAPUN.",
-    "PASTIKAN PERANGKAT ANDA MEMILIKI DAYA BATERAI YANG CUKUP.",
-    "HASIL AKAN LANGSUNG MUNCUL SETELAH ANDA MENYELESAIKAN SEMUA SOAL.",
-    "KLIK TOMBOL KONFIRMASI DI BAWAH UNTUK MEMULAI SESI UJIAN."
+    "WAKTU BERJALAN OTOMATIS SAAT MASUK.",
+    "PASTIKAN KONEKSI STABIL.",
+    "DILARANG MENYALIN SOAL.",
+    "JAWABAN TERSIMPAN OTOMATIS.",
+    "KLIK 'SELESAI' JIKA SUDAH YAKIN."
 ];
 </script>
 
 <template>
     <Head :title="'Konfirmasi: ' + tryout.title" />
 
-    <AuthenticatedLayout>
-        <template #header>
-            <div class="space-y-2 animate-in fade-in slide-in-from-top-4 duration-700">
-                <h2 class="font-black text-4xl text-gray-900 tracking-tighter uppercase leading-none">
-                    Detail Paket Ujian
-                </h2>
-                <p class="text-[10px] text-gray-400 font-black uppercase tracking-[0.3em]">
-                    Tinjau informasi dan tata tertib sebelum memulai simulasi
-                </p>
+    <div class="fixed inset-0 bg-gray-50 flex flex-col font-sans select-none overflow-hidden">
+        
+        <header class="h-14 bg-white border-b border-gray-100 px-6 flex justify-between items-center shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center font-black text-[9px] text-white">CAT</div>
+                <h1 class="font-black text-gray-900 uppercase text-[10px] tracking-widest">KONFIRMASI UJIAN</h1>
             </div>
-        </template>
+            <Link :href="route('tryout.index')" 
+                class="px-3 py-1.5 border border-gray-200 rounded-lg text-[9px] font-black text-gray-400 uppercase tracking-widest hover:bg-gray-50 transition-colors">
+                KEMBALI
+            </Link>
+        </header>
 
-        <div class="max-w-5xl mx-auto space-y-10 pb-24 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+        <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 p-4 gap-4 overflow-hidden">
             
-            <div class="bg-gradient-to-br from-gray-900 to-indigo-950 rounded-[3.5rem] p-10 md:p-14 shadow-2xl shadow-indigo-100/50 overflow-hidden relative">
-                <div class="absolute top-0 right-0 w-64 h-full bg-white/5 -skew-x-12 translate-x-24"></div>
-                <div class="absolute -bottom-10 -left-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl"></div>
-                
-                <div class="relative z-10 flex flex-col md:flex-row justify-between items-center gap-10 text-center md:text-left">
-                    <div class="space-y-5">
-                        <div class="inline-flex px-5 py-2 bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 text-[10px] font-black uppercase tracking-widest rounded-full">
-                            PAKET SOAL #{{ String(tryout.id).padStart(3, '0') }}
+            <div class="lg:col-span-7 h-full">
+                <div class="h-full bg-gray-900 rounded-[2rem] p-8 relative overflow-hidden flex flex-col justify-between shadow-xl group border border-gray-800">
+                    <div class="absolute top-0 right-0 w-80 h-80 bg-indigo-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-indigo-500/30 transition-all duration-1000"></div>
+                    
+                    <div class="relative z-10 space-y-4">
+                        <div class="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full border border-white/10 backdrop-blur-sm">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            <span class="text-[8px] font-black text-white uppercase tracking-[0.2em]">Siap Dikerjakan</span>
                         </div>
-                        <h1 class="text-3xl md:text-5xl font-black text-white tracking-tighter uppercase leading-tight">
+                        
+                        <h1 class="text-2xl md:text-4xl font-black text-white uppercase leading-tight tracking-tight">
                             {{ tryout.title }}
                         </h1>
-                        <p class="text-[10px] text-indigo-200/60 font-bold uppercase tracking-[0.4em]">
-                            STATUS: TERSEDIA UNTUK DIKERJAKAN
-                        </p>
+                        
+                        <div class="space-y-0.5">
+                            <p class="text-[8px] text-gray-400 font-black uppercase tracking-widest">KODE PAKET</p>
+                            <p class="text-base font-black text-indigo-400 tracking-widest uppercase">#CAT-{{ String(tryout.id).padStart(4, '0') }}</p>
+                        </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-4 shrink-0 w-full md:w-auto">
-                        <div class="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] text-center backdrop-blur-md">
-                            <p class="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">DURASI</p>
-                            <p class="text-xl font-black text-white uppercase tracking-tighter">90 MENIT</p>
+                    <div class="relative z-10 grid grid-cols-2 gap-3 mt-4">
+                        <div class="bg-white/5 border border-white/10 p-5 rounded-2xl backdrop-blur-md">
+                            <div class="text-xl mb-2">⏱️</div>
+                            <p class="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">DURASI</p>
+                            <p class="text-xl font-black text-white uppercase tracking-tighter">{{ tryout.duration_minutes }} MENIT</p>
                         </div>
-                        <div class="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] text-center backdrop-blur-md">
-                            <p class="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">SOAL</p>
-                            <p class="text-xl font-black text-white uppercase tracking-tighter">{{ tryout.questions_count }} BUTIR</p>
+                        <div class="bg-white/5 border border-white/10 p-5 rounded-2xl backdrop-blur-md">
+                            <div class="text-xl mb-2">📝</div>
+                            <p class="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">JUMLAH SOAL</p>
+                            <p class="text-xl font-black text-white uppercase tracking-tighter">{{ tryout.questions_count ?? 0 }} BUTIR</p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-white rounded-[3.5rem] border border-gray-100 shadow-sm overflow-hidden">
-                <div class="p-10 md:p-14">
-                    <div class="flex items-center gap-4 mb-10">
-                        <div class="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-xl">📋</div>
-                        <h3 class="text-xl font-black text-gray-900 uppercase tracking-tighter">Tata Tertib Pengerjaan</h3>
+            <div class="lg:col-span-5 h-full flex flex-col gap-4">
+                
+                <div class="flex-1 bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm flex flex-col overflow-hidden">
+                    <div class="flex items-center gap-3 mb-4 shrink-0">
+                        <div class="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center text-sm">🛡️</div>
+                        <div>
+                            <h3 class="text-sm font-black text-gray-900 uppercase tracking-tight">Tata Tertib</h3>
+                            <p class="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Wajib Ditaati</p>
+                        </div>
                     </div>
 
-                    <div class="space-y-6">
-                        <div v-for="(rule, index) in instructions" :key="index" class="flex gap-6 items-start group">
-                            <span class="w-10 h-10 bg-gray-50 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300 rounded-2xl flex items-center justify-center text-[11px] font-black text-gray-400 shrink-0 border border-gray-100">
+                    <div class="space-y-2 overflow-y-auto custom-scrollbar pr-1">
+                        <div v-for="(rule, index) in instructions" :key="index" class="flex gap-3 items-start p-2.5 rounded-xl bg-gray-50 border border-gray-100">
+                            <span class="w-5 h-5 bg-gray-900 text-white rounded-md flex items-center justify-center text-[8px] font-black shrink-0">
                                 {{ index + 1 }}
                             </span>
-                            <p class="text-[11px] font-bold text-gray-600 uppercase tracking-widest leading-relaxed pt-2.5">
+                            <p class="text-[8px] font-bold text-gray-600 uppercase leading-relaxed pt-0.5">
                                 {{ rule }}
                             </p>
                         </div>
                     </div>
                 </div>
+
+                <div class="shrink-0 space-y-3"> <Link :href="route('tryout.exam', tryout.id)" 
+        class="w-full block py-5 bg-indigo-600 text-white rounded-[1.5rem] text-center font-black text-xs uppercase tracking-[0.2em] shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 group relative overflow-hidden">
+        <span class="relative z-10 flex items-center justify-center gap-2">
+            MULAI UJIAN (MODE MODERN) <span class="group-hover:translate-x-1 transition-transform">🚀</span>
+        </span>
+    </Link>
+
+    <Link :href="route('tryout.exam.bkn', tryout.id)" 
+        class="w-full block py-4 bg-white border-2 border-gray-200 text-gray-500 rounded-[1.5rem] text-center font-black text-[10px] uppercase tracking-[0.2em] hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 transition-all duration-300">
+        SIMULASI TAMPILAN CAT BKN 🇮🇩
+    </Link>
+</div>
+
             </div>
 
-            <div class="flex flex-col md:flex-row items-center gap-6">
-                <Link :href="route('tryout.index')" 
-                    class="w-full md:w-1/3 text-center py-5 border-2 border-gray-100 text-gray-400 rounded-[2rem] font-black text-[11px] uppercase tracking-[0.2em] hover:bg-gray-50 hover:text-gray-600 transition-all active:scale-95">
-                    ← KEMBALI KE KATALOG
-                </Link>
-                
-                <Link :href="route('tryout.exam', tryout.id)" 
-                    class="w-full md:w-2/3 text-center py-6 bg-gray-900 text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] shadow-2xl shadow-gray-200 hover:bg-indigo-600 transition-all focus:ring-8 focus:ring-indigo-50 outline-none active:scale-95">
-                    KONFIRMASI & KERJAKAN SOAL 🚀
-                </Link>
-            </div>
-
-        </div>
-    </AuthenticatedLayout>
+        </main>
+    </div>
 </template>
 
 <style scoped>
-/* Menghilangkan semua gaya tulisan miring */
-* {
-    font-style: normal !important;
-}
+/* PAKSA TEGAK (NO ITALIC) */
+* { font-style: normal !important; }
 
-.transition-all {
-    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.animate-in {
-    animation: fadeIn 0.8s ease-out forwards;
-}
+.custom-scrollbar::-webkit-scrollbar { width: 3px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 </style>

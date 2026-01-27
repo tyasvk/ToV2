@@ -81,4 +81,21 @@ class DashboardController extends Controller
                 })
         ]);
     }
+
+// AttemptController.php atau DashboardController.php
+public function history()
+{
+    $attempts = auth()->user()->attempts()
+        ->with('tryout')
+        ->latest()
+        ->get();
+
+    // Jika pakai Inertia:
+    return inertia('User/History', [
+        'attempts' => $attempts
+    ]);
+
+    // Jika pakai Vue Standalone (API):
+    // return response()->json($attempts);
+}
 }

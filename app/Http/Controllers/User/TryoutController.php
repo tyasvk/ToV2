@@ -9,6 +9,7 @@ use App\Models\ExamAttempt; // PENTING: Import model hasil ujian
 use Illuminate\Http\Request; // PENTING: Import class Request
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class TryoutController extends Controller
 {
@@ -25,15 +26,24 @@ public function index()
     ]);
 }
 
-    public function show(Tryout $tryout)
-    {
-        $questions = $tryout->questions()->orderBy('order', 'asc')->get();
+public function show(Tryout $tryout)
+{
+    // Hanya mengirim data paket dan jumlah soal untuk konfirmasi
+    return Inertia::render('User/Tryout/Show', [
+        'tryout' => $tryout->loadCount('questions')
+    ]);
+}
 
-        return Inertia::render('User/Tryout/Show', [
-            'tryout' => $tryout,
-            'questions' => $questions
-        ]);
-    }
+public function exam(Tryout $tryout)
+{
+    // Mengambil soal hanya saat ujian benar-benar dimulai
+    $questions = $tryout->questions()->orderBy('order', 'asc')->get();
+
+    return Inertia::render('Tryout/ExamSheet', [
+        'tryout' => $tryout,
+        'questions' => $questions
+    ]);
+}
 
     public function finish(Request $request, Tryout $tryout)
     {
@@ -82,4 +92,67 @@ public function index()
             'attempt' => $attempt->load('tryout')
         ]);
     }
+
+public function examBkn(Tryout $tryout)
+{
+    $questions = $tryout->questions()->orderBy('order', 'asc')->get();
+
+    // PERBAIKAN: Render ke 'Tryout/ExamSheetBKN' (bukan User/Tryout/...)
+    return Inertia::render('Tryout/ExamSheetBKN', [
+        'tryout' => $tryout,
+        'questions' => $questions,
+        'user' => auth()->user()
+    ]);
+}
+
+public function review(ExamAttempt $examAttempt) 
+{
+    $questions = $examAttempt->tryout->questions()->orderBy('order', 'asc')->get();
+
+    return Inertia::render('User/Tryout/Review', [
+        'attempt' => $examAttempt,
+        'questions' => $questions
+    ]);
+}
+
+public function certificate(ExamAttempt $attempt) // Gunakan ExamAttempt, variabel tetap $attempt sesuai route
+{
+    // Pastikan user hanya bisa akses milik sendiri
+    if ($attempt->user_id !== auth()->id()) {
+        abort(403);
+    }
+
+    // Load relasi agar data tryout dan user muncul di PDF
+    $attempt->load(['user', 'tryout']);
+
+    // Ambang Batas SKD
+    $isPassed = $attempt->twk_score >= 65 && 
+                $attempt->tiu_score >= 80 && 
+                $attempt->tkp_score >= 166;
+
+    // Load view sertifikat
+    $pdf = Pdf::loadView('pdf.certificate', [
+        'attempt' => $attempt,
+        'isPassed' => $isPassed
+    ])->setPaper('a4', 'landscape');
+
+    $filename = 'Sertifikat_' . str_replace(' ', '_', $attempt->user->name) . '.pdf';
+
+    return $pdf->stream($filename);
+}
+public function leaderboard(Tryout $tryout)
+{
+    // Gunakan ExamAttempt, bukan Attempt
+    $rankings = ExamAttempt::where('tryout_id', $tryout->id)
+        ->with('user')
+        ->orderBy('total_score', 'desc')
+        ->get();
+
+    return Inertia::render('User/Tryout/Leaderboard', [
+        'tryout' => $tryout,
+        'rankings' => $rankings
+    ]);
+}
+
+
 }
