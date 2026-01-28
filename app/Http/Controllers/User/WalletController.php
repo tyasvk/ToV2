@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\WalletTransaction;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Midtrans\Config; // Import Midtrans
-use Midtrans\Snap;   // Import Midtrans
+use Midtrans\Config;
+use Midtrans\Snap;
 
 class WalletController extends Controller
 {
@@ -15,10 +15,8 @@ class WalletController extends Controller
     {
         return Inertia::render('User/Wallet/Index', [
             'balance' => auth()->user()->balance,
-            'transactions' => WalletTransaction::where('user_id', auth()->id())
-                ->latest()
-                ->get(),
-            // Kirim Client Key ke frontend
+            'transactions' => WalletTransaction::where('user_id', auth()->id())->latest()->get(),
+            // Kirim Client Key untuk frontend
             'midtrans_client_key' => config('services.midtrans.client_key'), 
         ]);
     }
@@ -30,27 +28,24 @@ class WalletController extends Controller
         ]);
 
         $user = auth()->user();
-        
-        // 1. Buat kode order unik
         $orderId = 'TOPUP-' . time() . '-' . $user->id;
 
-        // 2. Simpan Transaksi ke Database
-        $transaction = WalletTransaction::create([
+        // 1. Simpan Transaksi Pending
+        WalletTransaction::create([
             'user_id' => $user->id,
             'type' => 'credit',
             'amount' => $request->amount,
             'description' => 'Top Up Saldo #' . $orderId,
-            'status' => 'pending', 
-            'proof_payment' => $orderId, // Kita pakai kolom ini untuk simpan Order ID Midtrans sementara
+            'status' => 'pending',
+            'proof_payment' => $orderId, // Simpan Order ID sementara di sini
         ]);
 
-        // 3. Konfigurasi Midtrans
+        // 2. Konfigurasi Midtrans
         Config::$serverKey = config('services.midtrans.server_key');
         Config::$isProduction = config('services.midtrans.is_production');
         Config::$isSanitized = true;
         Config::$is3ds = true;
 
-        // 4. Buat Parameter Snap
         $params = [
             'transaction_details' => [
                 'order_id' => $orderId,
@@ -62,15 +57,15 @@ class WalletController extends Controller
             ],
         ];
 
-        // 5. Dapatkan Snap Token
         try {
+            // 3. Dapatkan Snap Token
             $snapToken = Snap::getSnapToken($params);
             
-            // Kembalikan token ke frontend menggunakan flash session
+            // 4. Kirim Token ke Frontend via Flash Session
             return back()->with('snapToken', $snapToken);
             
         } catch (\Exception $e) {
-            return back()->withErrors(['message' => 'Gagal terhubung ke gateway pembayaran: ' . $e->getMessage()]);
+            return back()->withErrors(['message' => 'Error: ' . $e->getMessage()]);
         }
     }
 }

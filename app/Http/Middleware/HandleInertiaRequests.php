@@ -17,19 +17,25 @@ class HandleInertiaRequests extends Middleware
     /**
      * Menentukan data yang dibagikan secara default ke semua halaman.
      */
+// app/Http/Middleware/HandleInertiaRequests.php
+
 public function share(Request $request): array
 {
-    return [
-        ...parent::share($request),
+    return array_merge(parent::share($request), [
         'auth' => [
             'user' => $request->user() ? [
                 'id' => $request->user()->id,
                 'name' => $request->user()->name,
                 'email' => $request->user()->email,
-                'province' => $request->user()->province, // WAJIB ADA INI
-                'roles' => $request->user()->getRoleNames(),
+                'balance' => $request->user()->balance, // Pastikan balance dikirim
+                'roles' => $request->user()->getRoleNames(), // Jika pakai Spatie
             ] : null,
         ],
-    ];
+        // Jangan lupa flash message untuk Midtrans Snap Token
+        'flash' => [
+            'message' => fn () => $request->session()->get('message'),
+            'snapToken' => fn () => $request->session()->get('snapToken'),
+        ],
+    ]);
 }
 }

@@ -8,6 +8,8 @@ use App\Http\Controllers\Admin\QuestionManagerController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\User\TryoutController;
 use App\Http\Controllers\User\CheckoutController;
+// TAMBAHKAN IMPORT INI:
+use App\Http\Controllers\User\WalletController; 
 
 // 1. Rute Publik (Landing Page)
 Route::get('/', function () {
@@ -34,6 +36,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // WALLET ROUTES
     Route::get('/wallet', [App\Http\Controllers\User\WalletController::class, 'index'])->name('wallet.index');
     Route::post('/wallet/topup', [App\Http\Controllers\User\WalletController::class, 'topUp'])->name('wallet.topup');
+
+    // === TAMBAHKAN ROUTE WALLET DI SINI ===
+        Route::get('/wallet', [WalletController::class, 'index'])->name('wallet.index');
+        Route::post('/wallet/topup', [WalletController::class, 'topUp'])->name('wallet.topup');
 
     // API internal untuk cek email peserta
     Route::post('/internal-api/check-participant-email', function (\Illuminate\Http\Request $request) {

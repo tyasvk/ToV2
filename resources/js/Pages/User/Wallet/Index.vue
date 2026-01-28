@@ -18,28 +18,26 @@ const form = useForm({
 
 const quickAmounts = [20000, 50000, 100000, 200000];
 
-// --- PERBAIKAN UTAMA DI SINI ---
-// 1. Gunakan Computed agar reaktif dan aman (cek apakah flash ada sebelum ambil snapToken)
+// 1. Tangkap Snap Token dari Flash Data secara reaktif
 const snapToken = computed(() => page.props.flash?.snapToken);
 
+// 2. Load Script Midtrans Snap
 onMounted(() => {
-    // Inject Script Midtrans Snap
     const script = document.createElement('script');
     script.src = props.midtrans_client_key 
-        ? 'https://app.sandbox.midtrans.com/snap/snap.js' // Sandbox URL
-        : 'https://app.midtrans.com/snap/snap.js';       // Production URL (jika nanti live)
-        
+        ? 'https://app.sandbox.midtrans.com/snap/snap.js' 
+        : 'https://app.midtrans.com/snap/snap.js';
+    
     script.setAttribute('data-client-key', props.midtrans_client_key);
     document.head.appendChild(script);
 });
 
-// 2. Watch variable computed 'snapToken'
+// 3. Watcher: Jika token muncul, buka popup pembayaran
 watch(snapToken, (newToken) => {
     if (newToken && window.snap) {
         window.snap.pay(newToken, {
             onSuccess: function(result){
                 alert("Pembayaran Berhasil!");
-                // Reload halaman untuk update saldo
                 window.location.reload();
             },
             onPending: function(result){
@@ -48,23 +46,21 @@ watch(snapToken, (newToken) => {
             },
             onError: function(result){
                 alert("Pembayaran Gagal!");
-                console.error(result);
             },
             onClose: function(){
-                console.log('Popup ditutup tanpa pembayaran');
+                console.log('Customer closed the popup without finishing the payment');
             }
         });
     }
 });
-// -----------------------
 
 const submitTopUp = () => {
+    // Post ke route wallet.topup
     form.post(route('wallet.topup'), {
         preserveScroll: true,
         onSuccess: () => {
             showTopUpModal.value = false;
-            form.reset();
-            // Snap Token akan otomatis terdeteksi oleh watcher di atas
+            // Token akan ditangkap oleh watcher di atas
         }
     });
 };
