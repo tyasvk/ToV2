@@ -15,17 +15,11 @@ class TryoutController extends Controller
 {
 public function index()
 {
-    // Mengambil tryout yang statusnya Published DAN tanggal publish sudah lewat (atau NULL)
-    $tryouts = Tryout::where('is_published', true)
-        ->where(function ($query) {
-            $query->where('published_at', '<=', now())
-                  ->orWhereNull('published_at');
-        })
-        ->orderBy('created_at', 'desc')
-        ->get();
+    // Ambil data (Gunakan all() dulu untuk memastikan data muncul)
+    $tryouts = \App\Models\Tryout::all();
 
     return Inertia::render('User/Tryout/Index', [
-        'tryouts' => $tryouts
+        'tryouts' => $tryouts // Nama kunci 'tryouts' ini HARUS sama dengan di Vue
     ]);
 }
 

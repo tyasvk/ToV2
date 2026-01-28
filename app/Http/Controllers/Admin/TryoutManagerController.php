@@ -21,22 +21,23 @@ class TryoutManagerController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+public function store(Request $request)
 {
     $validated = $request->validate([
-        'title' => 'required|string|max:255',
-        'description' => 'nullable|string',
-        'duration_minutes' => 'required|integer|min:1',
+        'title' => 'required|string',
+        'description' => 'nullable',
+        'duration_minutes' => 'required|integer',
         'is_paid' => 'required|boolean',
-        'price' => 'required_if:is_paid,true|numeric|min:0',
-        // Fitur Baru
-        'is_published' => 'required|boolean',
-        'published_at' => 'nullable|date',
-        'started_at' => 'nullable|date',
+        'price' => 'required_if:is_paid,true',
+        // Tambahkan validasi ini
+        'is_published' => 'boolean',
+        'published_at' => 'nullable',
+        'started_at' => 'nullable',
     ]);
 
     Tryout::create($validated);
-    return redirect()->back()->with('success', 'Paket berhasil dibuat.');
+
+    return redirect()->back();
 }
 
 public function update(Request $request, Tryout $tryout)
