@@ -9,62 +9,54 @@ use Inertia\Inertia;
 
 class TryoutManagerController extends Controller
 {
-    /**
-     * Menampilkan daftar tryout di halaman admin.
-     */
     public function index()
     {
-        $tryouts = Tryout::orderBy('created_at', 'desc')->get();
-
         return Inertia::render('Admin/Tryout/Index', [
-            'tryouts' => $tryouts
+            'tryouts' => Tryout::withCount('questions')->latest()->get()
         ]);
     }
 
-public function store(Request $request)
-{
-    $validated = $request->validate([
-        'title' => 'required|string',
-        'description' => 'nullable',
-        'duration_minutes' => 'required|integer',
-        'is_paid' => 'required|boolean',
-        'price' => 'required_if:is_paid,true',
-        // Tambahkan validasi ini
-        'is_published' => 'boolean',
-        'published_at' => 'nullable',
-        'started_at' => 'nullable',
-    ]);
+    public function store(Request $request)
+    {
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'duration_minutes' => 'required|integer|min:1',
+            'description' => 'nullable|string',
+            'is_paid' => 'required|boolean', // Validasi status berbayar
+            'price' => 'required_if:is_paid,true|numeric|min:0', // Harga wajib diisi jika berbayar
+        ]);
 
-    Tryout::create($validated);
+        Tryout::create($request->all());
 
-    return redirect()->back();
-}
+        return back()->with('message', 'Paket Tryout berhasil ditambahkan!');
+    }
 
-public function update(Request $request, Tryout $tryout)
-{
-    $validated = $request->validate([
-        'title' => 'required|string|max:255',
-        'description' => 'nullable|string',
-        'duration_minutes' => 'required|integer|min:1',
-        'is_paid' => 'required|boolean',
-        'price' => 'required_if:is_paid,true|numeric|min:0',
-        // Fitur Baru
-        'is_published' => 'required|boolean',
-        'published_at' => 'nullable|date',
-        'started_at' => 'nullable|date',
-    ]);
+    public function update(Request $request, Tryout $tryout)
+    {
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'duration_minutes' => 'required|integer|min:1',
+            'description' => 'nullable|string',
+            'published_at' => 'required',
+            'started_at' => 'required',
+            'is_paid' => 'required|boolean', // Validasi status berbayar
+            'price' => 'required_if:is_paid,true|numeric|min:0', // Harga wajib diisi jika berbayar
+        ]);
 
-    $tryout->update($validated);
-    return redirect()->back()->with('success', 'Paket berhasil diperbarui.');
-}
+        $tryout->update($request->all());
 
-    /**
-     * Menghapus paket tryout.
-     */
+        return back()->with('message', 'Paket tryout berhasil diperbarui!');
+    }
+
     public function destroy(Tryout $tryout)
     {
         $tryout->delete();
+        return back()->with('message', 'Paket Tryout berhasil dihapus.');
+    }
 
-        return redirect()->back()->with('success', 'Paket Tryout berhasil dihapus.');
+    public function toggleStatus(Tryout $tryout)
+    {
+        $tryout->update(['is_active' => !$tryout->is_active]);
+        return back()->with('message', 'Status paket berhasil diperbarui.');
     }
 }

@@ -26,6 +26,28 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/tryouts', [UserTryoutController::class, 'index'])->name('tryout.index');
         Route::get('/tryouts/{tryout}/show', [UserTryoutController::class, 'show'])->name('tryout.start');
         
+    Route::get('/tryouts/{tryout}/collective', [App\Http\Controllers\User\TryoutController::class, 'collectiveRegister'])->name('tryout.collective');
+    Route::get('/tryout/{tryout}/collective', [TryoutController::class, 'collectiveRegister'])->name('tryout.collective');
+    Route::get('/tryout/{tryout}/register', [App\Http\Controllers\User\TryoutController::class, 'registerForm'])->name('tryout.register');
+    Route::post('/tryout/{tryout}/register', [App\Http\Controllers\User\TryoutController::class, 'processRegistration'])->name('tryout.register.store');
+
+    // WALLET ROUTES
+    Route::get('/wallet', [App\Http\Controllers\User\WalletController::class, 'index'])->name('wallet.index');
+    Route::post('/wallet/topup', [App\Http\Controllers\User\WalletController::class, 'topUp'])->name('wallet.topup');
+
+    // API internal untuk cek email peserta
+    Route::post('/internal-api/check-participant-email', function (\Illuminate\Http\Request $request) {
+        $request->validate(['email' => 'required|email']);
+
+        // Cek apakah email ada di tabel users
+        $exists = \App\Models\User::where('email', $request->email)->exists();
+
+        if (!$exists) {
+            return response()->json(['message' => 'Peserta tidak terdaftar di CPNS Nusantara.'], 404);
+        }
+
+        return response()->json(['message' => 'Email valid.'], 200);
+    })->name('api.check.email');
     
         // Tambahkan ini
     Route::get('/checkout/{tryout}', [CheckoutController::class, 'show'])->name('checkout.show');

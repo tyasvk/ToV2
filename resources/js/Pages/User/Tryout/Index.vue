@@ -1,20 +1,27 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
+import { ref, watch } from 'vue';
 
-/** * BAGIAN KRUSIAL: 
- * Pastikan nama di defineProps ini ADALAH 'tryouts' (plural dengan 's'). 
- * Jika di Controller Anda mengirim ['tryout' => $tryouts], 
- * maka di sini harus 'tryout'. Sesuaikan dengan Controller Anda.
- */
 const props = defineProps({
-    tryouts: {
-        type: Array,
-        default: () => []
-    },
+    tryouts: Array,
+    filters: {
+        type: Object,
+        default: () => ({})
+    }
 });
 
-// Helper: Format Mata Uang (IDR)
+// --- LOGIKA PENCARIAN ---
+const search = ref(props.filters?.search || '');
+
+watch(search, (value) => {
+    router.get(route('tryout.index'), { search: value }, {
+        preserveState: true,
+        replace: true
+    });
+});
+
+// Helper Format Rupiah
 const formatPrice = (price) => {
     return new Intl.NumberFormat('id-ID', {
         style: 'currency',
@@ -22,114 +29,92 @@ const formatPrice = (price) => {
         minimumFractionDigits: 0
     }).format(price);
 };
-
-// Helper: Cek apakah Tryout sudah bisa dikerjakan berdasarkan tanggal mulai
-const isLocked = (startDate) => {
-    if (!startDate) return false;
-    return new Date(startDate) > new Date();
-};
-
-// Helper: Format Tanggal yang Manusiawi
-const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString('id-ID', {
-        day: 'numeric',
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-};
 </script>
 
 <template>
-    <Head title="Katalog Simulasi CAT" />
+    <Head title="Katalog Tryout" />
 
     <AuthenticatedLayout>
         <template #header>
-            <div class="flex flex-col">
-                <h2 class="text-2xl font-black text-slate-900 uppercase tracking-tighter italic">Katalog Tryout</h2>
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Pilih paket simulasi untuk menguji kemampuan Anda</p>
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-8">
+                <div class="space-y-2">
+                    <h2 class="font-black text-4xl text-gray-900 tracking-tighter uppercase leading-none">
+                        Katalog Tryout
+                    </h2>
+                    <p class="text-[10px] text-gray-400 font-black uppercase tracking-[0.3em]">
+                        Pilih paket soal terbaik untuk mengasah kemampuan anda
+                    </p>
+                </div>
+
+                <div class="relative w-full md:w-96 group">
+                    <span class="absolute left-5 top-1/2 -translate-y-1/2 text-xl">🔍</span>
+                    <input 
+                        v-model="search"
+                        type="text" 
+                        placeholder="CARI PAKET SOAL..." 
+                        class="w-full bg-white border-gray-100 rounded-2xl py-4 pl-14 pr-6 text-[10px] font-black tracking-widest uppercase placeholder:text-gray-300 focus:border-indigo-600 transition-all outline-none shadow-sm"
+                    />
+                </div>
             </div>
         </template>
 
-        <div class="py-12 bg-slate-50/50 min-h-screen">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div v-if="tryouts.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div v-for="tryout in tryouts" :key="tryout.id" 
+                class="bg-white rounded-[3rem] border border-gray-100 overflow-hidden shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 group flex flex-col">
                 
-                <div v-if="tryouts.length === 0" class="flex flex-col items-center justify-center py-24 bg-white rounded-[3rem] border-2 border-dashed border-slate-100 shadow-inner">
-                    <div class="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center text-4xl mb-6 grayscale opacity-50">📂</div>
-                    <h3 class="text-xs font-black text-slate-400 uppercase tracking-[0.4em]">Belum Ada Paket Tersedia</h3>
-                    <p class="text-[9px] font-bold text-slate-300 uppercase mt-2">Pastikan status paket sudah 'Published' di Admin Panel</p>
+                <div class="p-8 pb-0 flex justify-between items-start">
+                    <div class="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-xl border border-indigo-100 group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-500">
+                        📑
+                    </div>
+                    <span :class="tryout.is_paid ? 'text-amber-500 border-amber-100 bg-amber-50' : 'text-gray-400 border-gray-100 bg-gray-50'" 
+                        class="px-4 py-1.5 border text-[9px] font-black uppercase tracking-widest rounded-full">
+                        {{ tryout.is_paid ? 'Premium' : 'Gratis' }}
+                    </span>
                 </div>
 
-                <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    <div v-for="tryout in tryouts" :key="tryout.id" 
-                        class="group bg-white rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-slate-200/50 transition-all duration-500 overflow-hidden flex flex-col"
-                    >
-                        <div class="p-8 pb-0 flex justify-between items-start">
-                            <div class="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white shadow-lg group-hover:bg-indigo-600 transition-colors">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                            </div>
-                            <div :class="tryout.is_paid ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'" 
-                                class="px-3 py-1.5 rounded-xl border text-[8px] font-black uppercase tracking-widest shadow-sm">
-                                {{ tryout.is_paid ? 'Premium Access' : 'Gratis' }}
-                            </div>
+                <div class="p-8 pt-6 flex-1 flex flex-col">
+                    <h3 class="font-black text-xl text-gray-900 leading-tight uppercase tracking-tighter mb-4 h-14 overflow-hidden">
+                        {{ tryout.title }}
+                    </h3>
+                    
+                    <div class="flex items-center gap-4 mb-8 py-4 border-y border-gray-50">
+                        <div class="flex flex-col flex-1">
+                            <span class="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-1">Jumlah Soal</span>
+                            <span class="text-xs font-black text-gray-700 uppercase">{{ tryout.questions_count }} Butir</span>
                         </div>
-
-                        <div class="p-8 flex-1">
-                            <div class="mb-4">
-                                <span class="text-[8px] font-bold text-slate-300 uppercase tracking-widest">ID: #{{ String(tryout.id).padStart(4, '0') }}</span>
-                                <h3 class="text-xl font-black text-slate-900 uppercase tracking-tight leading-tight mt-1">{{ tryout.title }}</h3>
-                            </div>
-                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-tighter line-clamp-2 leading-relaxed mb-6">{{ tryout.description || 'Simulasi CAT dengan standar sistem BKN terbaru.' }}</p>
-                            
-                            <div class="grid grid-cols-2 gap-4 border-t border-slate-50 pt-6">
-                                <div>
-                                    <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Durasi</span>
-                                    <span class="text-xs font-black text-slate-900 uppercase">{{ tryout.duration_minutes }} Menit</span>
-                                </div>
-                                <div>
-                                    <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Biaya</span>
-                                    <span class="text-xs font-black text-slate-900 uppercase">
-                                        {{ tryout.is_paid ? formatPrice(tryout.price) : 'Tanpa Biaya' }}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="px-8 pb-8 pt-0">
-                            <div v-if="isLocked(tryout.started_at)" class="w-full py-4 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col items-center justify-center opacity-80">
-                                <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Akan Dibuka Pada</span>
-                                <span class="text-[9px] font-black text-slate-900 uppercase tracking-tighter italic">{{ formatDate(tryout.started_at) }}</span>
-                            </div>
-
-                            <Link v-else :href="route('tryout.show', tryout.id)" 
-                                class="w-full block text-center py-4 bg-slate-900 text-white rounded-2xl text-[9px] font-black uppercase tracking-[0.2em] shadow-xl shadow-slate-200 hover:bg-indigo-600 hover:-translate-y-1 transition-all active:scale-95"
-                            >
-                                {{ tryout.is_paid ? 'Ambil Paket Ini' : 'Mulai Sekarang' }}
-                            </Link>
+                        <div class="w-px h-8 bg-gray-100"></div>
+                        <div class="flex flex-col flex-1 pl-2">
+                            <span class="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-1">Durasi</span>
+                            <span class="text-xs font-black text-gray-700 uppercase">{{ tryout.duration_minutes || 90 }} Menit</span>
                         </div>
                     </div>
-                </div>
 
+                    <div v-if="tryout.is_paid" class="mb-6 flex justify-between items-center px-2">
+                        <span class="text-[9px] font-black text-gray-300 uppercase tracking-widest">Biaya Pendaftaran:</span>
+                        <span class="text-xs font-black text-indigo-600">
+                            {{ formatPrice(tryout.price || 0) }}
+                        </span>
+                    </div>
+
+                    <Link 
+                        :href="tryout.is_paid ? route('tryout.register', tryout.id) : route('tryout.show', tryout.id)" 
+                        class="mt-auto block w-full text-center bg-gray-900 text-white py-5 rounded-[1.5rem] font-black text-[11px] uppercase tracking-[0.2em] shadow-xl hover:bg-indigo-600 transition-all active:scale-95"
+                    >
+                        {{ tryout.is_paid ? 'Daftar Ujian' : 'Mulai Simulasi' }}
+                    </Link>
+                </div>
             </div>
+        </div>
+
+        <div v-else class="bg-white rounded-[4rem] border-2 border-dashed border-gray-100 p-24 text-center">
+            <h3 class="font-black text-2xl text-gray-900 uppercase tracking-tighter">Paket Tidak Ditemukan</h3>
+            <p class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Coba gunakan kata kunci pencarian yang berbeda</p>
         </div>
     </AuthenticatedLayout>
 </template>
 
 <style scoped>
-/* Paksa font tegak untuk gaya industrial */
-*:not(.italic) { font-style: normal !important; }
-
-/* Animasi transisi smooth */
 .transition-all {
     transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* Hover Effect Line-clamp */
-.line-clamp-2 {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
 }
 </style>
