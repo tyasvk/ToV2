@@ -31,11 +31,11 @@ public function share(Request $request): array
                 'roles' => $request->user()->getRoleNames(), // Jika pakai Spatie
             ] : null,
         ],
-        // Jangan lupa flash message untuk Midtrans Snap Token
-        'flash' => [
-            'message' => fn () => $request->session()->get('message'),
-            'snapToken' => fn () => $request->session()->get('snapToken'),
-        ],
+       // --- BAGIAN INI SANGAT PENTING ---
+            'flash' => [
+                'message' => fn () => $request->session()->get('message'),
+                'snapToken' => fn () => $request->session()->get('snapToken'), // <--- PASTIKAN INI ADA
+            ],
     ]);
 }
 }

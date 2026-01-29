@@ -7,39 +7,67 @@ const props = defineProps({
     users: Array
 });
 
-// --- STATE MANAGEMENT ---
+// --- STATE MANAGEMENT: EDIT USER ---
 const isEditModalOpen = ref(false);
 const editingUser = ref(null);
 
-const form = useForm({
+const editForm = useForm({
     name: '',
     email: '',
     role: '',
 });
 
-// --- LOGIKA MODAL ---
+// --- STATE MANAGEMENT: TAMBAH SALDO ---
+const isBalanceModalOpen = ref(false);
+const selectedUserForBalance = ref(null);
+
+const balanceForm = useForm({
+    amount: '',
+    description: '',
+});
+
+// --- LOGIKA MODAL: EDIT ---
 const openEditModal = (user) => {
     editingUser.value = user;
-    form.name = user.name;
-    form.email = user.email;
-    // Mengambil role pertama (karena kita pakai Spatie)
-    form.role = user.roles[0]?.name || 'user'; 
+    editForm.name = user.name;
+    editForm.email = user.email;
+    editForm.role = user.roles[0]?.name || 'user'; 
     isEditModalOpen.value = true;
 };
 
 const closeEditModal = () => {
     isEditModalOpen.value = false;
-    form.reset();
-    form.clearErrors();
+    editForm.reset();
+    editForm.clearErrors();
 };
 
 const submitUpdate = () => {
-    form.patch(route('admin.users.update', editingUser.value.id), {
+    editForm.patch(route('admin.users.update', editingUser.value.id), {
         onSuccess: () => closeEditModal(),
         preserveScroll: true,
     });
 };
 
+// --- LOGIKA MODAL: TAMBAH SALDO ---
+const openBalanceModal = (user) => {
+    selectedUserForBalance.value = user;
+    isBalanceModalOpen.value = true;
+};
+
+const closeBalanceModal = () => {
+    isBalanceModalOpen.value = false;
+    balanceForm.reset();
+    balanceForm.clearErrors();
+};
+
+const submitAddBalance = () => {
+    balanceForm.post(route('admin.users.add-balance', selectedUserForBalance.value.id), {
+        onSuccess: () => closeBalanceModal(),
+        preserveScroll: true,
+    });
+};
+
+// --- AKSI HAPUS ---
 const deleteUser = (id) => {
     if (confirm('Apakah Anda yakin ingin menghapus pengguna ini? Semua data hasil ujian mereka juga akan terhapus.')) {
         router.delete(route('admin.users.destroy', id), {
@@ -48,12 +76,21 @@ const deleteUser = (id) => {
     }
 };
 
+// --- UTILITIES ---
 const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('id-ID', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
     });
+};
+
+const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0
+    }).format(amount || 0);
 };
 </script>
 
@@ -64,7 +101,7 @@ const formatDate = (dateString) => {
         <template #header>
             <div class="flex flex-col gap-1">
                 <h2 class="font-black text-3xl text-gray-900 tracking-tighter uppercase italic">Kelola Pengguna</h2>
-                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em]">Manajemen otoritas akun dan data peserta</p>
+                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em]">Manajemen otoritas akun, saldo, dan data peserta</p>
             </div>
         </template>
 
@@ -74,8 +111,8 @@ const formatDate = (dateString) => {
                     <thead>
                         <tr class="bg-gray-50/50 border-b border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-widest">
                             <th class="px-8 py-5">Identitas Pengguna</th>
+                            <th class="px-8 py-5">Saldo Dompet</th>
                             <th class="px-8 py-5">Otoritas / Role</th>
-                            <th class="px-8 py-5">Tgl Bergabung</th>
                             <th class="px-8 py-5 text-right">Aksi</th>
                         </tr>
                     </thead>
@@ -93,21 +130,25 @@ const formatDate = (dateString) => {
                                 </div>
                             </td>
                             <td class="px-8 py-6">
+                                <p class="font-black text-gray-900 text-sm italic">{{ formatCurrency(user.balance) }}</p>
+                                <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Saldo Aktif</p>
+                            </td>
+                            <td class="px-8 py-6">
                                 <span v-for="role in user.roles" :key="role.id"
                                     :class="role.name === 'admin' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-indigo-50 text-indigo-600 border-indigo-100'"
                                     class="px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border shadow-sm">
                                     {{ role.name }}
                                 </span>
                             </td>
-                            <td class="px-8 py-6 text-[11px] text-gray-400 font-bold uppercase italic">
-                                {{ formatDate(user.created_at) }}
-                            </td>
                             <td class="px-8 py-6 text-right">
                                 <div class="flex justify-end gap-2">
-                                    <button @click="openEditModal(user)" class="w-10 h-10 flex items-center justify-center bg-gray-50 text-gray-400 hover:bg-indigo-600 hover:text-white rounded-xl transition-all shadow-sm active:scale-95">
+                                    <button @click="openBalanceModal(user)" title="Tambah Saldo" class="w-10 h-10 flex items-center justify-center bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-xl transition-all shadow-sm active:scale-95">
+                                        💰
+                                    </button>
+                                    <button @click="openEditModal(user)" title="Edit User" class="w-10 h-10 flex items-center justify-center bg-gray-50 text-gray-400 hover:bg-indigo-600 hover:text-white rounded-xl transition-all shadow-sm active:scale-95">
                                         ✏️
                                     </button>
-                                    <button v-if="user.id !== $page.props.auth.user.id" @click="deleteUser(user.id)" class="w-10 h-10 flex items-center justify-center bg-gray-50 text-gray-400 hover:bg-red-600 hover:text-white rounded-xl transition-all shadow-sm active:scale-95">
+                                    <button v-if="user.id !== $page.props.auth.user.id" @click="deleteUser(user.id)" title="Hapus User" class="w-10 h-10 flex items-center justify-center bg-gray-50 text-gray-400 hover:bg-red-600 hover:text-white rounded-xl transition-all shadow-sm active:scale-95">
                                         🗑️
                                     </button>
                                 </div>
@@ -119,9 +160,8 @@ const formatDate = (dateString) => {
         </div>
 
         <Teleport to="body">
-            <div v-if="isEditModalOpen" class="fixed inset-0 z-[999] flex items-center justify-center p-4 overflow-hidden">
-                <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" @click="closeEditModal"></div>
-
+            <div v-if="isEditModalOpen" class="fixed inset-0 z-[999] flex items-center justify-center p-4">
+                <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" @click="closeEditModal"></div>
                 <div class="relative bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-200">
                     <div class="flex justify-between items-start mb-8">
                         <div>
@@ -130,41 +170,59 @@ const formatDate = (dateString) => {
                         </div>
                         <button @click="closeEditModal" class="p-2 hover:bg-gray-100 rounded-xl transition">✕</button>
                     </div>
-                    
                     <form @submit.prevent="submitUpdate" class="space-y-6">
                         <div class="space-y-1.5">
                             <label class="text-[9px] font-black text-gray-400 uppercase ml-2 tracking-widest">Nama Lengkap</label>
-                            <input v-model="form.name" type="text" placeholder="Masukkan nama..." 
-                                class="w-full border-gray-100 bg-gray-50 rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-indigo-500 transition-all" />
-                            <div v-if="form.errors.name" class="text-red-500 text-[10px] font-black mt-1 ml-2 uppercase">{{ form.errors.name }}</div>
+                            <input v-model="editForm.name" type="text" class="w-full border-gray-100 bg-gray-50 rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-indigo-500" />
                         </div>
-
                         <div class="space-y-1.5">
                             <label class="text-[9px] font-black text-gray-400 uppercase ml-2 tracking-widest">Alamat Email</label>
-                            <input v-model="form.email" type="email" placeholder="email@contoh.com"
-                                class="w-full border-gray-100 bg-gray-50 rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-indigo-500 transition-all" />
-                            <div v-if="form.errors.email" class="text-red-500 text-[10px] font-black mt-1 ml-2 uppercase">{{ form.errors.email }}</div>
+                            <input v-model="editForm.email" type="email" class="w-full border-gray-100 bg-gray-50 rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-indigo-500" />
                         </div>
-
                         <div class="space-y-1.5">
                             <label class="text-[9px] font-black text-gray-400 uppercase ml-2 tracking-widest">Otoritas Role</label>
-                            <div class="relative">
-                                <select v-model="form.role" class="w-full border-gray-100 bg-gray-50 rounded-2xl p-4 text-sm font-bold appearance-none focus:ring-2 focus:ring-indigo-500 transition-all">
-                                    <option value="user">USER (PESERTA UJIAN)</option>
-                                    <option value="admin">ADMINISTRATOR SYSTEM</option>
-                                </select>
-                                <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">▼</div>
-                            </div>
+                            <select v-model="editForm.role" class="w-full border-gray-100 bg-gray-50 rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-indigo-500">
+                                <option value="user">USER (PESERTA UJIAN)</option>
+                                <option value="admin">ADMINISTRATOR SYSTEM</option>
+                            </select>
                         </div>
+                        <div class="flex gap-4 pt-4">
+                            <button type="button" @click="closeEditModal" class="flex-1 py-4 text-gray-400 font-black text-[10px] uppercase">Batal</button>
+                            <button type="submit" :disabled="editForm.processing" class="flex-[2] py-4 bg-gray-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600">
+                                {{ editForm.processing ? 'Menyimpan...' : 'Simpan Perubahan' }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </Teleport>
 
-                        <div class="flex gap-4 pt-6">
-                            <button type="button" @click="closeEditModal" class="flex-1 py-4 text-gray-400 font-black text-[10px] uppercase hover:bg-gray-50 rounded-2xl transition">Batal</button>
-                            <button 
-                                type="submit" 
-                                :disabled="form.processing" 
-                                class="flex-[2] py-4 bg-gray-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl shadow-gray-200 hover:bg-indigo-600 disabled:opacity-50 active:scale-95 transition-all"
-                            >
-                                {{ form.processing ? 'Menyimpan...' : 'Simpan Perubahan' }}
+        <Teleport to="body">
+            <div v-if="isBalanceModalOpen" class="fixed inset-0 z-[999] flex items-center justify-center p-4">
+                <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" @click="closeBalanceModal"></div>
+                <div class="relative bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-200">
+                    <div class="flex justify-between items-start mb-8">
+                        <div>
+                            <h3 class="font-black text-xl text-gray-900 uppercase tracking-tighter">Tambah Saldo Manual</h3>
+                            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">User: {{ selectedUserForBalance?.name }}</p>
+                        </div>
+                        <button @click="closeBalanceModal" class="p-2 hover:bg-gray-100 rounded-xl transition">✕</button>
+                    </div>
+                    <form @submit.prevent="submitAddBalance" class="space-y-6">
+                        <div class="space-y-1.5">
+                            <label class="text-[9px] font-black text-gray-400 uppercase ml-2 tracking-widest">Nominal (Rp)</label>
+                            <input v-model="balanceForm.amount" type="number" placeholder="Contoh: 50000"
+                                class="w-full border-gray-100 bg-gray-50 rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-emerald-500 transition-all" />
+                        </div>
+                        <div class="space-y-1.5">
+                            <label class="text-[9px] font-black text-gray-400 uppercase ml-2 tracking-widest">Keterangan</label>
+                            <input v-model="balanceForm.description" type="text" placeholder="Misal: Hadiah Event / Refund"
+                                class="w-full border-gray-100 bg-gray-50 rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-emerald-500 transition-all" />
+                        </div>
+                        <div class="flex gap-4 pt-4">
+                            <button type="button" @click="closeBalanceModal" class="flex-1 py-4 text-gray-400 font-black text-[10px] uppercase">Batal</button>
+                            <button type="submit" :disabled="balanceForm.processing" class="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-emerald-100 hover:bg-emerald-700">
+                                {{ balanceForm.processing ? 'Memproses...' : 'Tambah Saldo' }}
                             </button>
                         </div>
                     </form>
@@ -175,16 +233,6 @@ const formatDate = (dateString) => {
 </template>
 
 <style scoped>
-/* Transisi untuk modal */
-.animate-in {
-    animation: fadeIn 0.3s ease-out;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.custom-scrollbar::-webkit-scrollbar { width: 4px; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
+.animate-in { animation: fadeIn 0.3s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 </style>

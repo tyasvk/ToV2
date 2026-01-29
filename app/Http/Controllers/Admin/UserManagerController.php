@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\DB; // Tambahkan ini
+use App\Models\WalletTransaction;
 
 class UserManagerController extends Controller
 {
@@ -49,4 +51,36 @@ class UserManagerController extends Controller
 
     return back()->with('message', 'Data pengguna dan role berhasil diperbarui!');
 }
+
+/**
+     * Fitur Baru: Tambah Saldo Manual oleh Admin
+     */
+    public function addBalance(Request $request, User $user)
+    {
+        $request->validate([
+            'amount' => 'required|numeric|min:100',
+            'description' => 'nullable|string|max:255',
+        ]);
+
+        try {
+            DB::transaction(function () use ($request, $user) {
+                // 1. Update Saldo User
+                $user->increment('balance', $request->amount);
+
+                // 2. Catat di Riwayat Transaksi Dompet
+                WalletTransaction::create([
+                    'user_id' => $user->id,
+                    'type' => 'credit',
+                    'amount' => $request->amount,
+                    'description' => $request->description ?? 'Penambahan saldo manual oleh Admin',
+                    'status' => 'success',
+                    'proof_payment' => 'MANUAL-BY-ADMIN',
+                ]);
+            });
+
+            return back()->with('message', 'Saldo berhasil ditambahkan ke user ' . $user->name);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Gagal menambahkan saldo: ' . $e->getMessage());
+        }
+    }
 }

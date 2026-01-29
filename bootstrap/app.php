@@ -3,9 +3,8 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use App\Http\Middleware\HandleInertiaRequests; // Import middleware Inertia
-use Illuminate\Http\Middleware\AddQueuedCookiesToResponse;
-use Illuminate\Cookie\Middleware\EncryptCookies;
+use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\RoleMiddleware; // Import middleware lokal Anda
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -14,26 +13,25 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-->withMiddleware(function (Middleware $middleware) {
-    // Perbaikan: Gunakan namespace yang benar (Illuminate\Cookie\Middleware)
-    // ATAU lebih baik lagi, hapus saja karena Laravel sudah menyertakannya secara default di grup 'web'
-    $middleware->web(append: [
-        HandleInertiaRequests::class,
-    ]);
+    ->withMiddleware(function (Middleware $middleware) {
+        // 1. Tambahkan Middleware Inertia ke grup 'web'
+        $middleware->web(append: [
+            HandleInertiaRequests::class,
+        ]);
 
-    $middleware->alias([
-        'role'               => \Spatie\Permission\Middleware\RoleMiddleware::class,
-        'permission'         => \Spatie\Permission\Middleware\PermissionMiddleware::class,
-        'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
-    ]);
-})
-->withMiddleware(function (Middleware $middleware) {
-    $middleware->validateCsrfTokens(except: [
-        'api/midtrans-callback', // Tambahkan ini
-    ]);
-})
+        // 2. Daftarkan Alias Middleware (GABUNGKAN DI SINI)
+        $middleware->alias([
+            'role'               => RoleMiddleware::class, // Mengarah ke App\Http\Middleware\RoleMiddleware
+            'permission'         => \Spatie\Permission\Middleware\PermissionMiddleware::class,
+            'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
+        ]);
+
+        // 3. Pengecualian CSRF (GABUNGKAN DI SINI)
+        $middleware->validateCsrfTokens(except: [
+            'api/midtrans-callback',
+        ]);
+    })
     ->withExceptions(function (Exceptions $exceptions) {
-        // Konfigurasi penanganan error untuk Inertia (Opsional)
-        // Agar saat error 403/404 tetap muncul di UI Vue Anda
+        //
     })
     ->create();

@@ -1,11 +1,24 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3'; // Tambahkan usePage
 import { computed } from 'vue';
 
 const props = defineProps({
     availableTryouts: Array,
     stats: Object
+});
+
+const page = usePage();
+
+// --- PERBAIKAN: SAFE USER ACCESS ---
+// Kita buat computed property agar aman jika user undefined
+const user = computed(() => {
+    return page.props.auth?.user || {
+        name: 'Peserta',
+        id: 0,
+        created_at: new Date(),
+        email: ''
+    };
 });
 
 const formatDate = (dateString) => {
@@ -18,6 +31,8 @@ const formatDate = (dateString) => {
 };
 
 const getInitials = (name) => {
+    // Tambahkan pengecekan keamanan agar tidak error jika name kosong
+    if (!name) return 'TO';
     return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 };
 
@@ -25,7 +40,8 @@ const motivation = "Masa depan adalah milik mereka yang menyiapkan diri hari ini
 
 // Kalkulasi Lingkaran Progres (Keliling lingkaran r=34 adalah 213.6)
 const strokeDashoffset = computed(() => {
-    const score = props.stats.average_score || 0;
+    // Tambahkan optional chaining pada stats juga
+    const score = props.stats?.average_score || 0;
     return 213.6 - (score / 100) * 213.6;
 });
 </script>
@@ -42,21 +58,21 @@ const strokeDashoffset = computed(() => {
 
                 <div class="p-10 md:p-14 flex flex-col md:flex-row items-center gap-10 relative z-10">
                     <div class="w-28 h-28 bg-white rounded-[2.5rem] flex items-center justify-center text-indigo-900 text-4xl font-black shadow-2xl shrink-0 border-4 border-white/10">
-                        {{ getInitials($page.props.auth.user.name) }}
+                        {{ getInitials(user.name) }}
                     </div>
 
                     <div class="flex-1 text-center md:text-left space-y-4">
                         <div class="space-y-1">
                             <div class="flex flex-col md:flex-row md:items-center gap-4 justify-center md:justify-start">
                                 <h2 class="text-4xl font-black text-white tracking-tighter uppercase leading-none">
-                                    {{ $page.props.auth.user.name }}
+                                    {{ user.name }}
                                 </h2>
                                 <span class="px-4 py-1.5 bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-[9px] font-black uppercase tracking-[0.2em] rounded-full self-center">
                                     Akun Terverifikasi
                                 </span>
                             </div>
                             <p class="text-[10px] font-bold text-indigo-300/60 uppercase tracking-[0.3em]">
-                                ID Peserta: #{{ String($page.props.auth.user.id).padStart(5, '0') }} — Bergabung {{ formatDate($page.props.auth.user.created_at) }}
+                                ID Peserta: #{{ String(user.id).padStart(5, '0') }} — Bergabung {{ formatDate(user.created_at) }}
                             </p>
                         </div>
 
@@ -84,7 +100,7 @@ const strokeDashoffset = computed(() => {
                                 />
                             </svg>
                             <span class="absolute text-sm font-black text-white uppercase tracking-tighter">
-                                {{ stats.average_score }}%
+                                {{ stats?.average_score || 0 }}%
                             </span>
                         </div>
                         <div class="flex flex-col">
@@ -107,7 +123,7 @@ const strokeDashoffset = computed(() => {
                     <div class="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-xl">📝</div>
                     <span class="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Total Ujian</span>
                 </div>
-                <p class="text-4xl font-black text-gray-900 tracking-tighter mb-1">{{ stats.completed_count }}</p>
+                <p class="text-4xl font-black text-gray-900 tracking-tighter mb-1">{{ stats?.completed_count || 0 }}</p>
                 <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pengerjaan Selesai</p>
             </div>
 
@@ -116,7 +132,7 @@ const strokeDashoffset = computed(() => {
                     <div class="w-12 h-12 bg-green-50 rounded-2xl flex items-center justify-center text-xl">📈</div>
                     <span class="text-[9px] font-black text-green-400 uppercase tracking-widest">Skor Rata-Rata</span>
                 </div>
-                <p class="text-4xl font-black text-gray-900 tracking-tighter mb-1">{{ stats.average_score }}</p>
+                <p class="text-4xl font-black text-gray-900 tracking-tighter mb-1">{{ stats?.average_score || 0 }}</p>
                 <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Nilai Akumulasi</p>
             </div>
 
@@ -125,7 +141,7 @@ const strokeDashoffset = computed(() => {
                     <div class="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-xl">🕒</div>
                     <span class="text-[9px] font-black text-amber-400 uppercase tracking-widest">Aktivitas</span>
                 </div>
-                <p class="text-lg font-black text-gray-900 tracking-tight mb-1 uppercase truncate">{{ stats.last_activity }}</p>
+                <p class="text-lg font-black text-gray-900 tracking-tight mb-1 uppercase truncate">{{ stats?.last_activity || '-' }}</p>
                 <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Sesi Terakhir</p>
             </div>
         </div>

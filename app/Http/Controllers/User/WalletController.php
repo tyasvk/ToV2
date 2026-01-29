@@ -68,4 +68,47 @@ class WalletController extends Controller
             return back()->withErrors(['message' => 'Error: ' . $e->getMessage()]);
         }
     }
+
+    /**
+     * Method Baru: Bayar Transaksi Pending dari History
+     */
+    public function payPending(WalletTransaction $transaction)
+    {
+        // 1. Validasi Kepemilikan & Status
+        if ($transaction->user_id !== auth()->id()) {
+            abort(403);
+        }
+        if ($transaction->status !== 'pending') {
+            return back()->withErrors(['message' => 'Transaksi ini sudah tidak pending.']);
+        }
+
+        // 2. Konfigurasi Midtrans
+        Config::$serverKey = config('services.midtrans.server_key');
+        Config::$isProduction = config('services.midtrans.is_production');
+        Config::$isSanitized = true;
+        Config::$is3ds = true;
+
+        // 3. Gunakan Order ID yang lama (disimpan di proof_payment)
+        // Midtrans pintar: jika order_id sama dan belum dibayar, dia kembalikan token yang sama.
+        $params = [
+            'transaction_details' => [
+                'order_id' => $transaction->proof_payment, 
+                'gross_amount' => (int) $transaction->amount,
+            ],
+            'customer_details' => [
+                'first_name' => auth()->user()->name,
+                'email' => auth()->user()->email,
+            ],
+        ];
+
+        try {
+            $snapToken = Snap::getSnapToken($params);
+            
+            // Kirim token kembali ke frontend
+            return back()->with('snapToken', $snapToken);
+            
+        } catch (\Exception $e) {
+            return back()->withErrors(['message' => 'Error Midtrans: ' . $e->getMessage()]);
+        }
+    }
 }

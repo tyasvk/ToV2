@@ -1,6 +1,6 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, useForm, usePage } from '@inertiajs/vue3';
 import { ref, computed, reactive } from 'vue';
 import axios from 'axios';
 
@@ -8,8 +8,12 @@ const props = defineProps({
     tryout: Object
 });
 
+const page = usePage();
+
+// --- FORM INITIALIZATION ---
 const form = useForm({
-    emails: []
+    emails: [],
+    payment_method: 'midtrans', // Default ke Midtrans
 });
 
 const emailErrors = reactive([]);
@@ -18,6 +22,7 @@ const isValidating = reactive([]);
 const totalParticipants = computed(() => 1 + form.emails.length);
 const maxAdditionalParticipants = 5;
 
+// --- LOGIKA PESERTA ---
 const addParticipant = () => {
     if (form.emails.length < maxAdditionalParticipants) {
         form.emails.push('');
@@ -32,6 +37,7 @@ const removeParticipant = (index) => {
     isValidating.splice(index, 1);
 };
 
+// --- VALIDASI EMAIL API ---
 let debounceTimer = null;
 const validateEmail = (index, email) => {
     emailErrors[index] = null;
@@ -58,6 +64,7 @@ const validateEmail = (index, email) => {
     }, 500);
 };
 
+// --- KALKULASI HARGA ---
 const calculation = computed(() => {
     const qty = totalParticipants.value;
     const price = props.tryout.price || 0;
@@ -102,7 +109,7 @@ const submit = () => {
         <template #header></template>
 
         <div class="bg-slate-50/50 min-h-screen pt-0">
-            <div class="max-w-2xl mx-auto px-0 sm:px-4">
+            <div class="max-w-2xl mx-auto px-0 sm:px-4 pb-20">
                 
                 <div class="bg-white rounded-t-[3rem] sm:rounded-[3rem] p-6 sm:p-10 shadow-2xl border-x border-b sm:border border-slate-100 overflow-hidden relative z-10 -mt-2 sm:-mt-8">
                     
@@ -161,6 +168,48 @@ const submit = () => {
                             </button>
                         </div>
 
+                        <div class="mt-8 space-y-4">
+                            <h3 class="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-2">Metode Pembayaran</h3>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <label 
+                                    :class="form.payment_method === 'wallet' ? 'border-indigo-600 bg-indigo-50' : 'border-slate-100 bg-white'" 
+                                    class="flex items-center justify-between p-5 border-2 rounded-[2rem] cursor-pointer transition-all hover:border-indigo-200 group relative"
+                                >
+                                    <div class="flex items-center gap-4">
+                                        <span class="text-2xl grayscale group-hover:grayscale-0 transition-all" :class="{'grayscale-0': form.payment_method === 'wallet'}">💳</span>
+                                        <div>
+                                            <p class="font-black text-[10px] uppercase tracking-wide text-slate-900">Saldo Dompet</p>
+                                            <p class="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+                                                Sisa: {{ formatPrice($page.props.auth.user.balance) }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <input type="radio" v-model="form.payment_method" value="wallet" class="hidden">
+                                    <div v-if="form.payment_method === 'wallet'" class="w-5 h-5 bg-indigo-600 rounded-full flex items-center justify-center animate-in zoom-in duration-300">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3 text-white font-bold"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
+                                    </div>
+                                </label>
+
+                                <label 
+                                    :class="form.payment_method === 'midtrans' ? 'border-indigo-600 bg-indigo-50' : 'border-slate-100 bg-white'" 
+                                    class="flex items-center justify-between p-5 border-2 rounded-[2rem] cursor-pointer transition-all hover:border-indigo-200 group"
+                                >
+                                    <div class="flex items-center gap-4">
+                                        <span class="text-2xl grayscale group-hover:grayscale-0 transition-all" :class="{'grayscale-0': form.payment_method === 'midtrans'}">🌐</span>
+                                        <div>
+                                            <p class="font-black text-[10px] uppercase tracking-wide text-slate-900">Midtrans Online</p>
+                                            <p class="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Otomatis & Banyak Metode</p>
+                                        </div>
+                                    </div>
+                                    <input type="radio" v-model="form.payment_method" value="midtrans" class="hidden">
+                                    <div v-if="form.payment_method === 'midtrans'" class="w-5 h-5 bg-indigo-600 rounded-full flex items-center justify-center animate-in zoom-in duration-300">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3 text-white font-bold"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
                         <div class="bg-slate-900 rounded-[2rem] p-6 sm:p-8 text-white shadow-2xl shadow-indigo-100">
                             <div class="flex justify-between items-center mb-2">
                                 <span class="text-[9px] font-black uppercase tracking-widest text-slate-500">Total Slot</span>
@@ -185,7 +234,7 @@ const submit = () => {
                             :disabled="form.processing || hasValidationErrors" 
                             class="w-full py-5 bg-slate-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-[0.3em] hover:bg-indigo-600 transition-all shadow-xl active:scale-95 disabled:opacity-50 disabled:grayscale"
                         >
-                            {{ hasValidationErrors ? 'Perbaiki Data' : 'Konfirmasi Pendaftaran' }}
+                            {{ hasValidationErrors ? 'Perbaiki Data Peserta' : 'Konfirmasi Pendaftaran' }}
                         </button>
                     </form>
                 </div>
@@ -202,7 +251,6 @@ const submit = () => {
     transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Memastikan konten yang naik tidak tertutup header */
 .z-10 {
     z-index: 10;
 }

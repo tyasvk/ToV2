@@ -3,10 +3,24 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Tryout extends Model
 {
+
+use HasFactory;
+
+    protected $guarded = [];
+
+    /**
+     * Definisikan relasi ke tabel transactions
+     * Satu Tryout bisa memiliki banyak Transaksi
+     */
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(Transaction::class);
+    }
     protected $fillable = [
         'title', 
         'description', 
