@@ -40,8 +40,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Rute Baru: Detail Riwayat per Tryout
         Route::get('/tryouts/{tryout}/history', [UserTryoutController::class, 'historyDetail'])->name('tryout.history.detail');
 
-        // Rute Check Email (AJAX)
-        Route::post('/check-email-availability', [App\Http\Controllers\User\TryoutController::class, 'checkEmail'])
+        // Ganti definisi route check-email menjadi:
+    Route::post('/check-email-availability', [UserTryoutController::class, 'checkEmail'])
         ->name('api.check.email');
 
         // Ujian (Exam)

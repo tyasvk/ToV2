@@ -39,6 +39,61 @@ class TryoutController extends Controller
         ]);
     }
 
+    private function validateAccess(Tryout $tryout)
+    {
+        $user = auth()->user();
+        $now = Carbon::now();
+
+        // Cek apakah user adalah pembayar ATAU terdaftar sebagai peserta kolektif
+        $hasPaid = Transaction::where('tryout_id', $tryout->id)
+            ->whereIn('status', ['paid', 'success'])
+            ->where(function($query) use ($user) {
+                $query->where('user_id', $user->id)
+                      ->orWhereJsonContains('participants_data', $user->email);
+            })
+            ->exists();
+
+        if (!$hasPaid) {
+            return [
+                'allowed' => false,
+                'route' => 'tryout.register',
+                'message' => 'Anda belum terdaftar di tryout ini.'
+            ];
+        }
+
+        if ($tryout->started_at && $now->lt($tryout->started_at)) {
+            return [
+                'allowed' => false,
+                'route' => 'tryout.my',
+                'message' => 'Ujian belum dimulai.'
+            ];
+        }
+
+        $attemptsCount = ExamAttempt::where('user_id', $user->id)
+            ->where('tryout_id', $tryout->id)
+            ->count();
+
+        if ($attemptsCount >= 3) {
+            return [
+                'allowed' => false,
+                'route' => 'tryout.history.detail',
+                'message' => 'Batas maksimal pengerjaan tercapai.'
+            ];
+        }
+
+        return ['allowed' => true];
+    }
+
+    /**
+     * API Check Email - Digunakan untuk verifikasi real-time di frontend
+     */
+    public function checkEmail(Request $request)
+    {
+        if (!$request->has('email')) return response()->json(['exists' => false]);
+        $exists = \App\Models\User::where('email', $request->email)->exists();
+        return response()->json(['exists' => $exists]);
+    }
+
     /**
      * HALAMAN TRYOUT SAYA
      */
@@ -142,47 +197,6 @@ class TryoutController extends Controller
         ]);
 
         return redirect()->route('checkout.show', $tryout->id);
-    }
-
-    private function validateAccess(Tryout $tryout)
-    {
-        $user = auth()->user();
-        $now = Carbon::now();
-
-        $hasPaid = Transaction::where('user_id', $user->id)
-            ->where('tryout_id', $tryout->id)
-            ->whereIn('status', ['paid', 'success'])
-            ->exists();
-
-        if (!$hasPaid) {
-            return [
-                'allowed' => false,
-                'route' => 'tryout.register',
-                'message' => 'Anda belum terdaftar. Silakan lakukan pendaftaran.'
-            ];
-        }
-
-        if ($tryout->started_at && $now->lt($tryout->started_at)) {
-            return [
-                'allowed' => false,
-                'route' => 'tryout.my',
-                'message' => 'Ujian belum dimulai. Jadwal: ' . $tryout->started_at->format('d M Y, H:i')
-            ];
-        }
-
-        $attemptsCount = ExamAttempt::where('user_id', $user->id)
-            ->where('tryout_id', $tryout->id)
-            ->count();
-
-        if ($attemptsCount >= 3) {
-            return [
-                'allowed' => false,
-                'route' => 'tryout.history.detail',
-                'message' => 'Anda telah mencapai batas maksimal 3x pengerjaan.'
-            ];
-        }
-
-        return ['allowed' => true];
     }
 
     public function wait(Tryout $tryout)
@@ -410,20 +424,4 @@ public function leaderboard(Request $request, Tryout $tryout)
     {
         return Inertia::render('User/Tryout/CollectiveRegister', ['tryout' => $tryout]);
     }
-
-/**
-     * API Check Email
-     */
-    public function checkEmail(Request $request)
-    {
-        // Validasi input
-        if (!$request->has('email')) {
-            return response()->json(['exists' => false]);
-        }
-
-        // Cek database
-        $exists = \App\Models\User::where('email', $request->email)->exists();
-        
-        return response()->json(['exists' => $exists]);
-    }
-}
+} // <--- KURUNG PENUTUP CLASS ADA DI SINI (PALING BAWAH)
