@@ -6,103 +6,79 @@ use App\Http\Controllers\Controller;
 use App\Models\Tryout;
 use App\Models\Question;
 use App\Models\ExamAttempt;
+use App\Models\Transaction;
+use App\Models\WalletTransaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf;
-use App\Models\Transaction; 
-use Illuminate\Support\Str;
-use App\Models\WalletTransaction; // Tambahkan ini di atas
-use Illuminate\Support\Facades\DB;  // Tambahkan ini di atas
 
 class TryoutController extends Controller
 {
     /**
-     * Menampilkan daftar tryout yang tersedia (Katalog).
+     * Katalog Tryout - Menampilkan daftar paket yang tersedia.
      */
-public function index()
-{
-    $tryouts = Tryout::where('is_published', true)
-        ->with(['transactions' => function($query) {
-            // Hanya ambil transaksi milik user ini yang sudah lunas
-            $query->where('user_id', auth()->id())
-                  ->whereIn('status', ['paid', 'success']);
-        }])
-        ->latest()
-        ->get();
+    public function index(Request $request)
+    {
+        $search = $request->input('search');
 
-    return inertia('User/Tryout/Index', [
-        'tryouts' => $tryouts
-    ]);
-}
-public function examBkn(Tryout $tryout)
-{
-    // Ambil soal dengan urutan yang benar
-    $questions = $tryout->questions()->orderBy('order', 'asc')->get();
+        $tryouts = Tryout::query()
+            ->where('is_published', true)
+            ->when($search, function($query, $search) {
+                $query->where('title', 'like', "%{$search}%");
+            })
+            ->with(['transactions' => function($query) {
+                $query->where('user_id', auth()->id())
+                      ->whereIn('status', ['paid', 'success']);
+            }])
+            ->latest()
+            ->paginate(9)
+            ->withQueryString();
 
-    // PENTING: Arahkan ke folder User/Tryout/
-    return Inertia::render('User/Tryout/ExamSheetBKN', [
-        'tryout' => $tryout,
-        'questions' => $questions,
-        'user' => auth()->user()
-    ]);
-}
-
-public function wait(Tryout $tryout)
-{
-    // Cek apakah user sudah bayar/terdaftar
-    $isRegistered = \App\Models\Transaction::where('user_id', auth()->id())
-        ->where('tryout_id', $tryout->id)
-        ->whereIn('status', ['paid', 'success'])
-        ->exists();
-
-    if (!$isRegistered) {
-        return redirect()->route('tryout.index')->with('error', 'Anda belum terdaftar di tryout ini.');
+        return Inertia::render('User/Tryout/Index', [
+            'tryouts' => $tryouts,
+            'filters' => $request->only(['search']),
+        ]);
     }
 
-    return inertia('User/Tryout/Wait', [
-        'tryout' => $tryout->loadCount('questions')
-    ]);
-}
+    /**
+     * Halaman Detail Paket.
+     */
+    public function show(Tryout $tryout)
+    {
+        return Inertia::render('User/Tryout/Show', [
+            'tryout' => $tryout->loadCount('questions')
+        ]);
+    }
 
-public function leaderboard(Tryout $tryout)
-{
-    // Ambil semua hasil ujian (attempts) untuk tryout ini
-    // Diurutkan berdasarkan skor tertinggi, lalu waktu pengerjaan tercepat
-    $rankings = \App\Models\ExamAttempt::where('tryout_id', $tryout->id)
-        ->where('status', 'finished')
-        ->with('user:id,name')
-        ->select('user_id', 'total_score', 'started_at', 'finished_at')
-        // Logic peringkat: Skor tertinggi, jika sama maka yang selesai lebih cepat menang
-        ->orderByDesc('total_score')
-        ->orderByRaw('TIMESTAMPDIFF(SECOND, started_at, finished_at) ASC')
-        ->get()
-        ->map(function ($attempt, $index) {
-            return [
-                'rank' => $index + 1,
-                'name' => $attempt->user->name,
-                'score' => $attempt->total_score,
-                'is_me' => $attempt->user_id === auth()->id(),
-            ];
-        });
+    /**
+     * Halaman Registrasi / Form Pendaftaran.
+     */
+    public function registerForm(Tryout $tryout)
+    {
+        // Jika tryout gratis, arahkan langsung ke pendaftaran otomatis atau show
+        if ($tryout->price <= 0) {
+            return redirect()->route('tryout.show', $tryout->id);
+        }
 
-    return inertia('User/Tryout/Leaderboard', [
-        'tryout' => $tryout,
-        'rankings' => $rankings,
-        'my_rank' => $rankings->where('is_me', true)->first()
-    ]);
-}
+        return Inertia::render('User/Tryout/Register', [
+            'tryout' => $tryout
+        ]);
+    }
 
+    /**
+     * Proses Pembayaran (Wallet atau Midtrans).
+     */
     public function processRegistration(Request $request, Tryout $tryout)
     {
-        // 1. Validasi Input
         $request->validate([
             'payment_method' => 'required|in:wallet,midtrans',
             'emails' => 'array|max:5',
             'emails.*' => 'required|email|exists:users,email|distinct',
         ]);
 
-        // 2. Siapkan Data Peserta (Ketua + Anggota)
         $participants = collect([auth()->user()->email]);
         if ($request->emails) {
             $participants = $participants->merge($request->emails);
@@ -110,7 +86,7 @@ public function leaderboard(Tryout $tryout)
         $participants = $participants->unique()->values();
         $qty = $participants->count();
 
-        // 3. Kalkulasi Harga & Diskon Kolektif
+        // Kalkulasi Harga & Diskon
         $price = $tryout->price;
         $discount = 0;
         if ($qty === 2) $discount = 0.05;
@@ -120,20 +96,17 @@ public function leaderboard(Tryout $tryout)
 
         $finalAmount = ($price * $qty) * (1 - $discount);
 
-        // --- SKENARIO A: PEMBAYARAN VIA SALDO WALLET ---
+        // SKENARIO A: WALLET
         if ($request->payment_method === 'wallet') {
             $user = auth()->user();
 
-            // Cek apakah saldo cukup
             if ($user->balance < $finalAmount) {
-                return back()->withErrors(['payment' => 'Saldo dompet tidak mencukupi untuk pendaftaran ini.']);
+                return back()->withErrors(['payment' => 'Saldo dompet tidak mencukupi.']);
             }
 
             return DB::transaction(function () use ($user, $tryout, $finalAmount, $participants, $qty) {
-                // A1. Potong Saldo User
                 $user->decrement('balance', $finalAmount);
 
-                // A2. Catat Riwayat Wallet (Debit)
                 WalletTransaction::create([
                     'user_id' => $user->id,
                     'type' => 'debit',
@@ -143,7 +116,6 @@ public function leaderboard(Tryout $tryout)
                     'proof_payment' => 'WALLET-SYSTEM',
                 ]);
 
-                // A3. Buat Transaksi Tryout Langsung "Success"
                 Transaction::create([
                     'user_id' => $user->id,
                     'tryout_id' => $tryout->id,
@@ -152,17 +124,15 @@ public function leaderboard(Tryout $tryout)
                     'qty' => $qty,
                     'amount' => $finalAmount,
                     'participants_data' => $participants->all(),
-                    'status' => 'paid', // Langsung aktif
+                    'status' => 'paid',
                 ]);
 
-                return redirect()->route('tryout.index')
-                    ->with('message', 'Pendaftaran berhasil menggunakan saldo dompet!');
+                return redirect()->route('tryout.index')->with('message', 'Pendaftaran berhasil!');
             });
         }
 
-        // --- SKENARIO B: PEMBAYARAN VIA MIDTRANS ---
-        // Buat transaksi dengan status "pending" lalu lempar ke CheckoutController
-        $transaction = Transaction::create([
+        // SKENARIO B: MIDTRANS
+        Transaction::create([
             'user_id' => auth()->id(),
             'tryout_id' => $tryout->id,
             'invoice_code' => 'INV-' . strtoupper(Str::random(10)),
@@ -173,62 +143,85 @@ public function leaderboard(Tryout $tryout)
             'status' => 'pending',
         ]);
 
-        // Redirect ke halaman checkout Midtrans Anda
         return redirect()->route('checkout.show', $tryout->id);
     }
 
     /**
-     * Menampilkan Form Pendaftaran
+     * Halaman Instruksi (Wait) sebelum mulai.
      */
-    public function registerForm(Tryout $tryout)
+    public function wait(Tryout $tryout)
     {
-        if (!$tryout->is_paid) {
-            return redirect()->route('tryout.show', $tryout->id);
+        $hasAccess = Transaction::where('user_id', auth()->id())
+            ->where('tryout_id', $tryout->id)
+            ->whereIn('status', ['paid', 'success'])
+            ->exists();
+
+        if (!$hasAccess) {
+            return redirect()->route('tryout.index')->with('error', 'Anda belum terdaftar.');
         }
 
-        return Inertia::render('User/Tryout/Register', [
-            'tryout' => $tryout
-        ]);
-    }
-
-    /**
-     * Menampilkan detail tryout sebelum mengerjakan.
-     */
-    public function show(Tryout $tryout)
-    {
-        return Inertia::render('User/Tryout/Show', [
+        return Inertia::render('User/Tryout/Wait', [
             'tryout' => $tryout->loadCount('questions')
         ]);
     }
 
     /**
-     * Halaman pengerjaan soal (Ujian berlangsung).
+     * Halaman Ujian (BKN Mode).
+     */
+    public function examBkn(Tryout $tryout)
+    {
+        return $this->secureExamAccess($tryout, 'User/Tryout/ExamSheetBKN');
+    }
+
+    /**
+     * Halaman Ujian (Regular Mode).
      */
     public function exam(Tryout $tryout)
     {
-        if ($tryout->started_at && now() < $tryout->started_at) {
-            return redirect()->route('tryout.index')->with('error', 'Ujian belum dimulai.');
+        return $this->secureExamAccess($tryout, 'User/Tryout/ExamSheet');
+    }
+
+    /**
+     * Helper untuk memvalidasi akses ujian (Pembayaran & Waktu).
+     */
+    private function secureExamAccess(Tryout $tryout, $view)
+    {
+        $user = auth()->user();
+        $now = Carbon::now();
+
+        // 1. Cek Pembayaran
+        $hasAccess = Transaction::where('user_id', $user->id)
+            ->where('tryout_id', $tryout->id)
+            ->whereIn('status', ['paid', 'success'])
+            ->exists();
+
+        if (!$hasAccess) {
+            return redirect()->route('tryout.show', $tryout->id)->with('error', 'Silakan daftar terlebih dahulu.');
+        }
+
+        // 2. Cek Waktu Mulai
+        if ($tryout->start_time && $now->lt($tryout->start_time)) {
+            return redirect()->route('tryout.index')->with('error', 'Ujian belum dimulai. Akses dibuka: ' . $tryout->start_time->format('d M Y, H:i'));
         }
 
         $questions = $tryout->questions()->orderBy('order', 'asc')->get();
 
-        return Inertia::render('Tryout/ExamSheet', [
+        return Inertia::render($view, [
             'tryout' => $tryout,
-            'questions' => $questions
+            'questions' => $questions,
+            'user' => $user
         ]);
     }
 
     /**
-     * Menyimpan jawaban user dan menghitung skor.
+     * Menyimpan jawaban dan hitung skor.
      */
     public function finish(Request $request, Tryout $tryout)
     {
         $userAnswers = $request->answers ?? []; 
         $questions = $tryout->questions;
         
-        $twk = 0; 
-        $tiu = 0; 
-        $tkp = 0;
+        $twk = 0; $tiu = 0; $tkp = 0;
 
         foreach ($questions as $q) {
             $answer = $userAnswers[$q->id] ?? null;
@@ -251,103 +244,74 @@ public function leaderboard(Tryout $tryout)
             'tiu_score' => $tiu,
             'tkp_score' => $tkp,
             'total_score' => $twk + $tiu + $tkp,
-            'completed_at' => now(),
+            'status' => 'finished',
+            'finished_at' => now(),
         ]);
 
         return redirect()->route('tryout.result', $attempt->id);
     }
 
-    /**
-     * Menampilkan halaman hasil ujian.
-     */
+    // ... (Result, History, Review, Certificate Tetap Sama) ...
+    
     public function result(ExamAttempt $attempt)
     {
-        if ($attempt->user_id !== auth()->id()) {
-            abort(403, 'Unauthorized action.');
-        }
-
-        return Inertia::render('User/Tryout/Result', [
-            'attempt' => $attempt->load('tryout')
-        ]);
+        if ($attempt->user_id !== auth()->id()) abort(403);
+        return Inertia::render('User/Tryout/Result', ['attempt' => $attempt->load('tryout')]);
     }
 
-    /**
-     * Menampilkan riwayat ujian user.
-     */
     public function history()
     {
-        $attempts = ExamAttempt::where('user_id', auth()->id())
-            ->with('tryout')
-            ->latest()
-            ->get();
-
-        return Inertia::render('User/Tryout/History', [
-            'attempts' => $attempts
-        ]);
+        $attempts = ExamAttempt::where('user_id', auth()->id())->with('tryout')->latest()->get();
+        return Inertia::render('User/Tryout/History', ['attempts' => $attempts]);
     }
 
-    /**
-     * Pembahasan soal.
-     */
     public function review(ExamAttempt $attempt) 
     {
-        if ($attempt->user_id !== auth()->id()) {
-            abort(403);
-        }
-
+        if ($attempt->user_id !== auth()->id()) abort(403);
+        
         $attempt->load('tryout');
         $userAnswers = $attempt->answers ?? [];
+        $questions = $attempt->tryout->questions()->orderBy('order', 'asc')->get()->map(function ($q) use ($userAnswers) {
+            $selected = $userAnswers[$q->id] ?? null;
+            $q->user_selected_answer = $selected;
+            $q->is_correct = (string)$selected === (string)$q->correct_answer;
+            return $q;
+        });
 
-        $questions = $attempt->tryout->questions()
-            ->orderBy('order', 'asc')
+        return Inertia::render('User/Tryout/Review', ['attempt' => $attempt, 'questions' => $questions]);
+    }
+
+    public function leaderboard(Tryout $tryout)
+    {
+        $rankings = ExamAttempt::where('tryout_id', $tryout->id)
+            ->where('status', 'finished')
+            ->with('user:id,name')
+            ->orderByDesc('total_score')
+            ->orderByRaw('TIMESTAMPDIFF(SECOND, created_at, finished_at) ASC')
             ->get()
-            ->map(function ($question) use ($userAnswers) {
-                $selected = $userAnswers[(string)$question->id] ?? $userAnswers[$question->id] ?? null;
-                $question->user_selected_answer = $selected;
-                $question->is_correct = strtolower((string)$selected) === strtolower((string)$question->correct_answer);
-                $question->is_answered = !is_null($selected);
-                return $question;
+            ->map(function ($attempt, $index) {
+                return [
+                    'rank' => $index + 1,
+                    'name' => $attempt->user->name,
+                    'score' => $attempt->total_score,
+                    'is_me' => $attempt->user_id === auth()->id(),
+                ];
             });
 
-        return Inertia::render('User/Tryout/Review', [
-            'attempt' => $attempt,
-            'questions' => $questions
+        return Inertia::render('User/Tryout/Leaderboard', [
+            'tryout' => $tryout,
+            'rankings' => $rankings,
+            'my_rank' => $rankings->where('is_me', true)->first()
         ]);
     }
 
-    /**
-     * Cetak Sertifikat PDF.
-     */
     public function certificate(ExamAttempt $attempt)
     {
-        if ($attempt->user_id !== auth()->id()) {
-            abort(403);
-        }
-
+        if ($attempt->user_id !== auth()->id()) abort(403);
         $attempt->load(['user', 'tryout']);
-
-        $isPassed = $attempt->twk_score >= 65 && 
-                    $attempt->tiu_score >= 80 && 
-                    $attempt->tkp_score >= 166;
-
-        $pdf = Pdf::loadView('pdf.certificate', [
-            'attempt' => $attempt,
-            'isPassed' => $isPassed
-        ])->setPaper('a4', 'landscape');
-
-        $filename = 'Sertifikat_' . str_replace(' ', '_', $attempt->user->name) . '.pdf';
-
-        return $pdf->stream($filename);
-    }
-
-    public function collectiveRegister(Tryout $tryout)
-    {
-        if (!$tryout->is_paid) {
-            return redirect()->route('tryout.show', $tryout->id);
-        }
-
-        return Inertia::render('User/Tryout/CollectiveRegister', [
-            'tryout' => $tryout
-        ]);
+        
+        $isPassed = $attempt->twk_score >= 65 && $attempt->tiu_score >= 80 && $attempt->tkp_score >= 166;
+        $pdf = Pdf::loadView('pdf.certificate', compact('attempt', 'isPassed'))->setPaper('a4', 'landscape');
+        return $pdf->stream('Sertifikat_' . $attempt->user->name . '.pdf');
     }
 }

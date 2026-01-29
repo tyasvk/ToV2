@@ -39,6 +39,7 @@ use HasFactory;
         'is_active' => 'boolean',
         'is_paid' => 'boolean',   // Tambahkan ini agar database mengenali boolean
         'price' => 'decimal:2',    // Tambahkan ini agar format harga konsisten
+        'start_time' => 'datetime',
     ];
 
     /**

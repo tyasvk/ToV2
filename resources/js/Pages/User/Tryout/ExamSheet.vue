@@ -1,203 +1,257 @@
 <script setup>
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, router } from '@inertiajs/vue3';
+import { Head, router, usePage } from '@inertiajs/vue3';
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 
 const props = defineProps({
     tryout: Object,
     questions: Array,
-    attempt: Object
+    user: Object
 });
+
+const page = usePage();
 
 // --- 1. STATE MANAGEMENT ---
 const currentIndex = ref(0);
 const answers = ref({});
-// Sisa waktu dalam detik
-const timeLeft = ref(props.tryout.duration_minutes * 60);
+const timeLeft = ref(props.tryout?.duration_minutes * 60 || 0);
 const isSubmitting = ref(false);
+const showConfirmModal = ref(false);
 let timer = null;
 
-// Proteksi: Pastikan pertanyaan tidak undefined saat di-render
+const answersKey = computed(() => `cat_bkn_answers_${props.tryout?.id}_${page.props.auth.user.id}`);
+const indexKey = computed(() => `cat_bkn_index_${props.tryout?.id}_${page.props.auth.user.id}`);
+
 const currentQuestion = computed(() => {
-    return props.questions && props.questions[currentIndex.value] 
-        ? props.questions[currentIndex.value] 
-        : null;
+    if (!props.questions || props.questions.length === 0) return null;
+    return props.questions[currentIndex.value] || null;
 });
 
-// --- 2. LOGIKA TIMER & AUTO-SUBMIT ---
-const startTimer = () => {
-    timer = setInterval(() => {
-        if (timeLeft.value > 0) {
-            timeLeft.value--;
-        } else {
-            // WAKTU HABIS: Jalankan Auto-Submit
-            stopTimer();
-            autoSubmitExam();
-        }
-    }, 1000);
-};
+const subtestLabel = computed(() => {
+    const type = currentQuestion.value?.type;
+    if (type === 'TWK') return 'Tes Wawasan Kebangsaan - TWK';
+    if (type === 'TIU') return 'Tes Intelegensia Umum - TIU';
+    if (type === 'TKP') return 'Tes Karakteristik Pribadi - TKP';
+    return type || '-';
+});
 
-const stopTimer = () => {
-    if (timer) clearInterval(timer);
-};
+const answeredCount = computed(() => Object.keys(answers.value).length);
+const unansweredCount = computed(() => (props.questions?.length || 0) - answeredCount.value);
 
-const autoSubmitExam = () => {
-    if (isSubmitting.value) return;
-    isSubmitting.value = true;
-    
-    // Kirim tanpa confirm karena waktu sudah habis
-    router.post(route('tryout.finish', props.tryout.id), {
-        answers: answers.value,
-        auto_submit: true
-    }, {
-        onFinish: () => isSubmitting.value = false
-    });
-};
-
+// --- 2. LOGIKA PERSISTENSI & TIMER ---
 onMounted(() => {
-    // Load jawaban yang sudah ada (jika user refresh halaman)
-    props.questions.forEach((q) => {
+    props.questions?.forEach(q => {
         if (q.user_answer) answers.value[q.id] = q.user_answer;
     });
-    startTimer();
+
+    const savedAnswers = localStorage.getItem(answersKey.value);
+    if (savedAnswers) {
+        const parsed = JSON.parse(savedAnswers);
+        answers.value = { ...answers.value, ...parsed };
+    }
+
+    const savedIndex = localStorage.getItem(indexKey.value);
+    if (savedIndex) {
+        currentIndex.value = parseInt(savedIndex);
+    }
+    
+    timer = setInterval(() => {
+        if (timeLeft.value > 0) timeLeft.value--;
+        else autoSubmit();
+    }, 1000);
 });
 
-onUnmounted(() => stopTimer());
+watch(answers, (newVal) => {
+    localStorage.setItem(answersKey.value, JSON.stringify(newVal));
+}, { deep: true });
 
-// --- 3. NAVIGASI & ACTION ---
-const selectAnswer = (questionId, optionKey) => {
+watch(currentIndex, (newVal) => {
+    localStorage.setItem(indexKey.value, newVal);
+});
+
+onUnmounted(() => clearInterval(timer));
+
+const autoSubmit = () => {
     if (isSubmitting.value) return;
-    answers.value[questionId] = optionKey;
+    isSubmitting.value = true;
+    router.post(route('tryout.finish', props.tryout?.id), { 
+        answers: answers.value,
+        mode: 'BKN' 
+    }, {
+        onSuccess: () => {
+            localStorage.removeItem(answersKey.value);
+            localStorage.removeItem(indexKey.value);
+        }
+    });
 };
 
-const nextQuestion = () => {
-    if (currentIndex.value < props.questions.length - 1) currentIndex.value++;
+const finishExam = () => {
+    showConfirmModal.value = true;
 };
 
-const prevQuestion = () => {
-    if (currentIndex.value > 0) currentIndex.value--;
-};
-
-const manualFinish = () => {
-    if (confirm('Apakah Anda yakin ingin mengakhiri ujian sekarang?')) {
-        autoSubmitExam();
+const goTo = (index) => { currentIndex.value = index; };
+const next = () => { 
+    if (currentIndex.value < (props.questions?.length - 1)) {
+        currentIndex.value++; 
+    } else {
+        currentIndex.value = 0; 
     }
 };
 
-// Formatter Waktu (HH:MM:SS)
 const formatTime = (seconds) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
-    return `${h > 0 ? h + ':' : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 };
 </script>
 
 <template>
-    <Head :title="'Ujian: ' + tryout.title" />
+    <Head :title="'CAT BKN - ' + tryout?.title" />
 
-    <div class="min-h-screen bg-slate-50 flex flex-col font-sans">
+    <div class="min-h-screen bg-[#F0F2F5] flex flex-col font-sans text-slate-700">
         
-        <header class="fixed top-0 inset-x-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200 px-5 py-4 md:px-10">
-            <div class="max-w-5xl mx-auto flex items-center justify-between">
-                <div class="flex flex-col">
-                    <span class="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Sisa Waktu</span>
-                    <div :class="timeLeft < 300 ? 'text-red-600 animate-pulse' : 'text-slate-900'" class="text-xl md:text-2xl font-black tabular-nums leading-none">
-                        {{ formatTime(timeLeft) }}
+        <header class="bg-white border-b border-slate-200 sticky top-0 z-50 h-16 flex items-center shadow-sm">
+            <div class="w-full px-6 flex justify-between items-center">
+                <div class="flex items-center gap-4">
+                    <img src="/images/logo.png" alt="Logo" class="h-10 w-auto">
+                    <div class="hidden md:block border-l border-slate-200 pl-4">
+                        <h1 class="text-sm font-black text-[#004a87] uppercase leading-none">Simulasi CAT Nusantara</h1>
                     </div>
                 </div>
 
-                <div class="flex flex-col items-end text-right">
-                    <span class="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Nomor Soal</span>
-                    <div class="text-lg md:text-xl font-black text-indigo-600 leading-none">
-                        {{ currentIndex + 1 }}<span class="text-slate-300 mx-1">/</span><span class="text-slate-400">{{ questions.length }}</span>
+                <div class="flex items-center gap-6">
+                    <div class="bg-slate-900 text-white px-4 py-2 rounded-lg font-mono text-lg font-bold flex items-center gap-2 tabular-nums">
+                        <span class="text-yellow-400 text-sm">⏳</span> {{ formatTime(timeLeft) }}
                     </div>
+                    <button @click="finishExam" class="bg-rose-600 hover:bg-rose-700 text-white px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all shadow-md active:scale-95">
+                        Selesai Ujian
+                    </button>
                 </div>
             </div>
         </header>
 
-        <main class="flex-1 mt-20 mb-28 px-4 md:px-6">
-            <div class="max-w-3xl mx-auto py-8">
-                
-                <div v-if="currentQuestion" class="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div class="bg-white rounded-[2.5rem] p-7 md:p-12 shadow-sm border border-slate-100 mb-6 relative overflow-hidden">
-                        <div class="absolute top-0 left-0 w-1.5 h-full bg-indigo-600"></div>
-                        <div class="text-slate-800 text-sm md:text-base leading-relaxed font-medium" v-html="currentQuestion.question_text"></div>
+        <main class="flex-1 flex flex-col md:flex-row h-[calc(100vh-64px)] overflow-hidden">
+            
+            <aside class="w-full md:w-[320px] bg-white border-r border-slate-200 flex flex-col overflow-y-auto custom-scrollbar">
+                <div class="p-5 border-b border-slate-100">
+                    <div class="flex items-center gap-4 mb-4">
+                        <div class="w-12 h-12 bg-slate-100 rounded-xl overflow-hidden border border-slate-200 flex-shrink-0">
+                            <img v-if="page.props.auth?.user?.image" :src="page.props.auth?.user?.image" class="w-full h-full object-cover">
+                            <span v-else class="text-[9px] font-black text-slate-300 flex items-center justify-center h-full uppercase">USER</span>
+                        </div>
+                        <div class="overflow-hidden text-left leading-tight">
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Peserta</p>
+                            <h4 class="text-[13px] font-black text-slate-900 truncate uppercase">{{ page.props.auth?.user?.name }}</h4>
+                        </div>
+                    </div>
+                    <div class="space-y-1.5">
+                        <div class="flex justify-between text-[9px] font-bold uppercase">
+                            <span class="text-slate-400 italic">Email</span>
+                            <span class="text-slate-700 truncate ml-2 lowercase">{{ page.props.auth?.user?.email }}</span>
+                        </div>
+                        <div class="pt-2">
+                            <span class="block w-full text-center bg-blue-50 text-[#004a87] py-1.5 rounded-lg text-[9px] font-black border border-blue-100 uppercase tracking-tighter">
+                                {{ subtestLabel }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-5">
+                    <div class="grid grid-cols-2 gap-3 mb-5 text-center">
+                        <div class="bg-emerald-50 p-2 rounded-xl border border-emerald-100">
+                            <p class="text-[8px] font-bold text-emerald-600 uppercase">Dijawab</p>
+                            <p class="text-base font-black text-emerald-700 leading-none mt-1">{{ answeredCount }}</p>
+                        </div>
+                        <div class="bg-rose-50 p-2 rounded-xl border border-rose-100">
+                            <p class="text-[8px] font-bold text-rose-600 uppercase">Sisa</p>
+                            <p class="text-base font-black text-rose-700 leading-none mt-1">{{ unansweredCount }}</p>
+                        </div>
                     </div>
 
-                    <div class="grid grid-cols-1 gap-3">
-                        <button 
-                            v-for="(option, key) in currentQuestion.options" 
-                            :key="key"
-                            @click="selectAnswer(currentQuestion.id, key)"
+                    <div class="flex flex-wrap justify-center gap-1">
+                        <button v-for="(q, i) in questions" :key="q.id" @click="goTo(i)"
                             :class="[
-                                answers[currentQuestion.id] === key 
-                                ? 'border-indigo-600 bg-indigo-50 ring-4 ring-indigo-50' 
-                                : 'border-white bg-white hover:border-slate-200 shadow-sm'
+                                currentIndex === i ? 'ring-2 ring-blue-600 ring-offset-1 scale-105 z-10 shadow-sm' : '',
+                                answers[q.id] ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white text-slate-400 border-slate-200'
                             ]"
-                            class="group w-full text-left p-4 md:p-6 rounded-[1.8rem] border-2 transition-all flex items-start gap-4 active:scale-[0.98]"
-                        >
-                            <div :class="[answers[currentQuestion.id] === key ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-slate-100 text-slate-400']"
-                                class="w-10 h-10 md:w-12 md:h-12 rounded-2xl flex-shrink-0 flex items-center justify-center font-black text-sm uppercase transition-colors">
-                                {{ key }}
-                            </div>
-                            <div class="text-xs md:text-sm font-bold text-slate-700 pt-2.5 md:pt-3 flex-1">{{ option }}</div>
+                            class="w-6 h-6 border rounded-md text-[8px] font-black flex items-center justify-center transition-all hover:border-blue-400 active:scale-90">
+                            {{ i + 1 }}
                         </button>
                     </div>
                 </div>
+            </aside>
 
-                <div v-else class="flex flex-col items-center justify-center py-20 text-slate-300">
-                    <div class="w-12 h-12 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
-                    <p class="text-[10px] font-black uppercase tracking-widest">Menyiapkan Soal...</p>
+            <section class="flex-1 flex flex-col bg-slate-50 relative overflow-hidden">
+                <div class="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar">
+                    <div class="max-w-[1000px] mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="bg-slate-50 px-6 py-2 border-b border-slate-100">
+                            <span class="text-[11px] font-black text-[#004a87] uppercase tracking-[0.2em]">Soal Nomor {{ currentIndex + 1 }}</span>
+                        </div>
+
+                        <div v-if="currentQuestion" class="p-6 md:p-8 text-left">
+                            <div v-if="currentQuestion?.image" class="mb-5 rounded-xl overflow-hidden border border-slate-200 max-w-md mx-auto shadow-sm">
+                                <img :src="'/storage/' + currentQuestion.image" class="w-full h-auto" alt="Gambar Soal">
+                            </div>
+
+                            <div class="text-[13px] md:text-base leading-relaxed text-slate-800 mb-3 font-medium" v-html="currentQuestion?.content"></div>
+                            
+                            <div class="space-y-1">
+                                <label v-for="(option, key) in currentQuestion?.options" :key="key" 
+                                    class="flex items-start gap-3 p-1.5 rounded-lg border border-slate-100 cursor-pointer transition-all hover:bg-blue-50/50 group"
+                                    :class="{'bg-blue-50 border-blue-200 ring-1 ring-blue-50': answers[currentQuestion?.id] === key}">
+                                    <input type="radio" :name="'q-'+currentQuestion?.id" :value="key" v-model="answers[currentQuestion?.id]" class="mt-1 w-4 h-4 text-blue-600 border-slate-300">
+                                    <span class="text-xs font-black text-[#004a87] w-4 uppercase">{{ key }}.</span>
+                                    <span class="text-[12px] md:text-sm font-bold text-slate-600 group-hover:text-slate-900 flex-1 leading-snug">{{ option }}</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-            </div>
+                <div class="bg-white border-t border-slate-200 p-4 shadow-sm">
+                    <div class="max-w-[1000px] mx-auto flex justify-start items-center gap-3">
+                        <button @click="next" class="px-5 py-2.5 bg-white border border-slate-300 rounded-xl text-[10px] font-black uppercase text-slate-500 hover:bg-slate-50 transition-all shadow-sm">
+                            Lewatkan Soal Ini
+                        </button>
+                        <button @click="next" class="px-8 py-2.5 bg-[#f37021] text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-orange-600 active:scale-95 transition-all">
+                            Simpan dan Lanjutkan
+                        </button>
+                    </div>
+                </div>
+            </section>
         </main>
 
-        <footer class="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 p-4 md:p-6 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
-            <div class="max-w-3xl mx-auto flex items-center gap-3 md:gap-4">
-                
-                <button 
-                    @click="prevQuestion"
-                    :disabled="currentIndex === 0 || isSubmitting"
-                    class="flex-1 py-4 md:py-5 bg-slate-100 text-slate-500 rounded-2xl md:rounded-3xl font-black text-[10px] md:text-[11px] uppercase tracking-widest disabled:opacity-30 transition-all active:scale-95"
-                >
-                    Kembali
-                </button>
-
-                <button 
-                    v-if="currentIndex < questions.length - 1"
-                    @click="nextQuestion"
-                    :disabled="isSubmitting"
-                    class="flex-[2] py-4 md:py-5 bg-slate-900 text-white rounded-2xl md:rounded-3xl font-black text-[10px] md:text-[11px] uppercase tracking-[0.2em] shadow-xl hover:bg-indigo-600 transition-all active:scale-95"
-                >
-                    Selanjutnya
-                </button>
-
-                <button 
-                    v-else
-                    @click="manualFinish"
-                    :disabled="isSubmitting"
-                    class="flex-[2] py-4 md:py-5 bg-emerald-600 text-white rounded-2xl md:rounded-3xl font-black text-[10px] md:text-[11px] uppercase tracking-[0.2em] shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95"
-                >
-                    {{ isSubmitting ? 'Mengirim...' : 'Selesai Ujian' }}
-                </button>
-
+        <div v-if="showConfirmModal" class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <div class="bg-white rounded-[2rem] shadow-2xl max-w-xl w-full overflow-hidden animate-in zoom-in duration-300">
+                <div class="bg-rose-600 p-4 text-white text-center">
+                    <h3 class="text-xl font-black uppercase tracking-widest">Konfirmasi Selesai</h3>
+                </div>
+                <div class="p-8 text-slate-700">
+                    <p class="text-lg font-bold mb-6 text-center italic">SOAL BELUM DIJAWAB : <span class="text-rose-600 underline underline-offset-4">{{ unansweredCount }}</span></p>
+                    <div class="space-y-4 text-sm leading-relaxed text-center">
+                        <p class="font-black text-slate-900 text-base">Apakah Anda yakin ingin mengakhiri simulasi?</p>
+                        <p class="text-slate-500">Jika "Ya", jawaban Anda akan dikirim dan hasil ujian akan segera diproses. Anda tidak bisa kembali setelah ini.</p>
+                    </div>
+                </div>
+                <div class="p-6 bg-slate-50 border-t border-slate-100 flex justify-center gap-3">
+                    <button @click="autoSubmit" class="flex-1 py-3 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-emerald-700 shadow-xl transition-all active:scale-95">Ya, Selesai</button>
+                    <button @click="showConfirmModal = false" class="flex-1 py-3 bg-slate-200 text-slate-600 rounded-2xl font-black uppercase tracking-widest hover:bg-slate-300 transition-all active:scale-95">Tidak</button>
+                </div>
             </div>
-        </footer>
+        </div>
+
     </div>
 </template>
 
 <style scoped>
+.custom-scrollbar::-webkit-scrollbar { width: 5px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .tabular-nums { font-variant-numeric: tabular-nums; }
-.transition-all { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
 
-/* Animasi sederhana saat ganti soal */
-.animate-in {
-    animation: slideUp 0.4s ease-out;
-}
-@keyframes slideUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
+@keyframes zoomIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.animate-in { animation: zoomIn 0.2s ease-out forwards; }
 </style>
