@@ -5,7 +5,7 @@ import { ref, onMounted, onUnmounted, computed } from 'vue';
 const props = defineProps({
     tryout: Object,
     questions: Array,
-    attempt: Object
+    user: Object
 });
 
 const page = usePage();
@@ -14,19 +14,22 @@ const page = usePage();
 const currentIndex = ref(0);
 const answers = ref({});
 const timeLeft = ref(props.tryout?.duration_minutes * 60 || 0);
-const showNav = ref(false);
 const isSubmitting = ref(false);
 let timer = null;
 
-// PROTEKSI: Computed property yang aman untuk mengambil soal saat ini
+// PROTEKSI: Pastikan mengambil soal dengan aman
 const currentQuestion = computed(() => {
     if (!props.questions || props.questions.length === 0) return null;
     return props.questions[currentIndex.value] || null;
 });
 
+// Statistik Jawaban
+const answeredCount = computed(() => Object.keys(answers.value).length);
+const unansweredCount = computed(() => (props.questions?.length || 0) - answeredCount.value);
+
 // --- 2. LOGIKA TIMER ---
 onMounted(() => {
-    // Load jawaban yang tersimpan
+    // Muat jawaban yang sudah ada
     props.questions?.forEach(q => {
         if (q.user_answer) answers.value[q.id] = q.user_answer;
     });
@@ -42,19 +45,19 @@ onUnmounted(() => clearInterval(timer));
 const autoSubmit = () => {
     if (isSubmitting.value) return;
     isSubmitting.value = true;
-    router.post(route('tryout.finish', props.tryout.id), { 
+    router.post(route('tryout.finish', props.tryout?.id), { 
         answers: answers.value,
         mode: 'BKN' 
     });
 };
 
-// --- 3. NAVIGASI ---
-const goTo = (index) => {
-    currentIndex.value = index;
-    showNav.value = false;
+const finishExam = () => {
+    if (confirm('Apakah Anda yakin ingin menyelesaikan ujian?')) autoSubmit();
 };
 
-const next = () => { if (currentIndex.value < props.questions.length - 1) currentIndex.value++; };
+// --- 3. NAVIGASI ---
+const goTo = (index) => { currentIndex.value = index; };
+const next = () => { if (currentIndex.value < (props.questions?.length - 1)) currentIndex.value++; };
 const prev = () => { if (currentIndex.value > 0) currentIndex.value--; };
 
 const formatTime = (seconds) => {
@@ -68,108 +71,114 @@ const formatTime = (seconds) => {
 <template>
     <Head :title="'CAT BKN: ' + (tryout?.title || 'Ujian')" />
 
-    <div class="min-h-screen bg-[#f0f2f5] flex flex-col font-sans text-slate-700">
+    <div class="min-h-screen bg-[#f4f8fb] flex flex-col font-sans text-slate-700">
         
-        <header class="bg-[#004a87] text-white p-3 md:p-4 shadow-lg z-50">
-            <div class="max-w-[1440px] mx-auto flex justify-between items-center">
-                <div class="flex items-center gap-3">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/Logo_BKN.png/600px-Logo_BKN.png" 
-                         alt="BKN" class="w-8 h-8 md:w-10 md:h-10 object-contain bg-white rounded-full p-1">
-                    <div class="hidden sm:block">
-                        <h1 class="text-xs md:text-sm font-black uppercase tracking-tighter leading-none">Computer Assisted Test</h1>
-                        <p class="text-[9px] font-bold text-blue-200 uppercase mt-1">Simulator Ujian Resmi</p>
+        <header class="bg-[#f0f7ff] text-slate-900 p-3 md:p-5 shadow-sm border-b border-blue-100 sticky top-0 z-50">
+            <div class="max-w-[1440px] mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                
+                <div class="flex items-center gap-4 w-full md:w-auto">
+                    <div class="bg-white p-2 rounded-xl shadow-sm border border-blue-50">
+                        <img src="/images/logo.png" alt="Logo" class="h-12 md:h-20 w-auto object-contain">
+                    </div>
+                    <div class="text-left border-l border-blue-200 pl-4">
+                        <h1 class="text-[11px] md:text-sm font-black uppercase tracking-tighter leading-none text-[#004a87]">Simulasi CAT</h1>
+                        <p class="text-[9px] font-bold text-slate-400 uppercase mt-1 tracking-tight">CPNS Nusantara</p>
                     </div>
                 </div>
-                <div class="bg-[#ffcc00] text-[#004a87] px-4 py-2 rounded-md font-black text-sm md:text-xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)] tabular-nums">
-                    {{ formatTime(timeLeft) }}
+
+                <div class="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto justify-end">
+                    <div class="grid grid-cols-2 md:flex items-center gap-4 md:gap-8 w-full md:w-auto overflow-x-auto no-scrollbar justify-end text-right">
+                        <div class="flex flex-col min-w-[80px]">
+                            <span class="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Batas Waktu</span>
+                            <span class="text-xs font-black text-slate-900">{{ tryout?.duration_minutes }} Menit</span>
+                        </div>
+                        <div class="flex flex-col border-l border-blue-100 pl-4 md:pl-8 min-w-[80px]">
+                            <span class="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Jumlah Soal</span>
+                            <span class="text-xs font-black text-slate-900">{{ questions?.length || 0 }} Soal</span>
+                        </div>
+                        <div class="flex flex-col border-l border-blue-100 pl-4 md:pl-8 min-w-[80px]">
+                            <span class="text-[9px] uppercase font-bold text-emerald-500 tracking-wider">Dijawab</span>
+                            <span class="text-xs font-black text-emerald-600">{{ answeredCount }}</span>
+                        </div>
+                        <div class="flex flex-col border-l border-blue-100 pl-4 md:pl-8 min-w-[80px]">
+                            <span class="text-[9px] uppercase font-bold text-rose-500 tracking-wider">Belum Dijawab</span>
+                            <span class="text-xs font-black text-rose-600">{{ unansweredCount }}</span>
+                        </div>
+                    </div>
+
+                    <button @click="finishExam" class="w-full md:w-auto px-8 py-3 bg-[#004a87] hover:bg-blue-800 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg transition-all active:scale-95">
+                        Selesai Ujian
+                    </button>
                 </div>
             </div>
         </header>
 
-        <div class="flex-1 flex flex-col md:flex-row max-w-[1440px] mx-auto w-full p-2 md:p-4 gap-4 overflow-hidden">
+        <main class="flex-1 max-w-4xl mx-auto w-full p-3 md:p-4 space-y-4">
             
-            <aside class="hidden lg:flex flex-col w-64 gap-4">
-                <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 text-center">
-                    <div class="w-24 h-32 bg-slate-100 mx-auto rounded-md mb-4 border-2 border-slate-200 flex items-center justify-center text-slate-300 overflow-hidden relative">
-                        <img v-if="page.props.auth?.user?.image" :src="page.props.auth.user.image" class="w-full h-full object-cover">
-                        <span v-else class="text-[10px] font-black uppercase tracking-widest text-slate-400">Pas Foto</span>
-                    </div>
-                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Nama Peserta</p>
-                    <p class="text-[11px] font-black text-slate-900 uppercase leading-tight truncate mb-4">{{ page.props.auth?.user?.name || 'Peserta' }}</p>
-                    <div class="h-px bg-slate-100 mb-4"></div>
-                    <p class="text-[9px] font-bold text-indigo-600 uppercase italic">{{ tryout?.title }}</p>
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex items-center gap-4">
+                <div class="w-14 h-14 md:w-20 md:h-20 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0 relative">
+                    <img v-if="page.props.auth?.user?.image" :src="page.props.auth?.user?.image" class="w-full h-full object-cover">
+                    <span v-else class="text-[9px] font-black text-slate-300">PHOTO</span>
                 </div>
-            </aside>
+                <div class="flex-1 min-w-0 text-left">
+                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Identitas Peserta</p>
+                    <h4 class="text-sm md:text-base font-black text-slate-900 uppercase truncate">{{ page.props.auth?.user?.name || 'Peserta' }}</h4>
+                    <p class="text-[10px] font-bold text-blue-600 uppercase mt-1 tracking-tight italic">{{ tryout?.title }}</p>
+                </div>
+            </div>
 
-            <main class="flex-1 flex flex-col bg-white rounded-lg shadow-md border border-slate-200 overflow-hidden relative">
-                <div class="bg-slate-50 border-b border-slate-200 p-3 flex justify-between items-center">
-                    <span class="bg-[#004a87] text-white px-3 py-1 rounded text-[10px] font-black uppercase">
-                        Soal Nomor {{ currentIndex + 1 }}
-                    </span>
-                    <button @click="showNav = true" class="lg:hidden bg-white text-[#004a87] border border-blue-200 px-3 py-1 rounded text-[9px] font-black uppercase shadow-sm active:scale-95 transition-transform">
-                        Daftar Soal
-                    </button>
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden min-h-[450px] flex flex-col">
+                <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                    <span class="text-xs font-black text-[#004a87] uppercase tracking-widest">Lembar Soal #{{ currentIndex + 1 }}</span>
                 </div>
 
-                <div v-if="currentQuestion" class="flex-1 p-5 md:p-10 overflow-y-auto bg-white">
-                    <div v-if="currentQuestion?.image" class="mb-6 max-w-full overflow-hidden rounded-lg border border-slate-100">
-                        <img :src="currentQuestion.image" class="max-h-64 mx-auto object-contain" alt="Gambar Soal">
+                <div v-if="currentQuestion" class="p-6 md:p-12 flex-1 overflow-y-auto text-left animate-in fade-in">
+                    <div v-if="currentQuestion?.image" class="mb-8 rounded-2xl overflow-hidden border border-slate-100 max-w-md mx-auto shadow-sm">
+                        <img :src="'/storage/' + currentQuestion.image" class="w-full h-auto object-contain" alt="Gambar Soal">
                     </div>
 
-                    <div class="text-sm md:text-base leading-relaxed text-slate-800 mb-8" v-html="currentQuestion.question_text"></div>
+                    <div class="text-sm md:text-lg leading-relaxed text-slate-800 mb-10 font-medium" v-html="currentQuestion?.question_text"></div>
                     
-                    <div class="space-y-3">
-                        <label v-for="(option, key) in currentQuestion.options" :key="key" 
-                            class="flex items-start gap-3 p-4 rounded-xl border border-slate-100 cursor-pointer transition-all hover:bg-blue-50/50 group"
-                            :class="{'bg-blue-50 border-blue-300 ring-1 ring-blue-100': answers[currentQuestion.id] === key}">
-                            <input type="radio" :name="'q-'+currentQuestion.id" :value="key" v-model="answers[currentQuestion.id]" class="mt-1 w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500">
-                            <span class="text-xs font-black text-blue-900 w-4">{{ key }}.</span>
-                            <span class="text-xs md:text-sm font-bold text-slate-600 group-hover:text-slate-900 flex-1">{{ option }}</span>
+                    <div class="space-y-4">
+                        <label v-for="(option, key) in currentQuestion?.options" :key="key" 
+                            class="flex items-start gap-4 p-5 rounded-2xl border border-slate-100 cursor-pointer transition-all hover:bg-slate-50 group"
+                            :class="{'bg-blue-50 border-blue-300 ring-1 ring-blue-50': answers[currentQuestion?.id] === key}">
+                            <input type="radio" :name="'q-'+currentQuestion?.id" :value="key" v-model="answers[currentQuestion?.id]" class="mt-1 w-5 h-5 text-blue-600 border-slate-300">
+                            <span class="text-sm font-black text-[#004a87] w-5">{{ key }}.</span>
+                            <span class="text-sm md:text-base font-bold text-slate-600 group-hover:text-slate-900 flex-1">{{ option }}</span>
                         </label>
                     </div>
                 </div>
 
-                <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
-                    <button @click="prev" :disabled="currentIndex === 0" class="px-5 py-2.5 bg-white border border-slate-300 rounded-md text-[10px] font-black uppercase tracking-widest text-slate-500 shadow-sm disabled:opacity-30">Sebelumnya</button>
-                    <div class="flex gap-2">
-                        <button v-if="currentIndex < (questions?.length - 1)" @click="next" class="px-5 py-2.5 bg-[#f37021] text-white rounded-md text-[10px] font-black uppercase tracking-widest shadow-md hover:bg-[#d9611a] transition-colors">Selanjutnya</button>
-                        <button v-else @click="autoSubmit" class="px-5 py-2.5 bg-red-600 text-white rounded-md text-[10px] font-black uppercase tracking-widest shadow-md hover:bg-red-700 transition-colors">Selesai Ujian</button>
-                    </div>
+                <div v-else class="p-20 text-center text-slate-400 italic">
+                    Memuat pertanyaan... (Pastikan data soal sudah ada di Database)
                 </div>
-            </main>
 
-            <aside class="hidden lg:block w-72 bg-white rounded-xl shadow-sm border border-slate-200 p-5 overflow-y-auto max-h-[calc(100vh-140px)]">
-                <p class="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em] mb-4 text-center">Peta Soal</p>
-                <div class="grid grid-cols-5 gap-2">
+                <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-between gap-4 sticky bottom-0">
+                    <button @click="prev" :disabled="currentIndex === 0" class="flex-1 md:flex-none px-8 py-3 bg-white border border-slate-300 rounded-xl text-[10px] font-black uppercase text-slate-500 disabled:opacity-30 transition-colors">Sebelumnya</button>
+                    <button v-if="currentIndex < (questions?.length - 1)" @click="next" class="flex-1 md:flex-none px-10 py-3 bg-[#f37021] text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md">Selanjutnya</button>
+                    <button v-else @click="finishExam" class="flex-1 md:flex-none px-10 py-3 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md">Selesai</button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-8 mb-28">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-6 text-center italic">Navigasi Pengerjaan Soal</p>
+                <div v-if="questions?.length > 0" class="flex flex-wrap justify-center gap-3">
                     <button v-for="(q, i) in questions" :key="q.id" @click="goTo(i)"
                         :class="[
-                            currentIndex === i ? 'ring-2 ring-blue-600 ring-offset-2 scale-105 z-10' : '',
-                            answers[q.id] ? 'bg-green-500 text-white border-green-600 shadow-sm' : 'bg-white text-slate-400 border-slate-200'
+                            currentIndex === i ? 'ring-2 ring-blue-600 ring-offset-2 scale-110 z-10 shadow-lg' : '',
+                            answers[q.id] ? 'bg-emerald-500 text-white border-emerald-600 shadow-sm' : 'bg-white text-slate-400 border-slate-200 shadow-sm'
                         ]"
-                        class="h-9 border rounded-md text-[10px] font-black flex items-center justify-center transition-all hover:border-blue-400">
+                        class="w-12 h-12 border rounded-xl text-[11px] font-black flex items-center justify-center transition-all hover:border-blue-400 active:scale-90">
                         {{ i + 1 }}
                     </button>
                 </div>
-            </aside>
-        </div>
+            </div>
+        </main>
 
-        <div v-if="showNav" class="fixed inset-0 z-[100] lg:hidden">
-            <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="showNav = false"></div>
-            <div class="absolute right-0 top-0 bottom-0 w-72 bg-white p-6 shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="font-black text-xs uppercase text-slate-900">Navigasi Soal</h3>
-                    <button @click="showNav = false" class="text-slate-400 text-xl">✕</button>
-                </div>
-                <div class="grid grid-cols-4 gap-2 overflow-y-auto flex-1 p-1">
-                    <button v-for="(q, i) in questions" :key="q.id" @click="goTo(i)"
-                        :class="[
-                            currentIndex === i ? 'ring-2 ring-blue-600 ring-offset-1' : '',
-                            answers[q.id] ? 'bg-green-500 text-white border-green-600 shadow-md' : 'bg-white text-slate-400 border-slate-200'
-                        ]"
-                        class="h-10 border rounded-lg text-[10px] font-black flex items-center justify-center">
-                        {{ i + 1 }}
-                    </button>
-                </div>
+        <div class="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-bottom-10 duration-700">
+            <div class="bg-yellow-400 text-blue-900 px-6 py-4 rounded-2xl font-black text-sm md:text-2xl shadow-2xl border-4 border-white flex items-center gap-3 tabular-nums">
+                <span class="text-lg md:text-2xl">⏳</span> {{ formatTime(timeLeft) }}
             </div>
         </div>
 
@@ -178,8 +187,10 @@ const formatTime = (seconds) => {
 
 <style scoped>
 .tabular-nums { font-variant-numeric: tabular-nums; }
-.transition-all { transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+.transition-all { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-.animate-in { animation: fadeIn 0.3s ease-out; }
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.slide-in-from-bottom-10 { animation: slideUp 0.5s ease-out; }
 </style>

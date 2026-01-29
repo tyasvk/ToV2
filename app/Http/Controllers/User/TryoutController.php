@@ -35,6 +35,18 @@ public function index()
         'tryouts' => $tryouts
     ]);
 }
+public function examBkn(Tryout $tryout)
+{
+    // Ambil soal dengan urutan yang benar
+    $questions = $tryout->questions()->orderBy('order', 'asc')->get();
+
+    // PENTING: Arahkan ke folder User/Tryout/
+    return Inertia::render('User/Tryout/ExamSheetBKN', [
+        'tryout' => $tryout,
+        'questions' => $questions,
+        'user' => auth()->user()
+    ]);
+}
 
 public function wait(Tryout $tryout)
 {
@@ -203,20 +215,6 @@ public function leaderboard(Tryout $tryout)
         return Inertia::render('Tryout/ExamSheet', [
             'tryout' => $tryout,
             'questions' => $questions
-        ]);
-    }
-
-    /**
-     * Simulasi tampilan BKN.
-     */
-    public function examBkn(Tryout $tryout)
-    {
-        $questions = $tryout->questions()->orderBy('order', 'asc')->get();
-
-        return Inertia::render('Tryout/ExamSheetBKN', [
-            'tryout' => $tryout,
-            'questions' => $questions,
-            'user' => auth()->user()
         ]);
     }
 
