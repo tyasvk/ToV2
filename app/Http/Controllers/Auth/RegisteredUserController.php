@@ -42,6 +42,10 @@ class RegisteredUserController extends Controller
             'password' => Hash::make($request->password),
         ]);
 
+        // --- TAMBAHAN: OTOMATIS ASSIGN ROLE 'USER' ---
+        $user->assignRole('user'); 
+        // ---------------------------------------------
+
         event(new Registered($user));
 
         Auth::login($user);

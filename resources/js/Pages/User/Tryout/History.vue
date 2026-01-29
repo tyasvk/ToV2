@@ -1,147 +1,163 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
-import { ref, computed } from 'vue';
+import { computed } from 'vue';
 
 const props = defineProps({
     attempts: Array,
 });
 
-const search = ref('');
-
-const filteredAttempts = computed(() => {
-    if (!search.value) return props.attempts;
-    return props.attempts.filter(attempt => 
-        attempt.tryout.title.toLowerCase().includes(search.value.toLowerCase())
-    );
-});
-
+// Format Tanggal
 const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('id-ID', {
-        day: '2-digit', month: 'short', year: 'numeric'
+        day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
     });
+};
+
+// Hitung Statistik
+const stats = computed(() => {
+    if (!props.attempts.length) return { total: 0, highest: 0, average: 0 };
+    
+    const scores = props.attempts.map(a => a.total_score);
+    const total = scores.length;
+    const highest = Math.max(...scores);
+    const sum = scores.reduce((a, b) => a + b, 0);
+    const average = Math.round(sum / total);
+
+    return { total, highest, average };
+});
+
+// Cek Kelulusan (Passing Grade: TWK 65, TIU 80, TKP 166)
+const isPassed = (attempt) => {
+    return attempt.twk_score >= 65 && attempt.tiu_score >= 80 && attempt.tkp_score >= 166;
 };
 </script>
 
 <template>
-    <Head title="Riwayat Ujian" />
+    <Head title="Riwayat Tryout" />
 
     <AuthenticatedLayout>
         <template #header>
-            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
-                <div class="text-center md:text-left">
-                    <h2 class="font-black text-2xl text-slate-900 tracking-tighter uppercase">Riwayat Ujian</h2>
-                    <div class="flex items-center gap-2 mt-1 justify-center md:justify-start">
-                        <span class="w-1.5 h-1.5 bg-black rounded-full"></span>
-                        <p class="text-[10px] text-slate-400 font-black tracking-[0.2em] uppercase">Arsip Performa Anda</p>
-                    </div>
-                </div>
-                
-                <div class="flex gap-4 items-center">
-                    <div class="px-6 py-2 bg-black text-white rounded-sm text-center min-w-[120px]">
-                        <div class="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Total Sesi</div>
-                        <div class="text-xl font-black leading-none">{{ attempts.length }}</div>
-                    </div>
-                    <div class="px-6 py-2 border border-black rounded-sm text-center min-w-[120px]">
-                        <div class="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Best Score</div>
-                        <div class="text-xl font-black text-slate-900 leading-none">
-                            {{ attempts.length > 0 ? Math.max(...attempts.map(a => a.total_score)) : 0 }}
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <h2 class="font-semibold text-xl text-gray-800 leading-tight">Riwayat Tryout Saya</h2>
         </template>
 
-        <div class="py-4">
-            <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="py-8 md:py-12 bg-slate-50 min-h-screen">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
                 
-                <div class="mb-8">
-                    <div class="relative group max-w-2xl mx-auto">
-                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-transform group-focus-within:scale-110">
-                            <svg class="h-5 w-5 text-gray-400 group-focus-within:text-black transition-colors" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                        </div>
-                        
-                        <input 
-                            v-model="search" 
-                            type="text" 
-                            placeholder="CARI BERDASARKAN NAMA ATAU ID UJIAN..." 
-                            class="w-full bg-white border border-gray-200 focus:border-black py-5 pl-12 pr-20 text-[11px] font-black tracking-widest text-slate-900 placeholder-gray-300 focus:ring-4 focus:ring-gray-900/5 transition-all rounded-xl shadow-sm"
-                        >
-                        
-                        <div class="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                            <kbd class="hidden sm:inline-flex items-center px-2 py-1 border border-gray-200 rounded text-[9px] font-black text-gray-300 bg-gray-50 group-focus-within:border-black group-focus-within:text-black transition-all">
-                                SEARCH_CMD
-                            </kbd>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Ujian Dikerjakan</span>
+                        <div class="flex items-end gap-2">
+                            <h3 class="text-3xl font-black text-slate-800">{{ stats.total }}</h3>
+                            <span class="text-sm font-bold text-slate-500 mb-1.5">Kali</span>
                         </div>
                     </div>
-                    
-                    <div v-if="search" class="text-center mt-3 animate-pulse">
-                        <span class="text-[9px] font-black text-slate-400 tracking-[0.3em] uppercase">
-                            MENAMPILKAN {{ filteredAttempts.length }} HASIL DARI "{{ search }}"
-                        </span>
+
+                    <div class="bg-gradient-to-br from-[#004a87] to-blue-700 p-5 rounded-2xl shadow-md text-white flex flex-col justify-center relative overflow-hidden">
+                        <div class="absolute right-0 top-0 opacity-10 transform translate-x-2 -translate-y-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                        </div>
+                        <span class="text-xs font-bold text-blue-100 uppercase tracking-wider mb-1">Skor Tertinggi Global</span>
+                        <div class="text-3xl font-black tracking-tight">{{ stats.highest }}</div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Rata-rata Skor</span>
+                        <div class="flex items-end gap-2">
+                            <h3 class="text-3xl font-black text-slate-800">{{ stats.average }}</h3>
+                            <span class="text-sm font-bold text-slate-500 mb-1.5">Poin</span>
+                        </div>
                     </div>
                 </div>
 
-                <div class="space-y-3">
-                    <div 
-                        v-for="attempt in filteredAttempts" 
-                        :key="attempt.id" 
-                        class="bg-white border border-gray-100 p-6 flex flex-col lg:flex-row items-center gap-6 hover:shadow-2xl hover:shadow-gray-200/50 transition-all duration-300"
+                <div class="space-y-4">
+                    <h3 class="font-bold text-slate-700 text-lg mb-4 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Semua Aktivitas
+                    </h3>
+
+                    <div v-if="attempts.length === 0" class="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center">
+                        <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 mx-auto">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                        </div>
+                        <h3 class="text-slate-900 font-bold text-lg">Belum Ada Riwayat</h3>
+                        <p class="text-slate-500 text-sm mt-1 mb-4">Anda belum mengerjakan tryout apapun.</p>
+                        <Link :href="route('tryout.index')" class="inline-block px-6 py-2.5 bg-[#004a87] text-white rounded-xl text-sm font-bold shadow-md hover:bg-blue-800 transition">
+                            Cari Tryout
+                        </Link>
+                    </div>
+
+                    <div v-for="attempt in attempts" :key="attempt.id" 
+                        class="group bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-300 flex flex-col md:flex-row items-start md:items-center gap-6"
                     >
-                        <div class="w-full lg:w-48 shrink-0">
-                            <div class="text-[9px] font-black text-gray-400 uppercase mb-1">{{ formatDate(attempt.created_at) }}</div>
-                            <div class="text-xs font-mono font-bold text-gray-300">#{{ String(attempt.id).padStart(6, '0') }}</div>
+                        
+                        <div class="flex items-start gap-4 md:w-1/3">
+                            <div class="flex-shrink-0 mt-1">
+                                <div v-if="isPassed(attempt)" class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center border border-emerald-200" title="Lulus Passing Grade">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                                <div v-else class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200" title="Belum Lulus">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <div>
+                                <Link :href="route('tryout.history.detail', attempt.tryout.id)" class="text-sm md:text-base font-bold text-slate-800 hover:text-[#004a87] transition line-clamp-1 group-hover:underline">
+                                    {{ attempt.tryout.title }}
+                                </Link>
+                                <div class="text-xs text-slate-500 mt-1 flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 002-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                    {{ formatDate(attempt.created_at) }}
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="flex-1 w-full">
-                            <h3 class="text-lg font-black text-slate-900 uppercase leading-tight tracking-tight">{{ attempt.tryout.title }}</h3>
+                        <div class="flex-1 w-full border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6">
+                            <div class="flex flex-wrap items-center gap-y-2 gap-x-6">
+                                <div class="flex items-center gap-3 mr-4">
+                                    <span class="text-xs font-bold text-slate-400 uppercase">Total</span>
+                                    <span class="text-2xl font-black" :class="isPassed(attempt) ? 'text-emerald-600' : 'text-slate-700'">
+                                        {{ attempt.total_score }}
+                                    </span>
+                                </div>
+
+                                <div class="flex gap-2 flex-wrap">
+                                    <div class="px-2.5 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs font-medium text-slate-600" :class="{'bg-red-50 text-red-600 border-red-100': attempt.twk_score < 65}">
+                                        TWK: <span class="font-bold">{{ attempt.twk_score }}</span>
+                                    </div>
+                                    <div class="px-2.5 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs font-medium text-slate-600" :class="{'bg-red-50 text-red-600 border-red-100': attempt.tiu_score < 80}">
+                                        TIU: <span class="font-bold">{{ attempt.tiu_score }}</span>
+                                    </div>
+                                    <div class="px-2.5 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs font-medium text-slate-600" :class="{'bg-red-50 text-red-600 border-red-100': attempt.tkp_score < 166}">
+                                        TKP: <span class="font-bold">{{ attempt.tkp_score }}</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="flex gap-8 items-center bg-gray-50/50 px-6 py-3 rounded-sm border border-gray-100/50">
-                            <div class="text-center">
-                                <div class="text-[8px] font-bold text-gray-400 uppercase tracking-widest">TWK</div>
-                                <div class="font-black text-slate-900">{{ attempt.twk_score }}</div>
-                            </div>
-                            <div class="text-center">
-                                <div class="text-[8px] font-bold text-gray-400 uppercase tracking-widest">TIU</div>
-                                <div class="font-black text-slate-900">{{ attempt.tiu_score }}</div>
-                            </div>
-                            <div class="text-center">
-                                <div class="text-[8px] font-bold text-gray-400 uppercase tracking-widest">TKP</div>
-                                <div class="font-black text-slate-900">{{ attempt.tkp_score }}</div>
-                            </div>
-                            <div class="text-center border-l border-gray-200 pl-8">
-                                <div class="text-[8px] font-bold text-gray-400 uppercase tracking-widest">TOTAL</div>
-                                <div class="text-xl font-black text-slate-900">{{ attempt.total_score }}</div>
-                            </div>
-                        </div>
-
-                        <div class="flex items-center gap-2 w-full lg:w-auto shrink-0">
-                            <a :href="`/results/${attempt.id}/certificate`" target="_blank" class="flex-1 lg:flex-none px-4 py-2 border border-gray-200 text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition">
-                                Sertifikat
-                            </a>
-                            <Link :href="route('tryout.leaderboard', attempt.tryout_id)" class="flex-1 lg:flex-none px-4 py-2 border border-black text-[10px] font-black uppercase tracking-widest hover:bg-black hover:text-white transition">
-                                Ranking
+                        <div class="w-full md:w-auto flex gap-2 mt-2 md:mt-0">
+                            <Link :href="route('tryout.result', attempt.id)" 
+                                class="flex-1 md:flex-none inline-flex justify-center items-center px-4 py-2 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 text-xs font-bold rounded-lg transition-all whitespace-nowrap"
+                            >
+                                Rapor
                             </Link>
-                            <Link :href="route('tryout.review', attempt.id)" class="flex-1 lg:flex-none px-4 py-2 bg-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition">
-                                Review
+                            <Link :href="route('tryout.review', attempt.id)" 
+                                class="flex-1 md:flex-none inline-flex justify-center items-center px-4 py-2 bg-[#004a87] hover:bg-blue-800 text-white text-xs font-bold rounded-lg transition-all shadow-sm whitespace-nowrap"
+                            >
+                                Pembahasan
                             </Link>
                         </div>
+
                     </div>
                 </div>
 
-                <div v-if="attempts.length > 0" class="mt-12 text-center border-t border-gray-100 pt-8">
-                    <span class="text-[10px] font-black text-gray-300 uppercase tracking-[0.5em]">CPNS Nusantara Learning Center</span>
-                </div>
             </div>
         </div>
     </AuthenticatedLayout>
 </template>
-
-<style scoped>
-.transition-all {
-    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
-</style>

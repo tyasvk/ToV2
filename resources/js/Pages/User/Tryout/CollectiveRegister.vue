@@ -1,69 +1,93 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, useForm } from '@inertiajs/vue3';
-import { ref, computed, watch } from 'vue';
+import { ref } from 'vue';
+import axios from 'axios';
 
 const props = defineProps({
-    tryout: Object
+    tryout: Object,
 });
 
-const qty = ref(2); // Default minimal kolektif
-
-// Form data
 const form = useForm({
-    tryout_id: props.tryout.id,
-    total_participants: qty,
-    emails: ['', ''], // Array email untuk anggota (di luar penginput)
+    payment_method: 'wallet',
+    emails: ['', ''], 
 });
 
-// Update jumlah field email saat qty berubah
-watch(qty, (newQty) => {
-    const currentEmails = [...form.emails];
-    const needed = newQty - 1; // User sendiri tidak perlu input email
-    
-    if (currentEmails.length < needed) {
-        // Tambah field
-        for (let i = currentEmails.length; i < needed; i++) {
-            currentEmails.push('');
-        }
-    } else {
-        // Kurangi field
-        currentEmails.splice(needed);
+// State Visual
+const validationStatus = ref([null, null]); // 'valid', 'invalid', null
+const isLoading = ref([false, false]);
+
+// Controller untuk membatalkan request lama (biar tidak bentrok saat mengetik cepat)
+const abortControllers = ref([null, null]);
+
+// Tambah Peserta
+const addParticipant = () => {
+    if (form.emails.length < 5) {
+        form.emails.push('');
+        validationStatus.value.push(null);
+        isLoading.value.push(false);
+        abortControllers.value.push(null);
     }
-    form.emails = currentEmails;
-});
+};
 
-// Perhitungan Diskon
-const pricing = computed(() => {
-    const basePrice = parseFloat(props.tryout.price);
-    let discountPercent = 0;
+// Hapus Peserta
+const removeParticipant = (index) => {
+    form.emails.splice(index, 1);
+    validationStatus.value.splice(index, 1);
+    isLoading.value.splice(index, 1);
+    abortControllers.value.splice(index, 1);
+};
+
+// Fungsi Cek Email (REALTIME)
+const checkEmail = async (index, email) => {
+    // 1. Reset Status Visual (Gunakan splice agar reaktif)
+    validationStatus.value.splice(index, 1, null); 
+
+    // 2. Batalkan request sebelumnya jika masih jalan
+    if (abortControllers.value[index]) {
+        abortControllers.value[index].abort();
+    }
+
+    // 3. Jika kosong, berhenti
+    if (!email) return;
+
+    // 4. Validasi Format Email Sederhana
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        validationStatus.value.splice(index, 1, 'invalid'); // Format salah
+        return;
+    }
+
+    // 5. Mulai Loading & Request
+    isLoading.value.splice(index, 1, true);
     
-    if (qty.value === 2) discountPercent = 5;
-    else if (qty.value === 3) discountPercent = 10;
-    else if (qty.value === 4) discountPercent = 15;
-    else if (qty.value >= 5) discountPercent = 20;
+    const controller = new AbortController();
+    abortControllers.value[index] = controller;
 
-    const totalPrice = basePrice * qty.value;
-    const discountAmount = totalPrice * (discountPercent / 100);
-    
-    return {
-        percent: discountPercent,
-        total: totalPrice - discountAmount,
-        perPerson: (totalPrice - discountAmount) / qty.value
-    };
-});
+    try {
+        // PANGGIL API
+        const response = await axios.post(route('api.check.email'), { email }, {
+            signal: controller.signal
+        });
+        
+        // Update Status: Ada = valid, Tidak = invalid
+        const status = response.data.exists ? 'valid' : 'invalid';
+        validationStatus.value.splice(index, 1, status);
 
-const formatPrice = (price) => {
-    return new Intl.NumberFormat('id-ID', {
-        style: 'currency',
-        currency: 'IDR',
-        minimumFractionDigits: 0
-    }).format(price);
+    } catch (error) {
+        if (axios.isCancel(error)) return; // Abaikan jika dibatalkan user
+        console.error("API Error:", error);
+        // Jangan ubah status jadi null, biarkan user tau ada masalah (opsional)
+    } finally {
+        isLoading.value.splice(index, 1, false);
+    }
 };
 
 const submit = () => {
-    form.post(route('tryout.collective.store'));
+    form.post(route('tryout.processRegistration', props.tryout.id));
 };
+
+const formatRupiah = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
 </script>
 
 <template>
@@ -71,94 +95,124 @@ const submit = () => {
 
     <AuthenticatedLayout>
         <template #header>
-            <div class="flex flex-col">
-                <h2 class="text-2xl font-black text-slate-900 uppercase tracking-tighter italic">Pendaftaran Kolektif</h2>
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Dapatkan diskon hingga 20% dengan mengajak rekan anda</p>
-            </div>
+            <h2 class="font-semibold text-xl text-gray-800 leading-tight">Pendaftaran Kolektif</h2>
         </template>
 
-        <div class="py-12 bg-slate-50/50 min-h-screen">
-            <div class="max-w-4xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-3 gap-8">
-                
-                <div class="lg:col-span-2 space-y-6">
-                    <div class="bg-white rounded-[3rem] p-10 shadow-xl shadow-slate-200/50 border border-slate-100">
-                        <div class="mb-8">
-                            <h3 class="text-lg font-black text-slate-900 uppercase tracking-tight">Konfigurasi Kelompok</h3>
-                            <p class="text-[10px] text-slate-400 font-bold uppercase mt-1">Pilih jumlah peserta dan lengkapi email anggota</p>
-                        </div>
-
-                        <div class="mb-10">
-                            <label class="block text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 text-center">Jumlah Peserta</label>
-                            <div class="flex gap-2 p-2 bg-slate-50 rounded-3xl border border-slate-100">
-                                <button v-for="n in [2,3,4,5]" :key="n"
-                                    @click="qty = n"
-                                    type="button"
-                                    :class="qty === n ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400 hover:bg-indigo-50'"
-                                    class="flex-1 py-4 rounded-2xl text-xs font-black transition-all active:scale-95 uppercase"
-                                >
-                                    {{ n }} Orang
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="space-y-6">
-                            <div v-for="(email, index) in form.emails" :key="index" class="space-y-2">
-                                <label class="text-[9px] font-black text-slate-400 uppercase ml-4 tracking-widest">Email Anggota #{{ index + 2 }}</label>
-                                <input 
-                                    v-model="form.emails[index]"
-                                    type="email" 
-                                    required
-                                    placeholder="contoh: rekan@email.com"
-                                    class="w-full border-none bg-slate-50 rounded-[1.5rem] p-5 focus:ring-2 focus:ring-indigo-500/20 font-bold text-sm shadow-inner"
-                                />
-                            </div>
-                        </div>
+        <div class="py-12">
+            <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
+                    
+                    <div class="mb-6 border-b pb-4">
+                        <h3 class="text-lg font-bold text-slate-800">{{ tryout.title }}</h3>
+                        <p class="text-slate-500 text-sm">Harga Satuan: {{ formatRupiah(tryout.price) }}</p>
                     </div>
-                </div>
 
-                <div class="lg:col-span-1">
-                    <div class="bg-slate-900 rounded-[3rem] p-8 text-white shadow-2xl sticky top-8">
-                        <h4 class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 mb-6">Ringkasan Biaya</h4>
+                    <form @submit.prevent="submit">
                         
-                        <div class="space-y-4 mb-8">
-                            <div class="flex justify-between items-center">
-                                <span class="text-[10px] font-bold text-slate-400 uppercase">Paket</span>
-                                <span class="text-xs font-black uppercase tracking-tighter text-right">{{ tryout.title }}</span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-[10px] font-bold text-slate-400 uppercase">Harga Satuan</span>
-                                <span class="text-xs font-black">{{ formatPrice(tryout.price) }}</span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-[10px] font-bold text-slate-400 uppercase">Diskon Grup ({{ pricing.percent }}%)</span>
-                                <span class="text-xs font-black text-emerald-400">- {{ formatPrice(tryout.price * qty * (pricing.percent/100)) }}</span>
-                            </div>
-                            <div class="pt-4 border-t border-slate-800 flex justify-between items-end">
-                                <span class="text-[10px] font-black text-slate-500 uppercase">Total Bayar</span>
-                                <div class="text-right">
-                                    <p class="text-2xl font-black text-white leading-none tracking-tighter">{{ formatPrice(pricing.total) }}</p>
-                                    <p class="text-[8px] font-bold text-slate-500 uppercase mt-1">Hanya {{ formatPrice(pricing.perPerson) }} / Orang</p>
+                        <div class="space-y-4 mb-6">
+                            <label class="block text-sm font-medium text-gray-700">Email Peserta (Maks. 5 Orang)</label>
+                            
+                            <div class="flex items-center gap-2">
+                                <div class="relative w-full">
+                                    <input type="email" :value="$page.props.auth.user.email" disabled 
+                                        class="w-full border-slate-300 bg-slate-100 rounded-lg text-slate-500 cursor-not-allowed pl-3 pr-20 py-2" 
+                                    />
+                                    <div class="absolute right-3 top-1/2 -translate-y-1/2 z-10">
+                                        <span class="text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded">Ketua</span>
+                                    </div>
                                 </div>
                             </div>
+
+                            <div v-for="(email, index) in form.emails" :key="index" class="flex items-center gap-2 relative">
+                                <div class="relative w-full group">
+                                    <input 
+                                        v-model="form.emails[index]"
+                                        type="email" 
+                                        class="w-full border-slate-300 rounded-lg focus:ring-[#004a87] focus:border-[#004a87] pr-12 transition-colors"
+                                        :class="{
+                                            'border-red-500 focus:border-red-500 focus:ring-red-200': validationStatus[index] === 'invalid',
+                                            'border-emerald-500 focus:border-emerald-500 focus:ring-emerald-200': validationStatus[index] === 'valid'
+                                        }"
+                                        placeholder="Masukkan email anggota..."
+                                        required
+                                        @input="checkEmail(index, form.emails[index])"
+                                    />
+
+                                    <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center z-20 pointer-events-none">
+                                        
+                                        <svg v-if="isLoading[index]" class="animate-spin h-5 w-5 text-[#004a87]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        
+                                        <svg v-else-if="validationStatus[index] === 'valid'" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                        </svg>
+
+                                        <svg v-else-if="validationStatus[index] === 'invalid'" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+
+                                    </div>
+
+                                    <div v-if="validationStatus[index] === 'invalid'" class="absolute right-0 top-full mt-1 z-30 hidden group-hover:block">
+                                        <div class="bg-red-600 text-white text-xs rounded py-1 px-2 shadow-lg">
+                                            Email tidak terdaftar
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button type="button" @click="removeParticipant(index)" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition shrink-0">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
+                            </div>
+
+                            <button 
+                                v-if="form.emails.length < 5"
+                                type="button" 
+                                @click="addParticipant" 
+                                class="text-sm font-bold text-[#004a87] hover:underline flex items-center gap-1 mt-2"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                                Tambah Anggota
+                            </button>
                         </div>
 
-                        <button 
-                            @click="submit"
-                            :disabled="form.processing"
-                            class="w-full py-5 bg-indigo-600 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-900/50 hover:bg-white hover:text-indigo-600 transition-all active:scale-95 disabled:opacity-50"
-                        >
-                            {{ form.processing ? 'Memproses...' : 'Lanjut Pembayaran' }}
-                        </button>
-                    </div>
-                </div>
+                        <div class="mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <label class="block text-sm font-medium text-gray-700 mb-3">Metode Pembayaran</label>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <label class="border p-4 rounded-xl flex items-center gap-3 cursor-pointer transition bg-white hover:border-blue-300" :class="form.payment_method === 'wallet' ? 'border-[#004a87] ring-1 ring-[#004a87]' : 'border-slate-200'">
+                                    <input type="radio" v-model="form.payment_method" value="wallet" class="text-[#004a87] focus:ring-[#004a87]">
+                                    <div>
+                                        <div class="text-sm font-bold text-slate-700">Saldo Dompet</div>
+                                        <div class="text-xs text-slate-500">Bayar instan dengan saldo</div>
+                                    </div>
+                                </label>
+                                <label class="border p-4 rounded-xl flex items-center gap-3 cursor-pointer transition bg-white hover:border-blue-300" :class="form.payment_method === 'midtrans' ? 'border-[#004a87] ring-1 ring-[#004a87]' : 'border-slate-200'">
+                                    <input type="radio" v-model="form.payment_method" value="midtrans" class="text-[#004a87] focus:ring-[#004a87]">
+                                    <div>
+                                        <div class="text-sm font-bold text-slate-700">QRIS / Transfer</div>
+                                        <div class="text-xs text-slate-500">Virtual Account, E-Wallet</div>
+                                    </div>
+                                </label>
+                            </div>
+                            <p v-if="form.errors.payment" class="text-red-500 text-sm mt-2 font-medium">{{ form.errors.payment }}</p>
+                        </div>
 
+                        <div class="flex justify-end pt-4 border-t border-slate-100">
+                            <button 
+                                type="submit" 
+                                class="px-6 py-2.5 bg-[#004a87] text-white font-bold rounded-xl hover:bg-blue-800 transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                :disabled="form.processing || validationStatus.includes('invalid') || isLoading.includes(true)"
+                            >
+                                <svg v-if="form.processing" class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                {{ form.processing ? 'Memproses...' : 'Daftar Sekarang' }}
+                            </button>
+                        </div>
+
+                    </form>
+                </div>
             </div>
         </div>
     </AuthenticatedLayout>
 </template>
-
-<style scoped>
-/* Sembunyikan scrollbar untuk pengalaman UI yang lebih clean */
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-</style>

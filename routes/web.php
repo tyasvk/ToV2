@@ -26,11 +26,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['role:user'])->group(function () {
         
         // Katalog & Pendaftaran Tryout
-        Route::get('/tryouts', [UserTryoutController::class, 'index'])->name('tryout.index');
         Route::get('/tryouts/{tryout}', [UserTryoutController::class, 'show'])->name('tryout.show');
         Route::get('/tryout/{tryout}/register', [UserTryoutController::class, 'registerForm'])->name('tryout.register');
         Route::post('/tryout/{tryout}/register', [UserTryoutController::class, 'processRegistration'])->name('tryout.register.store');
         Route::get('/tryout/{tryout}/collective', [UserTryoutController::class, 'collectiveRegister'])->name('tryout.collective');
+
+        // Katalog (Index)
+        Route::get('/tryouts', [UserTryoutController::class, 'index'])->name('tryout.index');
+    
+        // Tryout Saya (Baru)
+        Route::get('/my-tryouts', [UserTryoutController::class, 'myTryouts'])->name('tryout.my');
+
+        // Rute Baru: Detail Riwayat per Tryout
+        Route::get('/tryouts/{tryout}/history', [UserTryoutController::class, 'historyDetail'])->name('tryout.history.detail');
+
+        // Rute Check Email (AJAX)
+        Route::post('/check-email-availability', [App\Http\Controllers\User\TryoutController::class, 'checkEmail'])
+        ->name('api.check.email');
 
         // Ujian (Exam)
         Route::get('/tryouts/{tryout}/exam', [UserTryoutController::class, 'exam'])->name('tryout.exam');

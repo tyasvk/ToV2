@@ -8,27 +8,18 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Tryout extends Model
 {
-
-use HasFactory;
+    use HasFactory;
 
     protected $guarded = [];
 
-    /**
-     * Definisikan relasi ke tabel transactions
-     * Satu Tryout bisa memiliki banyak Transaksi
-     */
-    public function transactions(): HasMany
-    {
-        return $this->hasMany(Transaction::class);
-    }
     protected $fillable = [
         'title', 
         'description', 
         'duration_minutes', 
         'is_active', 
-        'is_published', // Pastikan is_published juga ada jika digunakan
-        'is_paid',      // Tambahkan ini
-        'price',         // Tambahkan ini
+        'is_published', 
+        'is_paid',      
+        'price',         
         'published_at', 
         'started_at'
     ];
@@ -37,10 +28,19 @@ use HasFactory;
         'published_at' => 'datetime',
         'started_at' => 'datetime',
         'is_active' => 'boolean',
-        'is_paid' => 'boolean',   // Tambahkan ini agar database mengenali boolean
-        'price' => 'decimal:2',    // Tambahkan ini agar format harga konsisten
-        'start_time' => 'datetime',
+        'is_published' => 'boolean',
+        'is_paid' => 'boolean',   
+        'price' => 'decimal:2',    
     ];
+
+    /**
+     * Relasi ke tabel transactions
+     * Satu Tryout bisa memiliki banyak Transaksi
+     */
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(Transaction::class);
+    }
 
     /**
      * Relasi ke model Question
@@ -48,5 +48,14 @@ use HasFactory;
     public function questions(): HasMany
     {
         return $this->hasMany(Question::class);
+    }
+
+    /**
+     * Relasi ke model ExamAttempt (Riwayat Pengerjaan)
+     * INI YANG HILANG SEBELUMNYA
+     */
+    public function examAttempts(): HasMany
+    {
+        return $this->hasMany(ExamAttempt::class);
     }
 }

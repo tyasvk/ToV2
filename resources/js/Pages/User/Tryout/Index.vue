@@ -7,97 +7,85 @@ const props = defineProps({
     tryouts: [Object, Array], 
 });
 
-// 1. Ambil data list tryout
 const tryoutList = computed(() => {
     if (props.tryouts && props.tryouts.data) return props.tryouts.data;
     return Array.isArray(props.tryouts) ? props.tryouts : [];
 });
 
-// 2. Cek apakah user sudah daftar (punya transaksi lunas/success)
-const isRegistered = (tryout) => {
-    return tryout.transactions && tryout.transactions.length > 0;
-};
-
-// 3. Cek apakah waktu sekarang sudah masuk jadwal mulai
-const isStarted = (startTime) => {
-    if (!startTime) return true;
-    return new Date() >= new Date(startTime);
-};
-
-// 4. Format Tanggal untuk info di Card
-const formatDateTime = (dateTime) => {
-    if (!dateTime) return 'Kapan saja';
-    return new Date(dateTime).toLocaleString('id-ID', {
-        day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-    });
-};
+const paginationLinks = computed(() => {
+    return (props.tryouts && props.tryouts.links) ? props.tryouts.links : [];
+});
 
 const formatRupiah = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
 </script>
 
 <template>
-    <Head title="Daftar Tryout" />
+    <Head title="Katalog Tryout" />
 
     <AuthenticatedLayout>
-        <div class="py-12">
+        <template #header>
+            <div class="flex gap-6 overflow-x-auto whitespace-nowrap scrollbar-hide">
+                <Link :href="route('tryout.index')" class="pb-2 text-sm font-bold text-[#004a87] border-b-2 border-[#004a87]">
+                    Katalog Paket
+                </Link>
+                <Link :href="route('tryout.my')" class="pb-2 text-sm font-bold text-slate-500 hover:text-[#004a87] transition-colors border-b-2 border-transparent hover:border-slate-300">
+                    Tryout Saya
+                </Link>
+            </div>
+        </template>
+
+        <div class="pt-2 pb-12 md:pt-4">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 
-                <div v-if="tryoutList.length === 0" class="py-20 text-center bg-white rounded-3xl border border-dashed border-slate-300">
-                    <p class="text-slate-500 font-bold">Belum ada Tryout tersedia.</p>
+                <div v-if="tryoutList.length === 0" class="py-12 md:py-20 text-center bg-white rounded-3xl border border-dashed border-slate-300 mx-auto px-4 mt-4">
+                    <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 mx-auto">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                    </div>
+                    <h3 class="text-slate-900 font-bold text-lg">Semua Paket Sudah Anda Miliki</h3>
+                    <p class="text-slate-500 text-sm mt-1">Anda telah membeli semua paket tryout yang tersedia.</p>
                 </div>
 
-                <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div v-for="tryout in tryoutList" :key="tryout.id" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mt-2">
+                    <div v-for="tryout in tryoutList" :key="tryout.id" class="group bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col overflow-hidden relative">
                         
-                        <div class="h-32 bg-gradient-to-br from-slate-800 to-[#004a87] p-4 relative">
+                        <div class="h-32 bg-gradient-to-br from-slate-800 to-[#004a87] p-4 relative overflow-hidden">
+                            <div class="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
                             <div class="absolute top-3 right-3">
                                 <span class="px-2 py-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-black uppercase rounded">{{ tryout.price == 0 ? 'Gratis' : 'Premium' }}</span>
                             </div>
-                            <h3 class="text-white font-bold text-lg mt-8 line-clamp-2 leading-tight">{{ tryout.title }}</h3>
+                            <h3 class="text-white font-bold text-lg mt-12 line-clamp-2 leading-tight relative z-10">{{ tryout.title }}</h3>
                         </div>
 
                         <div class="p-5 flex-1 flex flex-col">
-                            <div class="space-y-2 mb-6 text-left">
+                            <div class="space-y-2 mb-6">
                                 <div class="flex items-center gap-2 text-[11px] font-bold text-slate-500 uppercase">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                     {{ tryout.duration_minutes }} Menit | CAT BKN
                                 </div>
-                                <div class="p-2 bg-blue-50 rounded-lg border border-blue-100 flex items-center gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 002-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                    <span class="text-[10px] font-black text-blue-700 uppercase">Akses: {{ formatDateTime(tryout.start_time) }}</span>
-                                </div>
                             </div>
 
-                            <div class="mt-auto pt-4 border-t flex items-center justify-between">
-                                <div class="text-left">
-                                    <p class="text-[9px] font-bold text-slate-400 uppercase">Harga</p>
-                                    <p class="text-sm font-black text-slate-900">{{ tryout.price > 0 ? formatRupiah(tryout.price) : 'Rp 0' }}</p>
+                            <div class="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
+                                <div>
+                                    <p class="text-[9px] font-bold text-slate-400 uppercase">Harga Paket</p>
+                                    <p class="text-sm font-black text-slate-900">{{ tryout.price > 0 ? formatRupiah(tryout.price) : 'Gratis' }}</p>
                                 </div>
 
-                                <Link v-if="!isRegistered(tryout)" 
-                                    :href="route('tryout.register', tryout.id)"
-                                    class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase rounded-xl transition-all shadow-md active:scale-95"
+                                <Link :href="route('tryout.register', tryout.id)"
+                                    class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-2 whitespace-nowrap"
                                 >
                                     Daftar
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                                 </Link>
-
-                                <button v-else-if="isRegistered(tryout) && !isStarted(tryout.start_time)"
-                                    disabled
-                                    class="px-5 py-2.5 bg-slate-200 text-slate-400 text-xs font-black uppercase rounded-xl cursor-not-allowed border border-slate-300"
-                                >
-                                    Belum Dimulai
-                                </button>
-
-                                <Link v-else
-                                    :href="route('tryout.wait', tryout.id)"
-                                    class="px-5 py-2.5 bg-[#004a87] hover:bg-blue-800 text-white text-xs font-black uppercase rounded-xl transition-all shadow-md active:scale-95"
-                                >
-                                    Mulai Ujian
-                                </Link>
-
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <div v-if="paginationLinks.length > 3" class="mt-8 md:mt-12 flex justify-center flex-wrap gap-1">
+                    <template v-for="(link, k) in paginationLinks" :key="k">
+                        <Link v-if="link.url" :href="link.url" v-html="link.label" class="px-3 py-2 md:px-4 text-xs font-bold rounded-lg transition-all border shadow-sm" :class="link.active ? 'bg-[#004a87] text-white border-[#004a87]' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'" />
+                        <span v-else v-html="link.label" class="px-3 py-2 md:px-4 text-xs text-slate-300 border border-transparent"></span>
+                    </template>
                 </div>
             </div>
         </div>
