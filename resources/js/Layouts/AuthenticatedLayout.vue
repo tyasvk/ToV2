@@ -4,33 +4,22 @@ import { Link, usePage } from '@inertiajs/vue3';
 
 const page = usePage();
 
-// --- 1. DATA AUTH & ROLE (SAFE ACCESS) ---
-// Menggunakan optional chaining (?.) untuk mencegah crash jika data auth belum siap
+// --- 1. DATA AUTH & ROLE ---
 const user = computed(() => page.props.auth?.user ?? null);
 
 // --- 2. NORMALISASI ROLES ---
-// Menangani format data dari Spatie (bisa Array atau Object) agar JavaScript tidak error
 const roles = computed(() => {
     const rawRoles = user.value?.roles;
-    
-    // Jika sudah array, pakai langsung
     if (Array.isArray(rawRoles)) return rawRoles;
-    
-    // Jika object (misal {0: "admin"}), ubah jadi array
     if (typeof rawRoles === 'object' && rawRoles !== null) return Object.values(rawRoles);
-    
-    // Jika tidak ada, kembalikan array kosong
     return [];
 });
 
-// --- 3. LOGIKA ROLE (DENGAN FALLBACK) ---
-// Admin: Harus punya role 'admin'
+// --- 3. LOGIKA ROLE ---
 const isAdmin = computed(() => 
     roles.value.some(r => String(r).toLowerCase() === 'admin')
 );
 
-// User: Punya role 'user' ATAU belum punya role sama sekali (User Baru)
-// Logika '|| roles.value.length === 0' memastikan sidebar tidak hilang untuk user baru.
 const isUser = computed(() => 
     roles.value.some(r => String(r).toLowerCase() === 'user') || roles.value.length === 0
 );
@@ -40,19 +29,14 @@ const logoRoute = computed(() => {
     try {
         return isAdmin.value ? route('admin.dashboard') : route('dashboard');
     } catch (e) {
-        return '/dashboard'; // Fallback aman
+        return '/dashboard'; 
     }
 });
 
 const isSidebarOpen = ref(true);
 
-// Debugging di Console (F12) untuk memantau status
 onMounted(() => {
-    console.log("=== STATUS LAYOUT ===");
-    console.log("User:", user.value?.name);
-    console.log("Roles:", roles.value);
-    console.log("Menu Admin:", isAdmin.value);
-    console.log("Menu User:", isUser.value);
+    console.log("Layout Loaded");
 });
 </script>
 
@@ -91,6 +75,11 @@ onMounted(() => {
                         <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Kelola Tryout</span>
                     </Link>
 
+                    <Link :href="route('admin.tryout-akbar.index')" :class="[route().current('admin.tryout-akbar.*') ? 'bg-red-50 text-red-600' : 'text-gray-500 hover:bg-red-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
+                        <span class="text-xl">🏆</span> 
+                        <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Tryout Akbar</span>
+                    </Link>
+
                     <Link :href="route('admin.transactions.index')" :class="[route().current('admin.transactions.*') ? 'bg-red-50 text-red-600' : 'text-gray-500 hover:bg-red-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
                         <span class="text-xl">💰</span> 
                         <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Transaksi</span>
@@ -110,12 +99,18 @@ onMounted(() => {
                         <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Dashboard</span>
                     </Link>
 
-                    <Link :href="route('tryout.index')" :class="[route().current('tryout.*') ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
+                    <Link :href="route('tryout-akbar.index')" :class="[route().current('tryout-akbar.*') ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
+                        <span class="text-xl">🔥</span> 
+                        <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Event Akbar</span>
+                    </Link>
+
+                    <Link :href="route('tryout.index')" 
+                        :class="[(route().current('tryout.index') || route().current('tryout.show') || route().current('tryout.register')) ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
                         <span class="text-xl">📝</span> 
                         <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Katalog Tryout</span>
                     </Link>
 
-                    <Link :href="route('user.history')" :class="[route().current('user.history') ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
+                    <Link :href="route('tryout.history')" :class="[route().current('tryout.history') ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
                         <span class="text-xl">📜</span> 
                         <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Riwayat Tryout</span>
                     </Link>
@@ -157,7 +152,7 @@ onMounted(() => {
                 <div class="hidden sm:flex items-center gap-3">
                     <div class="text-[9px] font-black text-green-500 uppercase bg-green-50 px-4 py-2 rounded-full border border-green-100 flex items-center gap-2">
                         <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
-                        Swoole Engine Active
+                        System Active
                     </div>
                 </div>
             </header>
@@ -176,17 +171,14 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* Styling Scrollbar Custom */
 .custom-scrollbar::-webkit-scrollbar { width: 4px; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 
-/* Transisi Halus */
 .transition-all {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Animasi Masuk */
 .animate-in {
     animation-duration: 0.5s;
     animation-fill-mode: both;

@@ -17,16 +17,19 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class TryoutController extends Controller
 {
-    /**
-     * HALAMAN KATALOG
-     */
-    public function index(Request $request)
+public function index(Request $request)
     {
+        $user = auth()->user();
+
         $tryouts = Tryout::query()
             ->where('is_published', true)
-            ->whereDoesntHave('transactions', function($query) {
-                $query->where('user_id', auth()->id())
-                      ->whereIn('status', ['paid', 'success']);
+            // PERBAIKAN: Sembunyikan jika user adalah PEMBAYAR atau PESERTA KOLEKTIF
+            ->whereDoesntHave('transactions', function($query) use ($user) {
+                $query->whereIn('status', ['paid', 'success'])
+                      ->where(function($subQuery) use ($user) {
+                          $subQuery->where('user_id', $user->id) // Cek jika dia yang beli
+                                   ->orWhereJsonContains('participants_data', $user->email); // Cek jika dia ditebengi
+                      });
             })
             ->when($request->search, fn($q, $s) => $q->where('title', 'like', "%{$s}%"))
             ->latest()
@@ -39,13 +42,14 @@ class TryoutController extends Controller
         ]);
     }
 
+    // Method ini dipanggil saat user klik "Kerjakan"
     private function validateAccess(Tryout $tryout)
     {
         $user = auth()->user();
-        $now = Carbon::now();
+        $now = now(); // Waktu server saat ini
 
-        // Cek apakah user adalah pembayar ATAU terdaftar sebagai peserta kolektif
-        $hasPaid = Transaction::where('tryout_id', $tryout->id)
+        // 1. CEK APAKAH SUDAH DAFTAR/BAYAR
+        $hasPaid = \App\Models\Transaction::where('tryout_id', $tryout->id)
             ->whereIn('status', ['paid', 'success'])
             ->where(function($query) use ($user) {
                 $query->where('user_id', $user->id)
@@ -57,56 +61,69 @@ class TryoutController extends Controller
             return [
                 'allowed' => false,
                 'route' => 'tryout.register',
-                'message' => 'Anda belum terdaftar di tryout ini.'
+                'params' => $tryout->id,
+                'message' => 'Anda belum terdaftar di event ini.'
             ];
         }
 
-        if ($tryout->started_at && $now->lt($tryout->started_at)) {
-            return [
-                'allowed' => false,
-                'route' => 'tryout.my',
-                'message' => 'Ujian belum dimulai.'
-            ];
+        // 2. KHUSUS TRYOUT AKBAR: CEK WAKTU EVENT
+        if ($tryout->type === 'akbar') {
+            
+            // Jika waktu sekarang KURANG DARI waktu mulai
+            if ($now->lt($tryout->started_at)) {
+                return [
+                    'allowed' => false,
+                    'route' => 'tryout-akbar.index', // Redirect balik ke list
+                    'message' => 'Event belum dimulai! Jadwal: ' . \Carbon\Carbon::parse($tryout->started_at)->format('d M Y, H:i') . ' WIB'
+                ];
+            }
+
+            // Jika waktu sekarang LEBIH DARI waktu selesai
+            if ($now->gt($tryout->ended_at)) {
+                return [
+                    'allowed' => false,
+                    'route' => 'tryout-akbar.index',
+                    'message' => 'Event sudah berakhir pada: ' . \Carbon\Carbon::parse($tryout->ended_at)->format('d M Y, H:i') . ' WIB'
+                ];
+            }
         }
 
-        $attemptsCount = ExamAttempt::where('user_id', $user->id)
+        // 3. CEK LIMIT MENGERJAKAN (Misal maks 1x untuk Akbar, atau 3x untuk umum)
+        // Biasanya Tryout Akbar cuma boleh 1x
+        $maxAttempts = ($tryout->type === 'akbar') ? 1 : 3;
+        
+        $attemptsCount = \App\Models\ExamAttempt::where('user_id', $user->id)
             ->where('tryout_id', $tryout->id)
             ->count();
 
-        if ($attemptsCount >= 3) {
+        if ($attemptsCount >= $maxAttempts) {
             return [
                 'allowed' => false,
-                'route' => 'tryout.history.detail',
-                'message' => 'Batas maksimal pengerjaan tercapai.'
+                'route' => 'tryout.history', // Redirect ke riwayat
+                'message' => 'Anda sudah menyelesaikan ujian ini.'
             ];
         }
 
         return ['allowed' => true];
     }
 
-    /**
-     * API Check Email - Digunakan untuk verifikasi real-time di frontend
-     */
-    public function checkEmail(Request $request)
+public function myTryouts(Request $request)
     {
-        if (!$request->has('email')) return response()->json(['exists' => false]);
-        $exists = \App\Models\User::where('email', $request->email)->exists();
-        return response()->json(['exists' => $exists]);
-    }
+        $userEmail = auth()->user()->email;
+        $userId = auth()->id();
 
-    /**
-     * HALAMAN TRYOUT SAYA
-     */
-    public function myTryouts(Request $request)
-    {
         $tryouts = Tryout::query()
             ->where('is_published', true)
-            ->whereHas('transactions', function($query) {
-                $query->where('user_id', auth()->id())
-                      ->whereIn('status', ['paid', 'success']);
+            // PERBAIKAN LOGIKA DI SINI
+            ->whereHas('transactions', function($query) use ($userId, $userEmail) {
+                $query->whereIn('status', ['paid', 'success'])
+                      ->where(function($q) use ($userId, $userEmail) {
+                          $q->where('user_id', $userId) // Cek jika dia pembayar
+                            ->orWhereJsonContains('participants_data', $userEmail); // Cek jika dia anggota tebengan
+                      });
             })
-            ->withCount(['examAttempts' => function($q) {
-                $q->where('user_id', auth()->id());
+            ->withCount(['examAttempts' => function($q) use ($userId) {
+                $q->where('user_id', $userId);
             }])
             ->when($request->search, fn($q, $s) => $q->where('title', 'like', "%{$s}%"))
             ->latest()
@@ -177,7 +194,7 @@ class TryoutController extends Controller
                     'unit_price' => $tryout->price,
                     'qty' => $qty,
                     'amount' => $finalAmount,
-                    'participants_data' => $participants->all(),
+                    'participants_data' => $participants->all(), // Data peserta disimpan di sini
                     'status' => 'paid',
                 ]);
             });
@@ -239,10 +256,6 @@ class TryoutController extends Controller
         ]);
     }
 
-    /**
-     * PERBAIKAN: finish method
-     * Menggunakan completed_at dan menghapus status.
-     */
     public function finish(Request $request, Tryout $tryout)
     {
         $answers = $request->answers ?? [];
@@ -271,8 +284,7 @@ class TryoutController extends Controller
             'tiu_score' => $tiu,
             'tkp_score' => $tkp,
             'total_score' => $twk + $tiu + $tkp,
-            'completed_at' => now(), // PERBAIKAN: Gunakan completed_at, bukan finished_at
-            // Hapus 'status' => 'finished' karena kolom tidak ada
+            'completed_at' => now(), 
         ]);
 
         return redirect()->route('tryout.result', $attempt->id);
@@ -284,16 +296,22 @@ class TryoutController extends Controller
         return Inertia::render('User/Tryout/Result', ['attempt' => $attempt->load('tryout')]);
     }
 
-    public function historyDetail(Tryout $tryout)
+public function historyDetail(Tryout $tryout)
     {
-        $hasPaid = Transaction::where('user_id', auth()->id())
-            ->where('tryout_id', $tryout->id)
+        $user = auth()->user();
+
+        // PERBAIKAN LOGIKA DI SINI JUGA
+        $hasPaid = Transaction::where('tryout_id', $tryout->id)
             ->whereIn('status', ['paid', 'success'])
+            ->where(function($query) use ($user) {
+                $query->where('user_id', $user->id)
+                      ->orWhereJsonContains('participants_data', $user->email);
+            })
             ->exists();
 
         if (!$hasPaid) abort(403, 'Akses ditolak.');
 
-        $attempts = ExamAttempt::where('user_id', auth()->id())
+        $attempts = ExamAttempt::where('user_id', $user->id)
             ->where('tryout_id', $tryout->id)
             ->orderBy('created_at', 'desc')
             ->get();
@@ -335,39 +353,30 @@ class TryoutController extends Controller
         ]);
     }
 
-    /**
-     * PERBAIKAN: leaderboard method
-     * Menggunakan completed_at sebagai penanda selesai dan waktu urut.
-     */
-public function leaderboard(Request $request, Tryout $tryout)
+    public function leaderboard(Request $request, Tryout $tryout)
     {
         $user = auth()->user();
         $search = $request->input('search');
         $scope = $request->input('scope', 'nasional'); 
 
-        // 1. Ambil ID Pengerjaan Pertama (First Attempt) setiap user
         $firstAttemptIds = ExamAttempt::selectRaw('MIN(id) as id')
             ->where('tryout_id', $tryout->id)
             ->whereNotNull('completed_at')
             ->groupBy('user_id');
 
-        // 2. Query Utama
         $query = ExamAttempt::query()
             ->whereIn('exam_attempts.id', $firstAttemptIds) 
             ->join('users', 'exam_attempts.user_id', '=', 'users.id') 
             ->select('exam_attempts.*'); 
 
-        // 3. Filter Scope (Nasional / Provinsi)
         if ($scope === 'provinsi') {
             $query->where('users.province', $user->province);
         }
 
-        // 4. Filter Pencarian Nama
         if ($search) {
             $query->where('users.name', 'like', "%{$search}%");
         }
 
-        // 5. Logika Perangkingan (PERBAIKAN: Tambahkan prefix 'exam_attempts.')
         $query->orderByRaw("
             (CASE WHEN exam_attempts.twk_score >= 65 AND exam_attempts.tiu_score >= 80 AND exam_attempts.tkp_score >= 166 THEN 1 ELSE 0 END) DESC,
             exam_attempts.total_score DESC,
@@ -377,7 +386,6 @@ public function leaderboard(Request $request, Tryout $tryout)
             TIMESTAMPDIFF(SECOND, exam_attempts.created_at, exam_attempts.completed_at) ASC
         ");
 
-        // Ambil Data
         $rankings = $query->get()->map(function ($attempt, $index) {
             $duration = $attempt->created_at->diff($attempt->completed_at);
             
@@ -424,4 +432,18 @@ public function leaderboard(Request $request, Tryout $tryout)
     {
         return Inertia::render('User/Tryout/CollectiveRegister', ['tryout' => $tryout]);
     }
-} // <--- KURUNG PENUTUP CLASS ADA DI SINI (PALING BAWAH)
+
+    /**
+     * API Check Email
+     */
+    public function checkEmail(Request $request)
+    {
+        if (!$request->has('email')) {
+            return response()->json(['exists' => false]);
+        }
+
+        $exists = \App\Models\User::where('email', $request->email)->exists();
+        
+        return response()->json(['exists' => $exists]);
+    }
+}

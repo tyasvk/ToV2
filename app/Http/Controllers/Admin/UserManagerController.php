@@ -52,35 +52,28 @@ class UserManagerController extends Controller
     return back()->with('message', 'Data pengguna dan role berhasil diperbarui!');
 }
 
-/**
-     * Fitur Baru: Tambah Saldo Manual oleh Admin
-     */
-    public function addBalance(Request $request, User $user)
+public function addBalance(Request $request, User $user)
     {
         $request->validate([
-            'amount' => 'required|numeric|min:100',
+            'amount' => 'required|numeric|min:1000',
             'description' => 'nullable|string|max:255',
         ]);
 
-        try {
-            DB::transaction(function () use ($request, $user) {
-                // 1. Update Saldo User
-                $user->increment('balance', $request->amount);
+        DB::transaction(function () use ($request, $user) {
+            // 1. Tambah saldo ke user
+            $user->increment('balance', $request->amount);
 
-                // 2. Catat di Riwayat Transaksi Dompet
-                WalletTransaction::create([
-                    'user_id' => $user->id,
-                    'type' => 'credit',
-                    'amount' => $request->amount,
-                    'description' => $request->description ?? 'Penambahan saldo manual oleh Admin',
-                    'status' => 'success',
-                    'proof_payment' => 'MANUAL-BY-ADMIN',
-                ]);
-            });
+            // 2. Catat riwayat transaksi dompet (Agar user tahu darimana saldo ini)
+            WalletTransaction::create([
+                'user_id' => $user->id,
+                'type' => 'credit', // credit = masuk
+                'amount' => $request->amount,
+                'description' => $request->description ?? 'Topup Manual oleh Admin',
+                'status' => 'success',
+                'proof_payment' => 'ADMIN-MANUAL',
+            ]);
+        });
 
-            return back()->with('message', 'Saldo berhasil ditambahkan ke user ' . $user->name);
-        } catch (\Exception $e) {
-            return back()->with('error', 'Gagal menambahkan saldo: ' . $e->getMessage());
-        }
+        return back()->with('success', 'Saldo berhasil ditambahkan sebesar Rp ' . number_format($request->amount));
     }
 }

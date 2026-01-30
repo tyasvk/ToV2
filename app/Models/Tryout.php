@@ -21,7 +21,9 @@ class Tryout extends Model
         'is_paid',      
         'price',         
         'published_at', 
-        'started_at'
+        'started_at',
+        'type',           // <--- WAJIB DITAMBAH
+        'requirements',   // <--- WAJIB DITAMBAH
     ];
 
     protected $casts = [

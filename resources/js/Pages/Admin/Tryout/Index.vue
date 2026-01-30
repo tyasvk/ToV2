@@ -156,7 +156,7 @@ const formatPrice = (price) => {
                                     <button @click="openEditModal(tryout)" class="inline-flex items-center bg-white border border-gray-200 hover:border-indigo-600 hover:text-indigo-600 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition shadow-sm">
                                         Edit
                                     </button>
-                                    <Link :href="route('admin.questions.index', tryout.id)" class="inline-flex items-center bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 transition shadow-sm">
+                                    <Link :href="route('admin.tryouts.questions.index', tryout.id)" class="inline-flex items-center bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 transition shadow-sm">
                                         Soal
                                     </Link>
                                     <button @click="deleteTryout(tryout.id)" class="p-2.5 text-gray-300 hover:text-red-500 transition">

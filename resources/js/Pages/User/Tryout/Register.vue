@@ -1,257 +1,323 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, useForm, usePage } from '@inertiajs/vue3';
-import { ref, computed, reactive } from 'vue';
+import { ref, computed } from 'vue';
 import axios from 'axios';
 
 const props = defineProps({
-    tryout: Object
+    tryout: Object,
 });
 
 const page = usePage();
+const currentUser = computed(() => page.props.auth.user);
 
-// --- FORM INITIALIZATION ---
 const form = useForm({
-    emails: [],
-    payment_method: 'midtrans', // Default ke Midtrans
+    payment_method: 'wallet',
+    emails: [], // Awal kosong
 });
 
-const emailErrors = reactive([]);
-const isValidating = reactive([]);
+// State Visual
+const validationStatus = ref([]); 
+const isLoading = ref([]);
+const errorMessage = ref([]);
+const abortControllers = ref([]);
 
-const totalParticipants = computed(() => 1 + form.emails.length);
-const maxAdditionalParticipants = 5;
+// Format Rupiah
+const formatRupiah = (num) => new Intl.NumberFormat('id-ID', { 
+    style: 'currency', 
+    currency: 'IDR', 
+    minimumFractionDigits: 0 
+}).format(num);
 
-// --- LOGIKA PESERTA ---
+// Tambah Peserta
 const addParticipant = () => {
-    if (form.emails.length < maxAdditionalParticipants) {
+    if (form.emails.length < 4) {
         form.emails.push('');
-        emailErrors.push(null);
-        isValidating.push(false);
+        validationStatus.value.push(null);
+        isLoading.value.push(false);
+        abortControllers.value.push(null);
+        errorMessage.value.push(null);
     }
 };
 
+// Hapus Peserta
 const removeParticipant = (index) => {
     form.emails.splice(index, 1);
-    emailErrors.splice(index, 1);
-    isValidating.splice(index, 1);
+    validationStatus.value.splice(index, 1);
+    isLoading.value.splice(index, 1);
+    abortControllers.value.splice(index, 1);
+    errorMessage.value.splice(index, 1);
 };
 
-// --- VALIDASI EMAIL API ---
-let debounceTimer = null;
-const validateEmail = (index, email) => {
-    emailErrors[index] = null;
-    if (!email || !email.includes('@')) return;
+// Cek Email Realtime
+const checkEmail = async (index, emailValue) => {
+    validationStatus.value.splice(index, 1, null);
+    errorMessage.value.splice(index, 1, null);
 
-    clearTimeout(debounceTimer);
-    isValidating[index] = true;
+    if (abortControllers.value[index]) abortControllers.value[index].abort();
 
-    debounceTimer = setTimeout(() => {
-        axios.post(route('api.check.email'), { email: email })
-            .then(() => {
-                emailErrors[index] = null;
-            })
-            .catch(error => {
-                if (error.response && error.response.status === 404) {
-                    emailErrors[index] = "Peserta tidak terdaftar di CPNS Nusantara.";
-                } else {
-                     emailErrors[index] = "Format email tidak valid.";
-                }
-            })
-            .finally(() => {
-                isValidating[index] = false;
-            });
-    }, 500);
+    if (!emailValue) {
+        isLoading.value.splice(index, 1, false);
+        return;
+    }
+
+    isLoading.value.splice(index, 1, true);
+    const controller = new AbortController();
+    abortControllers.value[index] = controller;
+
+    try {
+        const response = await axios.post('/check-email-availability', { email: emailValue }, {
+            signal: controller.signal
+        });
+
+        if (abortControllers.value[index] === controller) {
+            const exists = response.data.exists;
+            if (exists) {
+                validationStatus.value.splice(index, 1, 'valid');
+                errorMessage.value.splice(index, 1, 'User terdaftar');
+            } else {
+                validationStatus.value.splice(index, 1, 'invalid');
+                errorMessage.value.splice(index, 1, 'Email tidak ditemukan');
+            }
+        }
+    } catch (error) {
+        if (!axios.isCancel(error)) {
+            validationStatus.value.splice(index, 1, 'invalid');
+            errorMessage.value.splice(index, 1, 'Error validasi');
+        }
+    } finally {
+        if (abortControllers.value[index] === controller) {
+            isLoading.value.splice(index, 1, false);
+        }
+    }
 };
-
-// --- KALKULASI HARGA ---
-const calculation = computed(() => {
-    const qty = totalParticipants.value;
-    const price = props.tryout.price || 0;
-    let discount = 0;
-    
-    if (qty === 2) discount = 0.05;
-    else if (qty === 3) discount = 0.10;
-    else if (qty === 4) discount = 0.15;
-    else if (qty >= 5) discount = 0.20;
-
-    const totalNormal = price * qty;
-    const totalDiscount = totalNormal * discount;
-    const finalPrice = totalNormal - totalDiscount;
-
-    return {
-        unitPrice: price,
-        discountPercent: discount * 100,
-        totalDiscount: totalDiscount,
-        finalPrice: finalPrice
-    };
-});
-
-const formatPrice = (p) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(p);
-
-const hasValidationErrors = computed(() => {
-     return emailErrors.some(error => error !== null) || (form.emails.length > 0 && form.emails.some(email => email === ''));
-});
 
 const submit = () => {
-    if(hasValidationErrors.value) return;
-    form.transform((data) => ({
-        ...data,
-        qty: totalParticipants.value
-    })).post(route('tryout.register.store', props.tryout.id));
+    form.post(route('tryout.processRegistration', props.tryout.id));
 };
+
+const totalAmount = computed(() => {
+    return props.tryout.price * (form.emails.length + 1);
+});
 </script>
 
 <template>
-    <Head title="Pendaftaran" />
+    <Head title="Pendaftaran Kolektif" />
 
     <AuthenticatedLayout>
-        <template #header></template>
-
-        <div class="bg-slate-50/50 min-h-screen pt-0">
-            <div class="max-w-2xl mx-auto px-0 sm:px-4 pb-20">
+        <div class="min-h-screen bg-slate-50 pt-4 pb-20 font-sans">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 
-                <div class="bg-white rounded-t-[3rem] sm:rounded-[3rem] p-6 sm:p-10 shadow-2xl border-x border-b sm:border border-slate-100 overflow-hidden relative z-10 -mt-2 sm:-mt-8">
+                <form @submit.prevent="submit" class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
                     
-                    <div class="mb-8 mt-2">
-                        <div class="flex items-center gap-2 mb-4">
-                            <span class="text-[8px] font-black text-indigo-500 uppercase tracking-[0.3em] bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">Checkout System</span>
+                    <div class="lg:col-span-8 space-y-5">
+                        
+                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                            <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide mb-4 flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-[#004a87]"></span>
+                                Pendaftar Utama
+                            </h3>
+                            
+                            <div class="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                <div class="w-12 h-12 rounded-full bg-[#004a87] text-white flex items-center justify-center font-bold text-lg shadow-md shadow-blue-200 shrink-0">
+                                    {{ currentUser.name.charAt(0).toUpperCase() }}
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <h4 class="font-bold text-slate-800 truncate">{{ currentUser.name }}</h4>
+                                        <span class="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full uppercase shrink-0">Verified</span>
+                                    </div>
+                                    <p class="text-sm text-slate-500 truncate">{{ currentUser.email }}</p>
+                                </div>
+                            </div>
                         </div>
-                        <h3 class="text-xl sm:text-2xl font-black text-slate-900 uppercase tracking-tight leading-tight">{{ tryout.title }}</h3>
+
+                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                            <div class="flex justify-between items-center mb-6">
+                                <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full bg-slate-300"></span>
+                                    Anggota Tambahan
+                                </h3>
+                                <span class="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded">
+                                    {{ form.emails.length }} / 4 Slot
+                                </span>
+                            </div>
+
+                            <div class="space-y-4">
+                                <transition-group enter-active-class="transition duration-300 ease-out" enter-from-class="transform -translate-y-2 opacity-0" enter-to-class="transform translate-y-0 opacity-100" leave-active-class="transition duration-200 ease-in" leave-from-class="transform opacity-100" leave-to-class="transform opacity-0">
+                                    
+                                    <div v-for="(email, index) in form.emails" :key="index" class="relative group">
+                                        <div class="flex gap-3 items-start">
+                                            <div class="mt-3 w-8 h-8 rounded-lg bg-blue-50 text-[#004a87] flex items-center justify-center font-bold text-sm shrink-0">
+                                                {{ index + 1 }}
+                                            </div>
+                                            
+                                            <div class="flex-1">
+                                                <div class="relative">
+                                                    <input 
+                                                        v-model="form.emails[index]"
+                                                        type="email" 
+                                                        class="w-full rounded-xl px-4 py-3.5 border-2 transition-all outline-none"
+                                                        :class="{
+                                                            'border-slate-200 focus:border-[#004a87] focus:ring-4 focus:ring-blue-50/50': validationStatus[index] === null,
+                                                            'border-emerald-400 bg-emerald-50/20 text-emerald-900 focus:border-emerald-500': validationStatus[index] === 'valid',
+                                                            'border-red-300 bg-red-50/20 text-red-900 focus:border-red-500': validationStatus[index] === 'invalid'
+                                                        }"
+                                                        placeholder="Masukkan email anggota..."
+                                                        required
+                                                        @input="checkEmail(index, $event.target.value)"
+                                                    />
+
+                                                    <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                                                        <svg v-if="isLoading[index]" class="animate-spin h-5 w-5 text-slate-400" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                                        
+                                                        <button v-else-if="!email" @click="removeParticipant(index)" type="button" class="text-slate-300 hover:text-red-500 transition" title="Hapus">
+                                                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                        </button>
+                                                        
+                                                        <svg v-else-if="validationStatus[index] === 'valid'" class="h-6 w-6 text-emerald-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                                                        
+                                                        <svg v-else-if="validationStatus[index] === 'invalid'" class="h-6 w-6 text-red-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>
+                                                    </div>
+                                                </div>
+
+                                                <div class="flex justify-between items-start mt-1.5 ml-1">
+                                                    <div class="h-4">
+                                                        <p v-if="validationStatus[index] === 'valid'" class="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                                                            User terdaftar
+                                                        </p>
+                                                        <p v-if="validationStatus[index] === 'invalid'" class="text-xs font-bold text-red-500 flex items-center gap-1">
+                                                            {{ errorMessage[index] }}
+                                                        </p>
+                                                    </div>
+                                                    <button @click="removeParticipant(index)" type="button" class="text-[10px] font-bold text-slate-400 hover:text-red-500 hover:underline transition">Hapus Baris</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </transition-group>
+
+                                <div v-if="form.emails.length === 0" class="text-center py-10 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
+                                    <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm border border-slate-100">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                                    </div>
+                                    <p class="text-sm text-slate-500 font-medium">Belum ada anggota tambahan.</p>
+                                    <p class="text-xs text-slate-400 mt-1">Klik tombol di bawah untuk menambah peserta.</p>
+                                </div>
+
+                                <button v-if="form.emails.length < 4" type="button" @click="addParticipant" class="w-full py-4 border-2 border-dashed border-slate-300 rounded-2xl text-slate-400 font-bold hover:border-[#004a87] hover:text-[#004a87] hover:bg-blue-50 transition-all flex flex-col items-center justify-center gap-1 group">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 opacity-50 group-hover:opacity-100 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                                    <span class="text-xs uppercase tracking-widest">Tambah Anggota</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
-                    <form @submit.prevent="submit" class="space-y-6 sm:space-y-8">
+                    <div class="lg:col-span-4 space-y-6 lg:sticky lg:top-6">
                         
-                        <div class="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 border-dashed flex items-center gap-3">
-                            <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 text-xs">👤</div>
-                            <p class="text-[9px] sm:text-[10px] font-bold text-indigo-900 uppercase tracking-wide flex-1 leading-tight">
-                                Anda terdaftar sebagai <span class="font-black text-indigo-600">Peserta #1</span> (Ketua)
-                            </p>
-                        </div>
-
-                        <div class="space-y-4">
-                             <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Anggota Kelompok</label>
-                            
-                             <div v-for="(email, index) in form.emails" :key="index" class="relative group animate-in slide-in-from-bottom-2 duration-300">
-                                <div class="flex gap-2">
-                                    <div class="relative flex-1">
-                                        <input 
-                                            v-model="form.emails[index]"
-                                            @input="validateEmail(index, form.emails[index])"
-                                            type="email" 
-                                            required 
-                                            placeholder="Email peserta terdaftar..." 
-                                            :class="[emailErrors[index] ? 'border-red-300 bg-red-50 focus:ring-red-200' : 'border-slate-100 bg-slate-50 focus:ring-indigo-500/20']"
-                                            class="w-full border rounded-2xl p-4 pr-10 font-bold text-sm focus:ring-2 transition-all outline-none" 
-                                        />
-                                        <div v-if="isValidating[index]" class="absolute right-3 top-1/2 -translate-y-1/2">
-                                            <svg class="animate-spin h-4 w-4 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                        </div>
-                                    </div>
-
-                                    <button type="button" @click="removeParticipant(index)" class="p-4 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-sm">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
-                                    </button>
+                        <div class="bg-white rounded-2xl shadow-xl shadow-blue-900/5 border border-slate-200 overflow-hidden">
+                            <div class="bg-[#004a87] p-6 relative">
+                                <div class="relative z-10">
+                                    <h2 class="text-lg font-black text-white uppercase tracking-wider">PENDAFTARAN</h2>
+                                    <p class="text-blue-200 text-xs font-medium mt-1 opacity-90">Kolektif / Tim</p>
                                 </div>
-                                <p v-if="emailErrors[index]" class="text-[10px] font-black text-red-500 mt-2 ml-2 tracking-wide italic">
-                                    ! {{ emailErrors[index] }}
-                                </p>
+                                <div class="absolute right-0 bottom-0 w-24 h-24 bg-white/10 rounded-tl-full blur-md"></div>
                             </div>
 
-                            <button 
-                                type="button"
-                                @click="addParticipant"
-                                :disabled="form.emails.length >= maxAdditionalParticipants"
-                                class="w-full py-4 border-2 border-dashed border-slate-200 text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:border-indigo-400 hover:text-indigo-500 transition-all active:scale-95 disabled:opacity-30 disabled:grayscale flex items-center justify-center gap-2"
-                            >
-                                <span class="text-lg">+</span> Tambah Peserta {{ form.emails.length >= maxAdditionalParticipants ? '(Maksimal)' : '' }}
-                            </button>
-                        </div>
-
-                        <div class="mt-8 space-y-4">
-                            <h3 class="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-2">Metode Pembayaran</h3>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <label 
-                                    :class="form.payment_method === 'wallet' ? 'border-indigo-600 bg-indigo-50' : 'border-slate-100 bg-white'" 
-                                    class="flex items-center justify-between p-5 border-2 rounded-[2rem] cursor-pointer transition-all hover:border-indigo-200 group relative"
-                                >
-                                    <div class="flex items-center gap-4">
-                                        <span class="text-2xl grayscale group-hover:grayscale-0 transition-all" :class="{'grayscale-0': form.payment_method === 'wallet'}">💳</span>
-                                        <div>
-                                            <p class="font-black text-[10px] uppercase tracking-wide text-slate-900">Saldo Dompet</p>
-                                            <p class="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
-                                                Sisa: {{ formatPrice($page.props.auth.user.balance) }}
-                                            </p>
+                            <div class="p-6 bg-white">
+                                <div class="mb-6">
+                                    <h3 class="font-bold text-slate-800 leading-tight mb-2">{{ tryout.title }}</h3>
+                                    <div class="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                                        <div class="flex justify-between text-xs text-slate-500 mb-1">
+                                            <span>Harga Satuan</span>
+                                            <span class="font-bold text-slate-700">{{ formatRupiah(tryout.price) }}</span>
+                                        </div>
+                                        <div class="flex justify-between text-xs text-slate-500">
+                                            <span>Peserta</span>
+                                            <span class="font-bold text-slate-700">{{ form.emails.length + 1 }} Orang</span>
                                         </div>
                                     </div>
-                                    <input type="radio" v-model="form.payment_method" value="wallet" class="hidden">
-                                    <div v-if="form.payment_method === 'wallet'" class="w-5 h-5 bg-indigo-600 rounded-full flex items-center justify-center animate-in zoom-in duration-300">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3 text-white font-bold"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
-                                    </div>
-                                </label>
+                                </div>
 
-                                <label 
-                                    :class="form.payment_method === 'midtrans' ? 'border-indigo-600 bg-indigo-50' : 'border-slate-100 bg-white'" 
-                                    class="flex items-center justify-between p-5 border-2 rounded-[2rem] cursor-pointer transition-all hover:border-indigo-200 group"
+                                <div class="flex justify-between items-end pb-6 border-b border-dashed border-slate-200 mb-6">
+                                    <span class="text-sm font-bold text-slate-500">Total Bayar</span>
+                                    <span class="text-2xl font-black text-[#004a87]">{{ formatRupiah(totalAmount) }}</span>
+                                </div>
+
+                                <div class="mb-6">
+                                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Metode Pembayaran</label>
+                                    <div class="space-y-3">
+                                        
+                                        <label class="group relative block cursor-pointer">
+                                            <input type="radio" v-model="form.payment_method" value="wallet" class="peer sr-only">
+                                            <div class="p-4 rounded-xl border-2 transition-all duration-200 
+                                                        border-slate-200 bg-white hover:border-blue-300
+                                                        peer-checked:border-[#004a87] peer-checked:bg-[#004a87] peer-checked:text-white peer-checked:shadow-md">
+                                                
+                                                <div class="flex items-center justify-between mb-1">
+                                                    <span class="font-bold text-sm" :class="form.payment_method === 'wallet' ? 'text-white' : 'text-slate-700'">Saldo Dompet</span>
+                                                    
+                                                    <div class="w-5 h-5 rounded-full border flex items-center justify-center transition-colors"
+                                                         :class="form.payment_method === 'wallet' ? 'border-white bg-white' : 'border-slate-300 bg-white'">
+                                                        <div v-if="form.payment_method === 'wallet'" class="w-2.5 h-2.5 rounded-full bg-[#004a87]"></div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="text-xs flex justify-between items-center mt-2" :class="form.payment_method === 'wallet' ? 'text-blue-100' : 'text-slate-500'">
+                                                    <span>Sisa Saldo:</span>
+                                                    <span class="font-bold px-2 py-0.5 rounded"
+                                                          :class="form.payment_method === 'wallet' ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-600'">
+                                                        {{ formatRupiah(currentUser.balance) }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </label>
+
+                                        <label class="group relative block cursor-pointer">
+                                            <input type="radio" v-model="form.payment_method" value="midtrans" class="peer sr-only">
+                                            <div class="p-4 rounded-xl border-2 transition-all duration-200 
+                                                        border-slate-200 bg-white hover:border-blue-300
+                                                        peer-checked:border-[#004a87] peer-checked:bg-[#004a87] peer-checked:text-white peer-checked:shadow-md">
+                                                
+                                                <div class="flex items-center justify-between mb-1">
+                                                    <span class="font-bold text-sm" :class="form.payment_method === 'midtrans' ? 'text-white' : 'text-slate-700'">QRIS / Transfer</span>
+                                                    
+                                                    <div class="w-5 h-5 rounded-full border flex items-center justify-center transition-colors"
+                                                         :class="form.payment_method === 'midtrans' ? 'border-white bg-white' : 'border-slate-300 bg-white'">
+                                                        <div v-if="form.payment_method === 'midtrans'" class="w-2.5 h-2.5 rounded-full bg-[#004a87]"></div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <p class="text-[10px] mt-1" :class="form.payment_method === 'midtrans' ? 'text-blue-100' : 'text-slate-400'">
+                                                    Virtual Account (BCA, Mandiri, dll) & E-Wallet
+                                                </p>
+                                            </div>
+                                        </label>
+                                    </div>
+                                    <p v-if="form.errors.payment" class="text-red-500 text-xs mt-2 font-bold bg-red-50 p-2 rounded border border-red-100 flex items-center gap-1">
+                                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                                        {{ form.errors.payment }}
+                                    </p>
+                                </div>
+
+                                <button 
+                                    type="submit" 
+                                    class="w-full py-4 bg-[#004a87] text-white font-bold rounded-xl shadow-lg shadow-blue-200 hover:bg-blue-800 hover:shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    :disabled="form.processing || validationStatus.includes('invalid') || isLoading.includes(true)"
                                 >
-                                    <div class="flex items-center gap-4">
-                                        <span class="text-2xl grayscale group-hover:grayscale-0 transition-all" :class="{'grayscale-0': form.payment_method === 'midtrans'}">🌐</span>
-                                        <div>
-                                            <p class="font-black text-[10px] uppercase tracking-wide text-slate-900">Midtrans Online</p>
-                                            <p class="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Otomatis & Banyak Metode</p>
-                                        </div>
-                                    </div>
-                                    <input type="radio" v-model="form.payment_method" value="midtrans" class="hidden">
-                                    <div v-if="form.payment_method === 'midtrans'" class="w-5 h-5 bg-indigo-600 rounded-full flex items-center justify-center animate-in zoom-in duration-300">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3 text-white font-bold"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
-                                    </div>
-                                </label>
+                                    <svg v-if="form.processing" class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                    <span v-else>Bayar Sekarang</span>
+                                </button>
+
+                                <div class="mt-4 text-center">
+                                    <p class="text-[10px] text-slate-400">Pastikan semua email valid sebelum membayar.</p>
+                                </div>
                             </div>
                         </div>
+                    </div>
 
-                        <div class="bg-slate-900 rounded-[2rem] p-6 sm:p-8 text-white shadow-2xl shadow-indigo-100">
-                            <div class="flex justify-between items-center mb-2">
-                                <span class="text-[9px] font-black uppercase tracking-widest text-slate-500">Total Slot</span>
-                                <span class="text-xs font-black">{{ totalParticipants }} Peserta</span>
-                            </div>
-                            <div class="flex justify-between items-center mb-4 border-b border-white/5 pb-4">
-                                <span class="text-[9px] font-black uppercase tracking-widest text-slate-500">Biaya Dasar</span>
-                                <span class="text-xs font-black text-slate-300">{{ formatPrice(calculation.unitPrice) }}</span>
-                            </div>
-                            <div v-if="calculation.discountPercent > 0" class="flex justify-between items-center mb-4 text-emerald-400">
-                                <span class="text-[9px] font-black uppercase tracking-widest">Potongan Kolektif ({{ calculation.discountPercent }}%)</span>
-                                <span class="text-xs font-black">- {{ formatPrice(calculation.totalDiscount) }}</span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-[10px] font-black uppercase tracking-[0.2em]">Total Pembayaran</span>
-                                <span class="text-xl font-black text-indigo-400">{{ formatPrice(calculation.finalPrice) }}</span>
-                            </div>
-                        </div>
-
-                        <button 
-                            type="submit" 
-                            :disabled="form.processing || hasValidationErrors" 
-                            class="w-full py-5 bg-slate-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-[0.3em] hover:bg-indigo-600 transition-all shadow-xl active:scale-95 disabled:opacity-50 disabled:grayscale"
-                        >
-                            {{ hasValidationErrors ? 'Perbaiki Data Peserta' : 'Konfirmasi Pendaftaran' }}
-                        </button>
-                    </form>
-                </div>
-                <p class="text-[8px] sm:text-[9px] text-center text-slate-300 font-bold uppercase tracking-widest mt-6 mb-12">
-                    Maksimal 6 peserta dalam 1 transaksi pendaftaran kelompok.
-                </p>
+                </form>
             </div>
         </div>
     </AuthenticatedLayout>
 </template>
-
-<style scoped>
-.transition-all {
-    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.z-10 {
-    z-index: 10;
-}
-</style>
