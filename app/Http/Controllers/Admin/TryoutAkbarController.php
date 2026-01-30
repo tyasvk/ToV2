@@ -28,61 +28,81 @@ class TryoutAkbarController extends Controller
         ]);
     }
 
+    public function verifyRegistration(Request $request, \App\Models\Transaction $transaction)
+    {
+        $request->validate([
+            'action' => 'required|in:approve,reject',
+            'reason' => 'nullable|string|max:255' // Validasi input alasan
+        ]);
+
+        if ($request->action === 'approve') {
+            $transaction->update([
+                'status' => 'paid',
+                'rejection_note' => null // Hapus catatan jika akhirnya diterima
+            ]);
+            $message = 'Peserta berhasil diverifikasi (Diterima).';
+        } else {
+            $transaction->update([
+                'status' => 'failed',
+                'rejection_note' => $request->reason ?? 'Bukti tidak valid.' // Simpan alasan
+            ]);
+            $message = 'Peserta ditolak.';
+        }
+
+        return back()->with('success', $message);
+    }
+
     /**
      * Halaman Verifikasi Peserta
      */
-    public function participants(Request $request, Tryout $tryout) // Note: Model binding 'tryout'
+public function participants(Request $request, Tryout $tryout)
     {
-        // Pastikan ini tryout akbar
         if($tryout->type !== 'akbar') abort(404);
 
-        $query = \App\Models\Transaction::with('user')
-            ->where('tryout_id', $tryout->id);
+        // LOGIC BARU: Ambil hanya ID transaksi TERAKHIR untuk setiap user di tryout ini
+        // Ini memastikan "Satu Orang Satu Data" (data terbaru yang muncul)
+        $latestTransactionIds = \App\Models\Transaction::where('tryout_id', $tryout->id)
+            ->selectRaw('MAX(id) as id')
+            ->groupBy('user_id')
+            ->pluck('id');
 
-        // Filter Status (Default: Pending)
-        if ($request->has('status')) {
+        $query = \App\Models\Transaction::whereIn('id', $latestTransactionIds)
+            ->with('user');
+
+        // Filter Status
+        if ($request->has('status') && $request->status != '') {
             $query->where('status', $request->status);
         } else {
-            // Jika tidak ada filter, prioritaskan pending di atas
-            $query->orderByRaw("FIELD(status, 'pending', 'paid', 'failed')");
+            // Sorting: Pending paling atas, lalu Failed, lalu Paid
+            $query->orderByRaw("FIELD(status, 'pending', 'failed', 'paid')");
         }
 
-        $participants = $query->latest()->paginate(20)->withQueryString();
+        // Search (Opsional, untuk mencari nama peserta)
+        if ($request->has('search')) {
+            $query->whereHas('user', function($q) use ($request) {
+                $q->where('name', 'like', '%' . $request->search . '%')
+                  ->orWhere('email', 'like', '%' . $request->search . '%');
+            });
+        }
 
-        // Hitung statistik kecil
+        $participants = $query->paginate(20)->withQueryString();
+
+        // Hitung statistik realtime
+        // Kita hitung berdasarkan data unik juga agar akurat
+        $baseStats = \App\Models\Transaction::whereIn('id', $latestTransactionIds);
+        
         $stats = [
-            'total' => \App\Models\Transaction::where('tryout_id', $tryout->id)->count(),
-            'pending' => \App\Models\Transaction::where('tryout_id', $tryout->id)->where('status', 'pending')->count(),
-            'paid' => \App\Models\Transaction::where('tryout_id', $tryout->id)->where('status', 'paid')->count(),
+            'total' => (clone $baseStats)->count(),
+            'pending' => (clone $baseStats)->where('status', 'pending')->count(),
+            'paid' => (clone $baseStats)->where('status', 'paid')->count(),
         ];
 
         return Inertia::render('Admin/TryoutAkbar/Verify', [
             'tryout' => $tryout,
             'participants' => $participants,
             'stats' => $stats,
-            'filters' => $request->only(['status'])
+            'filters' => $request->only(['status', 'search'])
         ]);
-    }
-
-    /**
-     * Proses Approve / Reject
-     */
-    public function verifyRegistration(Request $request, \App\Models\Transaction $transaction)
-    {
-        $request->validate([
-            'action' => 'required|in:approve,reject',
-            'reason' => 'nullable|string' // Opsional jika reject kasih alasan
-        ]);
-
-        if ($request->action === 'approve') {
-            $transaction->update(['status' => 'paid']); // Paid = Valid
-            $message = 'Peserta berhasil diverifikasi (Diterima).';
-        } else {
-            $transaction->update(['status' => 'failed']);
-            $message = 'Peserta ditolak.';
-        }
-
-        return back()->with('success', $message);
     }
 
     /**

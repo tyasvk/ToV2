@@ -7,14 +7,22 @@ use Illuminate\Database\Eloquent\Model;
 class Transaction extends Model
 {
     protected $fillable = [
-        'user_id', 'tryout_id', 'invoice_code', 
-        'amount', 'unit_price', 'qty', 
-        'participants_data', 'status', 'snap_token'
+        'user_id', 
+        'tryout_id', 
+        'invoice_code', 
+        'amount', 
+        'unit_price', 
+        'qty', 
+        'participants_data', 
+        'status', 
+        'snap_token',
+        'proof_payment', // <--- WAJIB DITAMBAHKAN DI SINI
+        'rejection_note' // <--- TAMBAHKAN INI
     ];
 
     protected $casts = [
-        'participants_data' => 'array', // Agar otomatis jadi Array saat diambil
-        'proof_payment' => 'array', // Agar otomatis jadi JSON saat disimpan, dan jadi Array saat diambil
+        'participants_data' => 'array',
+        'proof_payment' => 'array', 
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
