@@ -42,6 +42,152 @@ public function index(Request $request)
         ]);
     }
 
+    public function myTryouts(Request $request)
+    {
+        $userEmail = auth()->user()->email;
+        $userId = auth()->id();
+
+        $tryouts = Tryout::query()
+            ->where('is_published', true)
+            // FILTER BARU: Sembunyikan Tryout Akbar dari halaman ini
+            ->where(function ($query) {
+                $query->where('type', '!=', 'akbar')
+                      ->orWhereNull('type'); // Jaga-jaga jika tipe reguler bernilai NULL
+            })
+            // Logika Pembayaran (Tetap)
+            ->whereHas('transactions', function($query) use ($userId, $userEmail) {
+                $query->whereIn('status', ['paid', 'success'])
+                      ->where(function($q) use ($userId, $userEmail) {
+                          $q->where('user_id', $userId) // Cek jika dia pembayar
+                            ->orWhereJsonContains('participants_data', $userEmail); // Cek jika dia anggota tebengan
+                      });
+            })
+            ->withCount(['examAttempts' => function($q) use ($userId) {
+                $q->where('user_id', $userId);
+            }])
+            ->when($request->search, fn($q, $s) => $q->where('title', 'like', "%{$s}%"))
+            ->latest()
+            ->paginate(9)
+            ->withQueryString();
+
+        return Inertia::render('User/Tryout/MyTryouts', [
+            'tryouts' => $tryouts,
+            'filters' => $request->only(['search']),
+        ]);
+    }
+
+    public function result(ExamAttempt $attempt)
+    {
+        // 1. Validasi User
+        if ($attempt->user_id !== auth()->id()) abort(403);
+        
+        // 2. Load Data Tryout
+        $attempt->load('tryout');
+        $tryout = $attempt->tryout;
+
+        // 3. Hitung Ranking (Sederhana)
+        // Menghitung berapa orang yang nilainya lebih tinggi dari user ini
+        $rank = ExamAttempt::where('tryout_id', $tryout->id)
+            ->where('total_score', '>', $attempt->total_score)
+            ->count() + 1;
+
+        $totalParticipants = ExamAttempt::where('tryout_id', $tryout->id)
+            ->distinct('user_id')
+            ->count();
+
+        // 4. Definisi Passing Grade (SKD Standar 2024)
+        // Anda bisa sesuaikan angka ini atau ambil dari database jika ada kolomnya
+        $passingGrades = [
+            'TWK' => 65,
+            'TIU' => 80,
+            'TKP' => 166
+        ];
+
+        // 5. Susun Rincian Skor
+        $scoreDetails = [
+            [
+                'category' => 'Tes Wawasan Kebangsaan (TWK)',
+                'score' => $attempt->twk_score,
+                'passing_grade' => $passingGrades['TWK'],
+                'is_passed' => $attempt->twk_score >= $passingGrades['TWK']
+            ],
+            [
+                'category' => 'Tes Intelegensia Umum (TIU)',
+                'score' => $attempt->tiu_score,
+                'passing_grade' => $passingGrades['TIU'],
+                'is_passed' => $attempt->tiu_score >= $passingGrades['TIU']
+            ],
+            [
+                'category' => 'Tes Karakteristik Pribadi (TKP)',
+                'score' => $attempt->tkp_score,
+                'passing_grade' => $passingGrades['TKP'],
+                'is_passed' => $attempt->tkp_score >= $passingGrades['TKP']
+            ]
+        ];
+
+        // 6. Tentukan Status Lulus/Tidak (Logic di Controller)
+        $isAllPassed = collect($scoreDetails)->every(fn($item) => $item['is_passed']);
+        
+        // Inject status ke object attempt agar bisa dibaca Vue (tanpa simpan ke DB)
+        $attempt->status = $isAllPassed ? 'lulus' : 'tidak_lulus';
+
+        // 7. Kirim Data Lengkap ke Inertia
+        return Inertia::render('User/Tryout/Result', [
+            'attempt' => $attempt,
+            'tryout' => $tryout, // <--- Ini yang sebelumnya missing (undefined)
+            'totalScore' => $attempt->total_score,
+            'scoreDetails' => $scoreDetails,
+            'ranking' => [
+                'rank' => $rank,
+                'total_participants' => $totalParticipants
+            ]
+        ]);
+    }
+
+    public function historyDetail(Tryout $tryout)
+    {
+        $user = auth()->user();
+
+        // 1. Cek Validasi Pembayaran (Kode Asli)
+        $hasPaid = Transaction::where('tryout_id', $tryout->id)
+            ->whereIn('status', ['paid', 'success'])
+            ->where(function($query) use ($user) {
+                $query->where('user_id', $user->id)
+                      ->orWhereJsonContains('participants_data', $user->email);
+            })
+            ->exists();
+
+        if (!$hasPaid) abort(403, 'Akses ditolak.');
+
+        // -----------------------------------------------------------
+        // LOGIKA BARU: REDIRECT KHUSUS TRYOUT AKBAR
+        // -----------------------------------------------------------
+        if ($tryout->type === 'akbar') {
+            // Cari attempt terakhir (seharusnya cuma satu untuk Akbar)
+            $attempt = ExamAttempt::where('user_id', $user->id)
+                ->where('tryout_id', $tryout->id)
+                ->latest()
+                ->first();
+
+            // Jika ada data pengerjaan, langsung lempar ke halaman Result
+            if ($attempt) {
+                return redirect()->route('tryout.result', $attempt->id);
+            }
+        }
+        // -----------------------------------------------------------
+
+        // Kode Asli (Untuk Tryout Reguler / Bisa dikerjakan berkali-kali)
+        $attempts = ExamAttempt::where('user_id', $user->id)
+            ->where('tryout_id', $tryout->id)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return Inertia::render('User/Tryout/HistoryDetail', [
+            'tryout' => $tryout,
+            'attempts' => $attempts
+        ]);
+    }
+
     // Method ini dipanggil saat user klik "Kerjakan"
     private function validateAccess(Tryout $tryout)
     {
@@ -105,35 +251,6 @@ public function index(Request $request)
         }
 
         return ['allowed' => true];
-    }
-
-public function myTryouts(Request $request)
-    {
-        $userEmail = auth()->user()->email;
-        $userId = auth()->id();
-
-        $tryouts = Tryout::query()
-            ->where('is_published', true)
-            // PERBAIKAN LOGIKA DI SINI
-            ->whereHas('transactions', function($query) use ($userId, $userEmail) {
-                $query->whereIn('status', ['paid', 'success'])
-                      ->where(function($q) use ($userId, $userEmail) {
-                          $q->where('user_id', $userId) // Cek jika dia pembayar
-                            ->orWhereJsonContains('participants_data', $userEmail); // Cek jika dia anggota tebengan
-                      });
-            })
-            ->withCount(['examAttempts' => function($q) use ($userId) {
-                $q->where('user_id', $userId);
-            }])
-            ->when($request->search, fn($q, $s) => $q->where('title', 'like', "%{$s}%"))
-            ->latest()
-            ->paginate(9)
-            ->withQueryString();
-
-        return Inertia::render('User/Tryout/MyTryouts', [
-            'tryouts' => $tryouts,
-            'filters' => $request->only(['search']),
-        ]);
     }
 
     public function registerForm(Tryout $tryout)
@@ -288,38 +405,6 @@ public function myTryouts(Request $request)
         ]);
 
         return redirect()->route('tryout.result', $attempt->id);
-    }
-
-    public function result(ExamAttempt $attempt)
-    {
-        if ($attempt->user_id !== auth()->id()) abort(403);
-        return Inertia::render('User/Tryout/Result', ['attempt' => $attempt->load('tryout')]);
-    }
-
-public function historyDetail(Tryout $tryout)
-    {
-        $user = auth()->user();
-
-        // PERBAIKAN LOGIKA DI SINI JUGA
-        $hasPaid = Transaction::where('tryout_id', $tryout->id)
-            ->whereIn('status', ['paid', 'success'])
-            ->where(function($query) use ($user) {
-                $query->where('user_id', $user->id)
-                      ->orWhereJsonContains('participants_data', $user->email);
-            })
-            ->exists();
-
-        if (!$hasPaid) abort(403, 'Akses ditolak.');
-
-        $attempts = ExamAttempt::where('user_id', $user->id)
-            ->where('tryout_id', $tryout->id)
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        return Inertia::render('User/Tryout/HistoryDetail', [
-            'tryout' => $tryout,
-            'attempts' => $attempts
-        ]);
     }
 
     public function show(Tryout $tryout)

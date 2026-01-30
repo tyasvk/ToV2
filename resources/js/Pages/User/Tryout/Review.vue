@@ -1,157 +1,220 @@
 <script setup>
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { ref, computed } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
+import dayjs from 'dayjs';
+import 'dayjs/locale/id';
+import relativeTime from 'dayjs/plugin/relativeTime';
+
+dayjs.locale('id');
+dayjs.extend(relativeTime);
 
 const props = defineProps({
     attempt: Object,
-    questions: Array
+    tryout: Object,
+    totalScore: Number,
+    scoreDetails: Array,
+    ranking: Object
 });
 
-const currentIdx = ref(0);
-const currentQ = computed(() => props.questions[currentIdx.value]);
+const isOverallPassed = computed(() => props.attempt.status === 'lulus');
 
-const jump = (i) => {
-    currentIdx.value = i;
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+const formatDate = (dateString) => {
+    return dayjs(dateString).format('DD MMMM YYYY • HH:mm WIB');
 };
 
-// Navigasi Peta Soal (Dibuat Lebih Kecil)
-const getNavClass = (index, q) => {
-    const isCurrent = currentIdx.value === index;
-    const base = "h-7 w-7 md:h-8 md:w-8 flex items-center justify-center rounded text-[9px] font-black transition-all border ";
-    
-    if (isCurrent) return base + "border-black bg-black text-white ring-1 ring-offset-1 ring-black z-10";
-    if (q.is_correct) return base + "bg-emerald-500 text-white border-emerald-600 shadow-sm";
-    return base + "bg-rose-500 text-white border-rose-600 shadow-sm";
+const getBarWidth = (score, max) => {
+    let percentage = (score / max) * 100;
+    return `${Math.min(percentage, 100)}%`;
 };
 
-// Card Pilihan Jawaban (Dibuat Super Slim)
-const getOptionClass = (key, q) => {
-    const isUser = q.user_selected_answer === key;
-    const isCorrect = q.correct_answer === key;
-
-    if (isCorrect) return 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500 z-10';
-    if (isUser && !isCorrect) return 'bg-rose-50 border-rose-500 ring-1 ring-rose-500 z-10';
-    return 'bg-white border-gray-100 opacity-70';
-};
+// Logika Navigasi Tombol Tutup
+const closeRoute = computed(() => {
+    // Jika Tryout Akbar, kembali ke halaman detail event tersebut
+    if (props.tryout.type === 'akbar') {
+        return route('tryout-akbar.show', props.tryout.id);
+    }
+    // Jika Regular, kembali ke list tryout (fungsi default)
+    return route('tryout.index');
+});
 </script>
 
 <template>
-    <Head title="Review Compact" />
+    <Head :title="'Hasil - ' + tryout.title" />
 
-    <AuthenticatedLayout>
-        <template #header>
-            <div class="flex justify-between items-center py-0">
-                <div class="flex items-center gap-2">
-                    <Link :href="route('user.history')" class="p-1 hover:bg-gray-100 rounded transition">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
-                    </Link>
-                    <h2 class="text-xs font-black uppercase tracking-tighter">Review Sesi #{{ attempt.id }}</h2>
-                </div>
+    <div class="min-h-screen bg-[#F8FAFC] font-sans text-slate-600 pb-20">
+        
+        <nav class="bg-white border-b border-slate-200 px-6 py-4 sticky top-0 z-30 shadow-sm/50 backdrop-blur-xl bg-white/90">
+            <div class="max-w-6xl mx-auto flex justify-between items-center">
                 <div class="flex items-center gap-3">
-                    <div class="text-right border-r pr-3 border-gray-200">
-                        <span class="block text-[7px] font-bold text-gray-400 uppercase">Skor</span>
-                        <span class="text-base font-black leading-none">{{ attempt.total_score }}</span>
+                    <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-md shadow-indigo-200">TO</div>
+                    <div>
+                        <h1 class="font-bold text-slate-900 leading-tight">Hasil Ujian</h1>
+                        <p class="text-[10px] text-slate-400 uppercase tracking-wider">Computer Assisted Test</p>
                     </div>
-                    <span class="text-[8px] font-black bg-gray-100 px-2 py-1 rounded">
-                        {{ currentIdx + 1 }} / {{ questions.length }}
-                    </span>
+                </div>
+                
+                <Link :href="closeRoute" class="text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors uppercase tracking-wider flex items-center gap-2 px-3 py-1.5 hover:bg-slate-100 rounded-lg">
+                    <span>Tutup</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </Link>
+            </div>
+        </nav>
+
+        <main class="max-w-6xl mx-auto p-4 lg:p-8 space-y-6">
+
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pb-2">
+                <div>
+                    <h2 class="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">{{ tryout.title }}</h2>
+                    <p class="text-sm font-medium text-slate-400 flex items-center gap-2 mt-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Selesai pada {{ formatDate(attempt.finished_at) }}
+                    </p>
                 </div>
             </div>
-        </template>
 
-        <div class="py-3 bg-white min-h-screen">
-            <div class="max-w-7xl mx-auto px-3 md:px-6">
-                <div class="flex flex-col lg:flex-row gap-4">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                
+                <div class="lg:col-span-4 space-y-5">
                     
-                    <div class="flex-1 space-y-3">
-                        <div class="border border-gray-200 p-4 md:p-6 bg-white relative">
-                            <div class="flex justify-between items-center mb-4 border-b pb-2 border-gray-50">
-                                <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest">Pertanyaan {{ currentIdx + 1 }}</span>
-                                <div class="flex gap-2">
-                                    <span v-if="currentQ.is_correct" class="text-[8px] font-black text-emerald-600 uppercase italic">CORRECT_RESULT</span>
-                                    <span v-else class="text-[8px] font-black text-rose-600 uppercase italic">INCORRECT_RESULT</span>
+                    <div class="relative overflow-hidden rounded-[2rem] shadow-xl transition-all group p-6 text-center flex flex-col items-center justify-center min-h-[260px]"
+                         :class="isOverallPassed ? 'bg-emerald-500 text-white shadow-emerald-200' : 'bg-white text-slate-900 border border-slate-200 shadow-slate-200'">
+                        
+                        <div class="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+
+                        <div class="mb-3 p-2.5 rounded-full inline-flex items-center justify-center shadow-sm scale-90"
+                             :class="isOverallPassed ? 'bg-white/20 text-white' : 'bg-rose-50 text-rose-500'">
+                            <svg v-if="isOverallPassed" xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </div>
+
+                        <h2 class="text-3xl font-black mb-0.5 tracking-tight" :class="isOverallPassed ? 'text-white' : 'text-slate-900'">
+                            {{ isOverallPassed ? 'LULUS' : 'TIDAK LULUS' }}
+                        </h2>
+                        <p class="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-5">Status Akhir</p>
+
+                        <div class="w-full border-t pt-4 mt-auto" :class="isOverallPassed ? 'border-white/20' : 'border-slate-100'">
+                            <p class="text-[10px] uppercase tracking-widest opacity-60 mb-1">Total Skor SKD</p>
+                            <p class="text-5xl font-black tracking-tighter">{{ totalScore }}</p>
+                        </div>
+                    </div>
+
+                    <Link :href="route('tryout.leaderboard', tryout.id)" 
+                        class="group flex items-center justify-between bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all relative overflow-hidden">
+                        
+                        <div class="flex items-center gap-3 relative z-10">
+                            <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Peringkat Kamu</p>
+                                <div class="flex items-baseline gap-1">
+                                    <span class="text-xl font-black text-slate-900">#{{ ranking.rank }}</span>
+                                    <span class="text-xs font-medium text-slate-400">/ {{ ranking.total_participants }}</span>
                                 </div>
                             </div>
+                        </div>
+                        
+                        <div class="text-indigo-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                            </svg>
+                        </div>
+                    </Link>
 
-                            <div class="mb-6">
-                                <p class="text-sm md:text-base font-bold text-slate-900 leading-snug" v-html="currentQ.question_text || currentQ.content"></p>
+                    <div class="grid grid-cols-1 gap-3">
+                        <Link :href="route('tryout.review', attempt.id)" 
+                              class="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-indigo-600 text-white font-bold text-sm uppercase tracking-wide hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all hover:-translate-y-0.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Pembahasan
+                        </Link>
+                        
+                        <Link :href="route('tryout.index')" 
+                              class="w-full block py-3.5 rounded-2xl bg-white border border-slate-200 text-slate-600 font-bold text-center text-sm uppercase tracking-wide hover:bg-slate-50 transition-all">
+                            Menu Utama
+                        </Link>
+                    </div>
+
+                </div>
+
+                <div class="lg:col-span-8">
+                    <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-6">
+                        
+                        <div class="flex items-center justify-between mb-6">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-slate-900 text-lg">Statistik Nilai</h3>
+                                    <p class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Rincian Sub-Tes</p>
+                                </div>
                             </div>
+                        </div>
 
-                            <div class="grid grid-cols-1 gap-1.5">
-                                <div v-for="(val, key) in (currentQ.options || {'a': currentQ.option_a, 'b': currentQ.option_b, 'c': currentQ.option_c, 'd': currentQ.option_d, 'e': currentQ.option_e})" 
-                                    :key="key"
-                                    :class="['group flex items-center p-2.5 border transition-all', getOptionClass(key, currentQ)]">
-                                    
-                                    <div :class="[currentQ.correct_answer === key ? 'bg-black text-white' : 'bg-gray-100 text-gray-400']" 
-                                         class="w-6 h-6 shrink-0 flex items-center justify-center text-[10px] font-black mr-3">
-                                        {{ key.toUpperCase() }}
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div v-for="(detail, index) in scoreDetails" :key="index" 
+                                 class="p-5 rounded-2xl border transition-all hover:shadow-md flex flex-col justify-between min-h-[140px]"
+                                 :class="detail.is_passed ? 'bg-emerald-50/40 border-emerald-100 hover:border-emerald-200' : 'bg-rose-50/40 border-rose-100 hover:border-rose-200'">
+                                
+                                <div class="flex items-center gap-3 mb-3">
+                                    <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black border shrink-0"
+                                         :class="detail.is_passed ? 'bg-emerald-100 text-emerald-600 border-emerald-200' : 'bg-rose-100 text-rose-600 border-rose-200'">
+                                        {{ detail.category.substring(0, 3) }}
+                                    </div>
+                                    <div class="overflow-hidden">
+                                        <h4 class="font-bold text-slate-700 text-sm truncate" :title="detail.category">{{ detail.category }}</h4>
+                                        <p class="text-[10px] font-medium text-slate-400">PG: {{ detail.passing_grade }}</p>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <div class="flex items-end justify-between mb-2">
+                                        <span class="text-3xl font-black leading-none" :class="detail.is_passed ? 'text-emerald-600' : 'text-rose-600'">
+                                            {{ detail.score }}
+                                        </span>
+                                        <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+                                              :class="detail.is_passed ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'">
+                                            {{ detail.is_passed ? 'Lolos' : 'Gagal' }}
+                                        </span>
                                     </div>
 
-                                    <div class="flex-1 flex justify-between items-center pr-1">
-                                        <span class="text-[11px] font-semibold text-slate-700 leading-tight uppercase tracking-tight">{{ val }}</span>
-                                        <div v-if="currentQ.correct_answer === key" class="flex items-center gap-1">
-                                            <div class="w-1 h-1 bg-emerald-500 rounded-full"></div>
-                                            <span class="text-[7px] font-black text-emerald-600 uppercase">Kunci</span>
+                                    <div class="h-1.5 w-full bg-slate-200/50 rounded-full overflow-hidden relative">
+                                        <div class="absolute top-0 bottom-0 w-0.5 bg-slate-400/50 z-10" style="left: 60%"></div>
+                                        <div class="h-full rounded-full transition-all duration-1000 ease-out relative"
+                                             :class="detail.is_passed ? 'bg-emerald-500' : 'bg-rose-500'"
+                                             :style="{ width: getBarWidth(detail.score, (index === 2 ? 225 : (index === 1 ? 175 : 150))) }">
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="bg-slate-50 border-x border-b border-gray-200 p-4">
-                            <h3 class="text-[9px] font-black text-gray-400 uppercase tracking-[0.3em] mb-3">Analisis_Pembahasan</h3>
-                            <div class="text-[11px] leading-relaxed text-slate-600 font-medium prose-tight" v-html="currentQ.explanation || 'N/A: No Data'"></div>
+                        <div class="mt-5 p-4 bg-slate-50 rounded-xl border border-slate-100 flex gap-3 items-center">
+                            <div class="w-5 h-5 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-xs font-bold shrink-0">i</div>
+                            <p class="text-xs text-slate-500 leading-tight">
+                                Kelulusan ditentukan jika nilai Anda memenuhi <strong>semua</strong> ambang batas (Passing Grade).
+                            </p>
                         </div>
 
-                        <div class="flex gap-1 pt-2">
-                            <button @click="jump(currentIdx - 1)" :disabled="currentIdx === 0" 
-                                class="flex-1 py-3 bg-white border border-gray-200 text-[10px] font-black uppercase tracking-widest disabled:opacity-20 transition-all">
-                                Previous
-                            </button>
-                            <button @click="jump(currentIdx + 1)" :disabled="currentIdx === questions.length - 1" 
-                                class="flex-1 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 disabled:opacity-20 transition-all shadow-md">
-                                Next Soal
-                            </button>
-                        </div>
                     </div>
-
-                    <div class="w-full lg:w-60 shrink-0 lg:sticky lg:top-4 h-fit">
-                        <div class="border border-gray-200 p-3 bg-white">
-                            <div class="text-[9px] font-black text-gray-400 uppercase mb-3 text-center tracking-widest">Navigator_Grid</div>
-                            
-                            <div class="grid grid-cols-8 lg:grid-cols-5 gap-1">
-                                <button v-for="(q, index) in questions" :key="q.id" 
-                                    @click="jump(index)"
-                                    :class="getNavClass(index, q)"
-                                >
-                                    {{ index + 1 }}
-                                </button>
-                            </div>
-
-                            <div class="mt-4 pt-3 border-t border-gray-50 flex flex-wrap justify-center gap-3">
-                                <div class="flex items-center gap-1.5 text-[8px] font-black text-gray-300 uppercase">
-                                    <div class="w-2 h-2 bg-emerald-500"></div> Benar
-                                </div>
-                                <div class="flex items-center gap-1.5 text-[8px] font-black text-gray-300 uppercase">
-                                    <div class="w-2 h-2 bg-rose-500"></div> Salah
-                                </div>
-                                <div class="flex items-center gap-1.5 text-[8px] font-black text-gray-300 uppercase">
-                                    <div class="w-2 h-2 bg-black"></div> Aktif
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                 </div>
-            </div>
-        </div>
-    </AuthenticatedLayout>
-</template>
 
-<style scoped>
-/* Menghilangkan margin berlebih pada elemen prose jika ada */
-.prose-tight :deep(p) { margin-bottom: 0.4rem; }
-.transition-all { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-</style>
+            </div>
+
+        </main>
+    </div>
+</template>

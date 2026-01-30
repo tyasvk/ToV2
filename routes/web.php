@@ -9,6 +9,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\User\TryoutController as UserTryoutController;
 use App\Http\Controllers\User\CheckoutController;
 use App\Http\Controllers\User\WalletController;
+use App\Http\Controllers\User\TryoutController;
 
 // Import Controller Admin
 use App\Http\Controllers\Admin\AdminDashboardController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\Admin\UserManagerController;
 use App\Http\Controllers\Admin\TryoutManagerController;
 use App\Http\Controllers\Admin\QuestionManagerController;
 use App\Http\Controllers\Admin\TransactionController;
+
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -48,6 +50,17 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     Route::get('/tryouts', [UserTryoutController::class, 'index'])->name('tryout.index');
     Route::get('/tryout/{tryout}', [UserTryoutController::class, 'show'])->name('tryout.show');
 
+// URL: /tryout/{id}/register
+Route::get('/tryout/{tryout}/register', [TryoutController::class, 'register'])->name('tryout.register');
+
+// 2. PROSES Simpan Pendaftaran (POST)
+// URL: /tryout/{id}/register (Method POST)
+Route::post('/tryout/{tryout}/register', [CheckoutController::class, 'store'])->name('tryout.processRegistration');
+
+// 3. Halaman Pembayaran/Checkout (View Show.vue)
+// URL: /checkout/{transaction} (Perhatikan: Parameternya transaction, bukan tryout)
+Route::get('/checkout/{transaction}', [CheckoutController::class, 'show'])->name('checkout.show');
+
     // Rute Tryout Akbar
     Route::get('/tryout-akbar', [\App\Http\Controllers\User\TryoutAkbarController::class, 'index'])->name('tryout-akbar.index');
     
@@ -76,6 +89,16 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     // Checkout
     Route::get('/checkout/{tryout}', [CheckoutController::class, 'show'])->name('checkout.show');
     Route::post('/checkout/{tryout}/process', [CheckoutController::class, 'process'])->name('checkout.process');
+
+    // Route untuk memproses form pendaftaran (POST)
+    Route::post('/tryout/{tryout_id}/register', [CheckoutController::class, 'store'])->name('tryout.processRegistration');
+
+    // Route untuk menampilkan halaman pembayaran (GET)
+    // Perhatikan parameternya {id} (ID Transaksi)
+    Route::get('/checkout/{id}', [CheckoutController::class, 'show'])->name('checkout.show');
+
+    // Route Callback (POST)
+    Route::post('/checkout/callback', [CheckoutController::class, 'callbackInternal'])->name('checkout.callback.internal');
 
     // My Tryouts
     Route::get('/my-tryouts', [UserTryoutController::class, 'myTryouts'])->name('tryout.my');

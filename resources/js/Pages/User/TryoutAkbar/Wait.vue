@@ -52,13 +52,13 @@ const formatDate = (dateString) => new Date(dateString).toLocaleDateString('id-I
     <Head title="Waiting Room" />
 
     <AuthenticatedLayout>
-        <div class="min-h-screen bg-[#F8FAFC] pt-4 pb-12 flex items-start justify-center relative overflow-hidden font-sans">
+        <div class="min-h-[calc(100vh-65px)] bg-[#F8FAFC] flex items-center justify-center relative overflow-hidden font-sans p-4">
             
             <div class="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 pointer-events-none"></div>
             <div class="absolute top-[-10%] right-[-5%] w-96 h-96 bg-indigo-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob pointer-events-none"></div>
             <div class="absolute bottom-[-10%] left-[-5%] w-96 h-96 bg-amber-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000 pointer-events-none"></div>
 
-            <div class="relative z-10 max-w-3xl w-full px-4">
+            <div class="relative z-10 max-w-3xl w-full">
                 
                 <div class="mb-6 text-center">
                     <Link :href="route('tryout-akbar.index')" class="text-sm font-bold text-slate-400 hover:text-indigo-600 transition">
@@ -92,7 +92,6 @@ const formatDate = (dateString) => new Date(dateString).toLocaleDateString('id-I
                                 Refresh Status
                             </button>
                         </div>
-
 
                         <div v-else-if="transaction.status === 'paid' || transaction.status === 'success'">
                             

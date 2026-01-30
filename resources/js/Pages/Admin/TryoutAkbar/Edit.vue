@@ -169,7 +169,7 @@ const submit = () => {
                                         <label class="block text-xs font-bold text-slate-700 mb-1">Harga Pendaftaran</label>
                                         <div class="relative">
                                             <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">Rp</span>
-                                            <input type="number" v-model="form.price" class="w-full rounded-lg border-slate-300 text-sm pl-8 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0">
+                                            <input type="number" v-model="form.price" class="w-full rounded-lg border-slate-300 text-sm pl-12 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0">
                                         </div>
                                         <p class="text-[10px] text-slate-400 mt-1">Isi 0 untuk Gratis.</p>
                                         <div v-if="form.errors.price" class="text-red-500 text-[10px] mt-1">{{ form.errors.price }}</div>

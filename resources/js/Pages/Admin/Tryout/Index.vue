@@ -1,16 +1,27 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
+import { debounce } from 'lodash'; 
 
 const props = defineProps({
-    tryouts: Array
+    tryouts: Object, // Diubah jadi Object karena menggunakan Pagination
+    filters: Object
 });
 
 // --- STATE MODAL ---
 const showModal = ref(false);
 const isEdit = ref(false);
 const editingId = ref(null);
+const search = ref(props.filters?.search || '');
+
+// --- SEARCH LOGIC ---
+const handleSearch = debounce(() => {
+    router.get(route('admin.tryouts.index'), { search: search.value }, {
+        preserveState: true,
+        replace: true
+    });
+}, 500);
 
 // --- FORM DATA ---
 const form = useForm({
@@ -20,9 +31,9 @@ const form = useForm({
     is_published: false,
     published_at: '',
     started_at: '',
-    // KEMBALIKAN FIELD HARGA
     is_paid: false,
     price: 0,
+    type: 'general' // Default type
 });
 
 // --- LOGIKA MODAL ---
@@ -40,13 +51,9 @@ const openEditModal = (tryout) => {
     form.title = tryout.title;
     form.duration_minutes = tryout.duration_minutes;
     form.description = tryout.description;
-    
-    // Load Status Publish
     form.is_published = !!tryout.is_published;
     form.published_at = tryout.published_at ? tryout.published_at.substring(0, 16) : '';
     form.started_at = tryout.started_at ? tryout.started_at.substring(0, 16) : '';
-    
-    // LOAD DATA HARGA
     form.is_paid = !!tryout.is_paid;
     form.price = tryout.price;
     
@@ -104,7 +111,19 @@ const formatPrice = (price) => {
             </div>
         </template>
 
-        <div class="max-w-6xl mx-auto mt-8">
+        <div class="max-w-6xl mx-auto mt-8 px-4 sm:px-0">
+            
+            <div class="mb-6 relative">
+                <input 
+                    v-model="search" 
+                    @input="handleSearch"
+                    type="text" 
+                    placeholder="Cari paket tryout..." 
+                    class="w-full pl-12 pr-4 py-3 rounded-2xl border-none shadow-sm text-sm font-bold focus:ring-2 focus:ring-indigo-500"
+                >
+                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+            </div>
+
             <div class="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left min-w-[800px]">
@@ -117,13 +136,13 @@ const formatPrice = (price) => {
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-50">
-                            <tr v-if="tryouts.length === 0">
+                            <tr v-if="tryouts.data.length === 0">
                                 <td colspan="4" class="px-8 py-12 text-center text-gray-400">
                                     <p class="text-xs font-bold uppercase tracking-widest">Belum ada paket tryout</p>
                                 </td>
                             </tr>
 
-                            <tr v-for="tryout in tryouts" :key="tryout.id" class="hover:bg-gray-50/50 transition-all group">
+                            <tr v-for="tryout in tryouts.data" :key="tryout.id" class="hover:bg-gray-50/50 transition-all group">
                                 <td class="px-8 py-6">
                                     <div class="flex items-center gap-4">
                                         <div class="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-xl">📑</div>
@@ -156,9 +175,11 @@ const formatPrice = (price) => {
                                     <button @click="openEditModal(tryout)" class="inline-flex items-center bg-white border border-gray-200 hover:border-indigo-600 hover:text-indigo-600 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition shadow-sm">
                                         Edit
                                     </button>
-                                    <Link :href="route('admin.tryouts.questions.index', tryout.id)" class="inline-flex items-center bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 transition shadow-sm">
+                                    
+                                    <Link :href="route('admin.tryouts.questions.index', { tryout: tryout.id })" class="inline-flex items-center bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 transition shadow-sm">
                                         Soal
                                     </Link>
+                                    
                                     <button @click="deleteTryout(tryout.id)" class="p-2.5 text-gray-300 hover:text-red-500 transition">
                                         🗑️
                                     </button>
@@ -166,6 +187,21 @@ const formatPrice = (price) => {
                             </tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-center" v-if="tryouts.links && tryouts.links.length > 3">
+                <div class="flex gap-1 bg-white p-2 rounded-xl shadow-sm">
+                    <template v-for="(link, key) in tryouts.links" :key="key">
+                        <Link 
+                            v-if="link.url"
+                            :href="link.url"
+                            v-html="link.label"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold transition"
+                            :class="link.active ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:bg-gray-50'"
+                        />
+                        <span v-else v-html="link.label" class="px-3 py-1.5 text-xs text-gray-300"></span>
+                    </template>
                 </div>
             </div>
         </div>
@@ -185,7 +221,7 @@ const formatPrice = (price) => {
                     <form @submit.prevent="submit" class="space-y-5">
                         <div class="space-y-1">
                             <label class="text-[9px] font-black text-gray-400 uppercase ml-2">Nama Paket</label>
-                            <input v-model="form.title" type="text" class="w-full border-gray-100 bg-gray-50 rounded-2xl p-4 focus:ring-indigo-500 font-bold text-sm" placeholder="Contoh: Tryout Akbar #1" required />
+                            <input v-model="form.title" type="text" class="w-full border-gray-100 bg-gray-50 rounded-2xl p-4 focus:ring-indigo-500 font-bold text-sm" placeholder="Contoh: Tryout UTBK #1" required />
                         </div>
 
                         <div class="grid grid-cols-2 gap-4">
@@ -244,16 +280,6 @@ const formatPrice = (price) => {
 </template>
 
 <style scoped>
-/* CSS UNTUK MENYEMBUNYIKAN SCROLLBAR TAPI TETAP BISA SCROLL */
-
-/* Chrome, Safari and Opera */
-.no-scrollbar::-webkit-scrollbar {
-    display: none;
-}
-
-/* IE, Edge and Firefox */
-.no-scrollbar {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
-}
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 </style>

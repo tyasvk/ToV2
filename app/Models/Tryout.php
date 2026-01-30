@@ -24,6 +24,8 @@ class Tryout extends Model
         'started_at',
         'type',           // <--- WAJIB DITAMBAH
         'requirements',   // <--- WAJIB DITAMBAH
+        'ended_at',       // <--- WAJIB DITAMBAH
+        'duration',       // <--- WAJIB DITAMBAH (Sesuaikan dengan Controller)
     ];
 
     protected $casts = [
@@ -31,6 +33,7 @@ class Tryout extends Model
         'started_at' => 'datetime',
         'is_active' => 'boolean',
         'is_published' => 'boolean',
+        'ended_at'   => 'datetime', // <--- Tambahkan casting ini juga
         'is_paid' => 'boolean',   
         'price' => 'decimal:2',    
     ];

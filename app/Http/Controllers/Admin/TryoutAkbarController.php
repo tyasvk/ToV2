@@ -157,7 +157,7 @@ public function participants(Request $request, Tryout $tryout)
     /**
      * Update data Tryout Akbar.
      */
-    public function update(Request $request, $id)
+public function update(Request $request, $id)
     {
         $tryout = Tryout::where('id', $id)->where('type', 'akbar')->firstOrFail();
 
@@ -172,6 +172,10 @@ public function participants(Request $request, Tryout $tryout)
             'is_published' => 'boolean',
         ]);
 
+        // Pastikan tipe boolean terbaca dengan benar
+        $validated['is_published'] = $request->boolean('is_published');
+
+        // Update data
         $tryout->update($validated);
 
         return redirect()->route('admin.tryout-akbar.index')

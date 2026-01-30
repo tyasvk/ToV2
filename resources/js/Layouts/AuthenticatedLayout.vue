@@ -24,6 +24,29 @@ const isUser = computed(() =>
     roles.value.some(r => String(r).toLowerCase() === 'user') || roles.value.length === 0
 );
 
+// --- 4. LOGIKA ACTIVE SIDEBAR (FIXED) ---
+// Cek apakah halaman ini milik Tryout Akbar (Termasuk halaman soal/questions jika tipenya akbar)
+const isAkbarActive = computed(() => {
+    // 1. Jika rute depannya memang tryout-akbar
+    if (route().current('admin.tryout-akbar.*')) return true;
+    
+    // 2. Jika rute soal/questions TAPI data tryout-nya bertipe 'akbar'
+    if (route().current('admin.tryouts.questions.*') && page.props.tryout?.type === 'akbar') {
+        return true;
+    }
+    return false;
+});
+
+// Cek apakah halaman ini milik Tryout Biasa
+const isTryoutActive = computed(() => {
+    // Jika sudah dideteksi sebagai Akbar, maka ini false
+    if (isAkbarActive.value) return false;
+
+    // Logic default untuk tryout biasa
+    return route().current('admin.tryouts.*') || route().current('admin.questions.*');
+});
+
+
 // --- DYNAMIC LOGO ROUTE ---
 const logoRoute = computed(() => {
     try {
@@ -70,12 +93,12 @@ onMounted(() => {
                         <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Dashboard</span>
                     </Link>
 
-                    <Link :href="route('admin.tryouts.index')" :class="[route().current('admin.tryouts.*') || route().current('admin.questions.*') ? 'bg-red-50 text-red-600' : 'text-gray-500 hover:bg-red-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
+                    <Link :href="route('admin.tryouts.index')" :class="[isTryoutActive ? 'bg-red-50 text-red-600' : 'text-gray-500 hover:bg-red-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
                         <span class="text-xl">📑</span> 
                         <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Kelola Tryout</span>
                     </Link>
 
-                    <Link :href="route('admin.tryout-akbar.index')" :class="[route().current('admin.tryout-akbar.*') ? 'bg-red-50 text-red-600' : 'text-gray-500 hover:bg-red-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
+                    <Link :href="route('admin.tryout-akbar.index')" :class="[isAkbarActive ? 'bg-red-50 text-red-600' : 'text-gray-500 hover:bg-red-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
                         <span class="text-xl">🏆</span> 
                         <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Tryout Akbar</span>
                     </Link>

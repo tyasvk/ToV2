@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Tryout;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use App\Models\Transaction; // <--- WAJIB ADA BARIS INI
-use Illuminate\Support\Str; // <--- WAJIB DITAMBAHKAN AGAR ERROR HILANG
+use App\Models\Transaction;
+use Illuminate\Support\Str;
 
 class TryoutAkbarController extends Controller
 {
@@ -19,7 +19,6 @@ class TryoutAkbarController extends Controller
         $user = auth()->user();
 
         // Ambil tryout tipe 'akbar' yang sudah dipublish
-        // Kita juga bisa mengecek status kepesertaan user di sini jika perlu
         $tryouts = Tryout::where('type', 'akbar')
             ->where('is_published', true)
             ->withExists(['transactions as is_registered' => function ($query) use ($user) {
@@ -29,8 +28,26 @@ class TryoutAkbarController extends Controller
                             ->orWhereJsonContains('participants_data', $user->email);
                       });
             }])
+            // --- TAMBAHAN: Ambil data pengerjaan (attempt) terakhir user ini ---
+            ->with(['examAttempts' => function ($query) use ($user) {
+                $query->where('user_id', $user->id)
+                      ->orderBy('id', 'desc')
+                      ->select('id', 'tryout_id', 'user_id', 'total_score'); // Ambil kolom seperlunya
+            }])
             ->latest()
             ->get();
+
+        // --- TAMBAHAN: Map data agar mudah dibaca di frontend ---
+        $tryouts->transform(function ($tryout) {
+            // Ambil ID attempt pertama (jika ada)
+            $attempt = $tryout->examAttempts->first();
+            $tryout->latest_attempt_id = $attempt ? $attempt->id : null;
+            
+            // Hapus relation agar payload lebih ringan
+            unset($tryout->examAttempts);
+            
+            return $tryout;
+        });
 
         return Inertia::render('User/TryoutAkbar/Index', [
             'tryouts' => $tryouts
@@ -45,7 +62,6 @@ class TryoutAkbarController extends Controller
             ->latest()
             ->first();
 
-        // JIKA SUDAH DAFTAR (Pending / Paid), LANGSUNG KE WAITING ROOM
         if ($transaction && in_array($transaction->status, ['pending', 'paid', 'success'])) {
             return redirect()->route('tryout-akbar.wait', $tryout->id);
         }
@@ -84,11 +100,9 @@ class TryoutAkbarController extends Controller
             'payment_method' => 'manual',
         ]);
 
-        // REDIRECT KE WAITING ROOM SETELAH UPLOAD
         return redirect()->route('tryout-akbar.wait', $tryout->id);
     }
 
-    // METHOD BARU: Waiting Room
     public function waitingRoom(Tryout $tryout)
     {
         $user = auth()->user();
@@ -97,7 +111,6 @@ class TryoutAkbarController extends Controller
             ->latest()
             ->first();
 
-        // Jika belum daftar atau ditolak, kembalikan ke register
         if (!$transaction || $transaction->status === 'failed') {
             return redirect()->route('tryout-akbar.register', $tryout->id);
         }
@@ -108,10 +121,6 @@ class TryoutAkbarController extends Controller
         ]);
     }
 
-    /**
-     * Menampilkan detail spesifik Tryout Akbar (Opsional).
-     * Jika Anda ingin halaman detail sebelum register.
-     */
     public function show($id)
     {
         $tryout = Tryout::where('id', $id)

@@ -13,14 +13,17 @@ class TransactionController extends Controller
     {
         // Query Dasar dengan Relasi
         $query = Transaction::query()
-            ->with(['user', 'tryout']); // Load data User dan Tryout agar tidak error di frontend
+            ->with(['user', 'tryout']) // Load data User dan Tryout
+            ->where('amount', '>', 0); // <--- FILTER PENTING: Hanya ambil yang berbayar (Harga > 0)
 
-        // Fitur Pencarian (Opsional, tapi bagus untuk Admin)
+        // Fitur Pencarian
         if ($request->search) {
-            $query->where('invoice_code', 'like', '%' . $request->search . '%')
-                  ->orWhereHas('user', function($q) use ($request) {
-                      $q->where('name', 'like', '%' . $request->search . '%');
+            $query->where(function($q) use ($request) {
+                $q->where('invoice_code', 'like', '%' . $request->search . '%')
+                  ->orWhereHas('user', function($userQ) use ($request) {
+                      $userQ->where('name', 'like', '%' . $request->search . '%');
                   });
+            });
         }
 
         // Ambil data terbaru, 10 per halaman
@@ -34,7 +37,7 @@ class TransactionController extends Controller
 
     public function approve(Transaction $transaction)
     {
-        $transaction->update(['status' => 'paid']); // Atau 'success' tergantung enum Anda
+        $transaction->update(['status' => 'paid']); 
         return back()->with('success', 'Transaksi berhasil disetujui.');
     }
 }
