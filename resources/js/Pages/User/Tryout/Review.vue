@@ -1,220 +1,262 @@
 <script setup>
-import { Head, Link } from '@inertiajs/vue3';
-import { computed } from 'vue';
-import dayjs from 'dayjs';
-import 'dayjs/locale/id';
-import relativeTime from 'dayjs/plugin/relativeTime';
-
-dayjs.locale('id');
-dayjs.extend(relativeTime);
+import { Head, Link, usePage } from '@inertiajs/vue3';
+import { ref, computed } from 'vue';
 
 const props = defineProps({
-    attempt: Object,
     tryout: Object,
-    totalScore: Number,
-    scoreDetails: Array,
-    ranking: Object
-});
-
-const isOverallPassed = computed(() => props.attempt.status === 'lulus');
-
-const formatDate = (dateString) => {
-    return dayjs(dateString).format('DD MMMM YYYY • HH:mm WIB');
-};
-
-const getBarWidth = (score, max) => {
-    let percentage = (score / max) * 100;
-    return `${Math.min(percentage, 100)}%`;
-};
-
-// Logika Navigasi Tombol Tutup
-const closeRoute = computed(() => {
-    // Jika Tryout Akbar, kembali ke halaman detail event tersebut
-    if (props.tryout.type === 'akbar') {
-        return route('tryout-akbar.show', props.tryout.id);
+    questions: Array,
+    user: Object,
+    attempt: Object,
+    mode: {
+        type: String,
+        default: 'bkn' // 'bkn' atau 'modern'
     }
-    // Jika Regular, kembali ke list tryout (fungsi default)
-    return route('tryout.index');
 });
+
+const page = usePage();
+
+// --- STATE ---
+const currentIndex = ref(0);
+const isSidebarOpen = ref(false);
+
+// --- COMPUTED ---
+const currentQuestion = computed(() => {
+    if (!props.questions || props.questions.length === 0) return null;
+    return props.questions[currentIndex.value] || null;
+});
+
+const subtestTopic = computed(() => {
+    const type = currentQuestion.value?.type;
+    if (type === 'TWK') return 'Nasionalisme & Bela Negara';
+    if (type === 'TIU') return 'Kemampuan Verbal & Logika';
+    if (type === 'TKP') return 'Pelayanan Publik & Jejaring Kerja';
+    return '';
+});
+
+// Helper: Cek status jawaban
+const isCorrect = (q) => q.user_answer === q.correct_answer;
+
+// --- METHODS ---
+const goTo = (index) => { currentIndex.value = index; isSidebarOpen.value = false; };
+const next = () => { 
+    if (currentIndex.value < (props.questions?.length - 1)) currentIndex.value++; 
+    else currentIndex.value = 0; 
+};
+const prev = () => { if (currentIndex.value > 0) currentIndex.value--; };
+
+// --- LOGIKA WARNA (BKN MODE) ---
+const getBknSidebarClass = (q, index) => {
+    if (currentIndex.value === index) return 'bg-[#1e60aa] text-white font-black ring-1 ring-blue-300 rounded-sm z-10 shadow-md';
+    if (q.user_answer === q.correct_answer) return 'bg-emerald-600 text-white border-emerald-700 rounded-full font-bold';
+    return 'bg-red-600 text-white border-red-700 hover:bg-red-700 rounded-sm font-bold';
+};
+
+const getBknOptionClass = (key) => {
+    const q = currentQuestion.value;
+    if (key === q.correct_answer) return 'bg-emerald-100 border-emerald-500 ring-1 ring-emerald-500';
+    if (key === q.user_answer && key !== q.correct_answer) return 'bg-rose-100 border-rose-500 ring-1 ring-rose-500';
+    return 'bg-white border-slate-200 opacity-70';
+};
+
+// --- LOGIKA WARNA (MODERN MODE) ---
+const getModernOptionClass = (key) => {
+    const q = currentQuestion.value;
+    if (key === q.correct_answer) return 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500 shadow-sm z-10';
+    if (key === q.user_answer && key !== q.correct_answer) return 'bg-rose-50 border-rose-500 ring-1 ring-rose-500 shadow-sm z-10';
+    return 'bg-white border-slate-200 opacity-60 hover:opacity-100';
+};
+
+const getModernSidebarClass = (q, index) => {
+    let base = "h-8 w-8 text-[10px] font-bold rounded-lg flex items-center justify-center transition-all duration-200 border ";
+    if (currentIndex.value === index) return base + "bg-[#1e60aa] text-white border-[#1e60aa] ring-2 ring-blue-200 shadow-md transform scale-110 z-10";
+    if (q.user_answer === q.correct_answer) return base + "bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-200";
+    return base + "bg-rose-100 text-rose-700 border-rose-200 hover:bg-rose-200";
+};
 </script>
 
 <template>
-    <Head :title="'Hasil - ' + tryout.title" />
+    <Head :title="'Pembahasan: ' + (tryout?.title || 'Loading...')" />
 
-    <div class="min-h-screen bg-[#F8FAFC] font-sans text-slate-600 pb-20">
+    <div v-if="mode === 'modern'" class="min-h-screen bg-slate-50 font-sans text-slate-700 flex flex-col">
         
-        <nav class="bg-white border-b border-slate-200 px-6 py-4 sticky top-0 z-30 shadow-sm/50 backdrop-blur-xl bg-white/90">
-            <div class="max-w-6xl mx-auto flex justify-between items-center">
-                <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-md shadow-indigo-200">TO</div>
-                    <div>
-                        <h1 class="font-bold text-slate-900 leading-tight">Hasil Ujian</h1>
-                        <p class="text-[10px] text-slate-400 uppercase tracking-wider">Computer Assisted Test</p>
-                    </div>
-                </div>
-                
-                <Link :href="closeRoute" class="text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors uppercase tracking-wider flex items-center gap-2 px-3 py-1.5 hover:bg-slate-100 rounded-lg">
-                    <span>Tutup</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </Link>
-            </div>
-        </nav>
-
-        <main class="max-w-6xl mx-auto p-4 lg:p-8 space-y-6">
-
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pb-2">
-                <div>
-                    <h2 class="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">{{ tryout.title }}</h2>
-                    <p class="text-sm font-medium text-slate-400 flex items-center gap-2 mt-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Selesai pada {{ formatDate(attempt.finished_at) }}
-                    </p>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                
-                <div class="lg:col-span-4 space-y-5">
-                    
-                    <div class="relative overflow-hidden rounded-[2rem] shadow-xl transition-all group p-6 text-center flex flex-col items-center justify-center min-h-[260px]"
-                         :class="isOverallPassed ? 'bg-emerald-500 text-white shadow-emerald-200' : 'bg-white text-slate-900 border border-slate-200 shadow-slate-200'">
-                        
-                        <div class="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
-
-                        <div class="mb-3 p-2.5 rounded-full inline-flex items-center justify-center shadow-sm scale-90"
-                             :class="isOverallPassed ? 'bg-white/20 text-white' : 'bg-rose-50 text-rose-500'">
-                            <svg v-if="isOverallPassed" xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                            </svg>
-                            <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </div>
-
-                        <h2 class="text-3xl font-black mb-0.5 tracking-tight" :class="isOverallPassed ? 'text-white' : 'text-slate-900'">
-                            {{ isOverallPassed ? 'LULUS' : 'TIDAK LULUS' }}
-                        </h2>
-                        <p class="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-5">Status Akhir</p>
-
-                        <div class="w-full border-t pt-4 mt-auto" :class="isOverallPassed ? 'border-white/20' : 'border-slate-100'">
-                            <p class="text-[10px] uppercase tracking-widest opacity-60 mb-1">Total Skor SKD</p>
-                            <p class="text-5xl font-black tracking-tighter">{{ totalScore }}</p>
-                        </div>
-                    </div>
-
-                    <Link :href="route('tryout.leaderboard', tryout.id)" 
-                        class="group flex items-center justify-between bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all relative overflow-hidden">
-                        
-                        <div class="flex items-center gap-3 relative z-10">
-                            <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                </svg>
-                            </div>
-                            <div>
-                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Peringkat Kamu</p>
-                                <div class="flex items-baseline gap-1">
-                                    <span class="text-xl font-black text-slate-900">#{{ ranking.rank }}</span>
-                                    <span class="text-xs font-medium text-slate-400">/ {{ ranking.total_participants }}</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="text-indigo-600">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                            </svg>
-                        </div>
+        <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm/50 backdrop-blur-md bg-white/90">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <Link :href="route('dashboard')" class="bg-blue-50 p-1.5 rounded-lg border border-blue-100">
+                        <img src="/images/logo.png" alt="Logo" class="h-8 w-8 object-contain">
                     </Link>
-
-                    <div class="grid grid-cols-1 gap-3">
-                        <Link :href="route('tryout.review', attempt.id)" 
-                              class="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-indigo-600 text-white font-bold text-sm uppercase tracking-wide hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all hover:-translate-y-0.5">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            Pembahasan
-                        </Link>
-                        
-                        <Link :href="route('tryout.index')" 
-                              class="w-full block py-3.5 rounded-2xl bg-white border border-slate-200 text-slate-600 font-bold text-center text-sm uppercase tracking-wide hover:bg-slate-50 transition-all">
-                            Menu Utama
-                        </Link>
+                    <div class="hidden md:block leading-tight">
+                        <h1 class="font-bold text-slate-900 text-sm tracking-tight">PEMBAHASAN SOAL</h1>
+                        <p class="text-[10px] font-medium text-slate-500 uppercase tracking-wider">{{ tryout?.title }}</p>
                     </div>
-
                 </div>
+                <div class="flex items-center gap-3">
+                    <Link :href="route('tryout.result', attempt?.id)" class="group flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-full text-xs font-bold uppercase tracking-wide hover:bg-slate-50 transition-all">
+                        <span>Kembali</span>
+                    </Link>
+                    <button @click="isSidebarOpen = !isSidebarOpen" class="md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg">☰</button>
+                </div>
+            </div>
+        </header>
 
-                <div class="lg:col-span-8">
-                    <div class="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-6">
-                        
-                        <div class="flex items-center justify-between mb-6">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h3 class="font-bold text-slate-900 text-lg">Statistik Nilai</h3>
-                                    <p class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Rincian Sub-Tes</p>
-                                </div>
+        <div class="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8 flex gap-6 lg:gap-8 relative items-start">
+            <main class="flex-1 w-full min-w-0 space-y-6">
+                <div v-if="currentQuestion" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-100 flex flex-wrap justify-between items-center bg-slate-50/50 gap-3">
+                        <div class="flex items-center gap-3">
+                            <span class="bg-[#1e60aa] text-white text-xs font-black px-2.5 py-1 rounded-md shadow-sm">NO. {{ currentIndex + 1 }}</span>
+                            <span class="text-xs font-bold text-slate-500 uppercase">{{ currentQuestion.type }}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span v-if="isCorrect(currentQuestion)" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase border border-emerald-200">Benar</span>
+                            <span v-else class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-100 text-rose-700 text-[10px] font-bold uppercase border border-rose-200">Salah</span>
+                        </div>
+                    </div>
+                    <div class="p-6 md:p-8">
+                        <div v-if="currentQuestion.image" class="mb-6 max-w-lg"><img :src="'/storage/' + currentQuestion.image" class="w-full h-auto rounded-lg border"></div>
+                        <div class="prose prose-sm max-w-none text-slate-800 font-medium leading-relaxed mb-8" v-html="currentQuestion.content"></div>
+                        <div class="space-y-3">
+                            <div v-for="(option, key) in currentQuestion.options" :key="key" class="relative flex items-start gap-4 p-4 rounded-xl border-2 transition-all" :class="getModernOptionClass(key)">
+                                <div class="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0 transition-colors bg-slate-100 text-slate-500">{{ key.toUpperCase() }}</div>
+                                <div class="flex-1 text-sm pt-0.5">{{ option }}</div>
                             </div>
                         </div>
+                    </div>
+                </div>
+                <div class="bg-blue-50/50 rounded-2xl border-l-4 border-blue-500 shadow-sm p-6 md:p-8">
+                    <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">💡 Pembahasan</h3>
+                    <div class="prose prose-sm max-w-none text-slate-600 leading-loose" v-html="currentQuestion?.explanation || 'Tidak ada pembahasan.'"></div>
+                </div>
+                <div class="flex justify-between items-center pt-4">
+                    <button @click="prev" :disabled="currentIndex === 0" class="px-6 py-3 rounded-xl font-bold text-xs uppercase border bg-white disabled:opacity-50">Previous</button>
+                    <button @click="next" class="px-6 py-3 rounded-xl font-bold text-xs uppercase bg-[#1e60aa] text-white shadow-md">Next</button>
+                </div>
+            </main>
+            <aside :class="['fixed lg:sticky lg:top-24 inset-y-0 right-0 z-50 w-72 bg-white lg:bg-transparent lg:border-0 border-l shadow-2xl lg:shadow-none transition-transform duration-300 transform lg:transform-none lg:block flex flex-col', isSidebarOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0']">
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full lg:h-auto lg:max-h-[calc(100vh-8rem)]">
+                    <div class="p-4 border-b border-slate-100 bg-slate-50/50"><h3 class="font-bold text-slate-700 text-sm">Navigasi</h3></div>
+                    <div class="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                        <div class="grid grid-cols-5 gap-2">
+                            <button v-for="(q, i) in questions" :key="q.id" @click="goTo(i)" :class="getModernSidebarClass(q, i)">{{ i + 1 }}</button>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div v-for="(detail, index) in scoreDetails" :key="index" 
-                                 class="p-5 rounded-2xl border transition-all hover:shadow-md flex flex-col justify-between min-h-[140px]"
-                                 :class="detail.is_passed ? 'bg-emerald-50/40 border-emerald-100 hover:border-emerald-200' : 'bg-rose-50/40 border-rose-100 hover:border-rose-200'">
-                                
-                                <div class="flex items-center gap-3 mb-3">
-                                    <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black border shrink-0"
-                                         :class="detail.is_passed ? 'bg-emerald-100 text-emerald-600 border-emerald-200' : 'bg-rose-100 text-rose-600 border-rose-200'">
-                                        {{ detail.category.substring(0, 3) }}
-                                    </div>
-                                    <div class="overflow-hidden">
-                                        <h4 class="font-bold text-slate-700 text-sm truncate" :title="detail.category">{{ detail.category }}</h4>
-                                        <p class="text-[10px] font-medium text-slate-400">PG: {{ detail.passing_grade }}</p>
-                                    </div>
-                                </div>
+    <div v-else class="h-screen flex flex-col font-sans text-slate-800 bg-[#eef2f7] overflow-hidden">
+        
+        <header class="bg-[#1e60aa] text-white shadow-md z-50 shrink-0 h-16 flex items-center px-4 justify-between">
+            <div class="flex items-center gap-4">
+                <div class="bg-white p-1 rounded-md shrink-0"><img src="/images/logo.png" alt="Logo" class="h-9 w-9 object-contain"></div>
+                <div class="leading-tight hidden md:block">
+                    <h1 class="font-bold text-lg tracking-wide">PEMBAHASAN SOAL</h1>
+                    <p class="text-[10px] opacity-80 uppercase font-medium">{{ tryout?.title }}</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <Link :href="route('tryout.result', attempt?.id)" class="hidden sm:flex bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition border border-white/10">Kembali</Link>
+                <div class="text-right hidden sm:block"><p class="text-sm font-bold">{{ page.props.auth?.user?.name }}</p></div>
+                <button @click="isSidebarOpen = !isSidebarOpen" class="md:hidden p-2 bg-white/20 rounded">☰</button>
+            </div>
+        </header>
 
-                                <div>
-                                    <div class="flex items-end justify-between mb-2">
-                                        <span class="text-3xl font-black leading-none" :class="detail.is_passed ? 'text-emerald-600' : 'text-rose-600'">
-                                            {{ detail.score }}
-                                        </span>
-                                        <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
-                                              :class="detail.is_passed ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'">
-                                            {{ detail.is_passed ? 'Lolos' : 'Gagal' }}
-                                        </span>
-                                    </div>
+        <div class="flex flex-1 overflow-hidden relative">
+            
+            <aside :class="['absolute md:static inset-y-0 left-0 z-40 w-64 bg-white border-r border-slate-300 flex flex-col transition-transform duration-300 transform shadow-lg md:shadow-none', isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0']">
+                <div class="flex-1 overflow-y-auto px-7 py-4 custom-scrollbar">
+                    <div class="grid grid-cols-5 gap-0.5 place-content-start">
+                        <button v-for="(q, i) in questions" :key="q.id" @click="goTo(i)" :class="getBknSidebarClass(q, i)" class="h-6 w-full text-[9px] flex items-center justify-center transition-all shadow-sm border border-transparent">{{ i + 1 }}</button>
+                    </div>
+                </div>
+                <div class="p-4 bg-slate-50 border-t border-slate-200 text-[10px] space-y-2">
+                    <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-emerald-600"></div> <span>Benar</span></div>
+                    <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-sm bg-red-600"></div> <span>Salah / Kosong</span></div>
+                    <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-sm bg-[#1e60aa] ring-1 ring-blue-300"></div> <span>Aktif</span></div>
+                </div>
+            </aside>
 
-                                    <div class="h-1.5 w-full bg-slate-200/50 rounded-full overflow-hidden relative">
-                                        <div class="absolute top-0 bottom-0 w-0.5 bg-slate-400/50 z-10" style="left: 60%"></div>
-                                        <div class="h-full rounded-full transition-all duration-1000 ease-out relative"
-                                             :class="detail.is_passed ? 'bg-emerald-500' : 'bg-rose-500'"
-                                             :style="{ width: getBarWidth(detail.score, (index === 2 ? 225 : (index === 1 ? 175 : 150))) }">
+            <div v-if="isSidebarOpen" @click="isSidebarOpen = false" class="fixed inset-0 bg-black/50 z-30 md:hidden"></div>
+
+            <main class="flex-1 flex flex-col relative overflow-hidden bg-[#eef2f7]">
+                
+                <div class="flex flex-col md:flex-row items-stretch px-4 py-3 shrink-0 gap-3">
+                    <div class="flex-1 flex items-stretch bg-white rounded-r-lg border border-slate-300 shadow-sm overflow-hidden">
+                        <div class="w-16 bg-slate-200 shrink-0 relative border-r border-slate-100">
+                            <img v-if="page.props.auth?.user?.image" :src="page.props.auth?.user?.image" class="w-full h-full object-cover absolute inset-0">
+                            <div v-else class="w-full h-full flex items-center justify-center text-[8px] font-bold text-slate-400 absolute inset-0">IMG</div>
+                        </div>
+                        <div class="min-w-0 flex-1 flex flex-col justify-center text-center p-1.5">
+                            <p class="text-[10px] font-bold text-slate-900 uppercase leading-none truncate">{{ page.props.auth?.user?.name }} <span class="font-normal opacity-70 ml-1">({{ page.props.auth?.user?.username || page.props.auth?.user?.id }})</span></p>
+                            <p class="text-[9px] text-slate-500 leading-none mt-1 truncate">{{ page.props.auth?.user?.email }}</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-col gap-1.5 shrink-0 w-full md:w-auto min-w-[140px]">
+                        <div class="bg-white border border-slate-300 rounded-lg shadow-sm px-4 py-1.5 flex flex-col items-center justify-center h-full">
+                            <span class="text-[9px] font-bold uppercase text-slate-400 tracking-wider">Status Jawaban</span>
+                            <div v-if="currentQuestion" class="mt-0.5">
+                                <span v-if="isCorrect(currentQuestion)" class="text-sm font-black text-emerald-600 uppercase">BENAR</span>
+                                <span v-else class="text-sm font-black text-rose-600 uppercase">SALAH</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex-1 overflow-y-auto px-4 pb-4 custom-scrollbar">
+                    <div class="w-full bg-white rounded-lg shadow-sm border border-slate-300 overflow-hidden">
+                        <div class="bg-[#1e60aa] text-white px-5 py-2.5 flex items-center justify-between">
+                            <span class="font-bold text-xs tracking-wide uppercase">{{ subtestTopic }}</span>
+                        </div>
+                        <div v-if="currentQuestion" class="p-5 md:p-8">
+                            <div v-if="currentQuestion?.image" class="mb-5 max-w-md mx-auto"><img :src="'/storage/' + currentQuestion.image" class="w-full h-auto rounded border p-1 bg-slate-50 shadow-sm"></div>
+                            
+                            <div class="flex items-start gap-2 mb-6">
+                                <span class="font-bold text-slate-900 text-[10px] md:text-xs shrink-0 mt-0.5">No. {{ currentIndex + 1 }}</span>
+                                <div class="text-[10px] md:text-xs text-slate-800 font-medium leading-relaxed whitespace-pre-wrap" v-html="currentQuestion.content"></div>
+                            </div>
+
+                            <div class="space-y-2.5">
+                                <div v-for="(option, key) in currentQuestion?.options" :key="key" class="flex items-start gap-3 p-2.5 rounded border-2 transition-all relative overflow-hidden" :class="getBknOptionClass(key)">
+                                    <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 font-bold text-[10px]" 
+                                         :class="key === currentQuestion.correct_answer ? 'bg-emerald-500 border-emerald-500 text-white' : (key === currentQuestion.user_answer ? 'bg-rose-500 border-rose-500 text-white' : 'border-slate-300 text-slate-400')">
+                                        {{ key.toUpperCase() }}
+                                    </div>
+                                    <div class="flex-1">
+                                        <span class="text-[10px] md:text-xs text-slate-700 pt-0.5 block">{{ option }}</span>
+                                        <div class="mt-1.5 flex gap-2">
+                                            <span v-if="key === currentQuestion.correct_answer" class="text-[9px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 rounded">Kunci Jawaban</span>
+                                            <span v-if="key === currentQuestion.user_answer && key !== currentQuestion.correct_answer" class="text-[9px] font-bold text-rose-700 bg-rose-100 border border-rose-200 px-1.5 py-0.5 rounded">Jawaban Anda</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div class="mt-5 p-4 bg-slate-50 rounded-xl border border-slate-100 flex gap-3 items-center">
-                            <div class="w-5 h-5 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-xs font-bold shrink-0">i</div>
-                            <p class="text-xs text-slate-500 leading-tight">
-                                Kelulusan ditentukan jika nilai Anda memenuhi <strong>semua</strong> ambang batas (Passing Grade).
-                            </p>
+                            <div class="mt-8 pt-6 border-t border-slate-200">
+                                <div class="bg-indigo-50 border border-indigo-100 rounded-lg p-5 relative">
+                                    <h3 class="font-bold text-indigo-900 text-xs uppercase tracking-wider mb-2">Pembahasan Soal</h3>
+                                    <div class="text-[10px] md:text-xs text-slate-700 leading-relaxed whitespace-pre-wrap" v-html="currentQuestion.explanation || 'Pembahasan belum tersedia.'"></div>
+                                </div>
+                            </div>
                         </div>
-
                     </div>
                 </div>
 
-            </div>
+                <div class="bg-white border-t border-slate-300 py-3 px-4 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                    <div class="flex justify-between items-center gap-3">
+                        <button @click="prev" :disabled="currentIndex === 0" class="flex items-center gap-2 px-5 py-2 bg-white border border-slate-300 text-slate-600 rounded font-bold text-[10px] uppercase hover:bg-slate-50 disabled:opacity-50 transition">&laquo; Sebelumnya</button>
+                        <button @click="next" class="flex items-center gap-2 px-5 py-2 bg-[#1e60aa] text-white rounded font-bold text-[10px] uppercase hover:bg-blue-800 shadow-md transition">Selanjutnya &raquo;</button>
+                    </div>
+                </div>
 
-        </main>
+            </main>
+        </div>
     </div>
 </template>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+</style>

@@ -14,21 +14,17 @@ class TryoutManagerController extends Controller
      */
     public function index(Request $request)
     {
-        // Query dasar: Hitung jumlah soal
         $query = Tryout::query()->withCount('questions');
 
-        // FILTER PENTING: Jangan tampilkan tipe 'akbar'
         $query->where(function ($q) {
             $q->where('type', '!=', 'akbar')
               ->orWhereNull('type');
         });
 
-        // Fitur Pencarian
         if ($request->search) {
             $query->where('title', 'like', '%' . $request->search . '%');
         }
 
-        // Ambil data dengan pagination (10 per halaman)
         $tryouts = $query->latest()->paginate(10)->withQueryString();
 
         return Inertia::render('Admin/Tryout/Index', [
@@ -42,15 +38,27 @@ class TryoutManagerController extends Controller
      */
     public function store(Request $request)
     {
+        // 1. Validasi bisa menerima 'duration' atau 'duration_minutes'
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'duration_minutes' => 'required|integer|min:1',
+            'duration' => 'sometimes|integer|min:1',         // Nama kolom baru
+            'duration_minutes' => 'sometimes|integer|min:1', // Nama input lama (jaga-jaga)
             'description' => 'nullable|string',
             'is_paid' => 'required|boolean', 
             'price' => 'required_if:is_paid,true|numeric|min:0',
         ]);
 
-        // SET DEFAULT TYPE: 'general' (Agar tidak dianggap akbar)
+        // 2. Normalisasi: Pastikan data masuk ke kolom 'duration'
+        if (isset($validated['duration_minutes'])) {
+            $validated['duration'] = $validated['duration_minutes'];
+            unset($validated['duration_minutes']); // Hapus agar tidak error di DB
+        }
+
+        // Default value jika tidak ada input durasi sama sekali
+        if (!isset($validated['duration'])) {
+            $validated['duration'] = 110; 
+        }
+
         $validated['type'] = 'general';
 
         Tryout::create($validated);
@@ -65,13 +73,20 @@ class TryoutManagerController extends Controller
     {
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'duration_minutes' => 'required|integer|min:1',
+            'duration' => 'sometimes|integer|min:1',
+            'duration_minutes' => 'sometimes|integer|min:1',
             'description' => 'nullable|string',
-            'published_at' => 'nullable|date', // Diperbolehkan null
-            'started_at' => 'nullable|date',   // Diperbolehkan null
+            'published_at' => 'nullable|date',
+            'started_at' => 'nullable|date',
             'is_paid' => 'required|boolean',
             'price' => 'required_if:is_paid,true|numeric|min:0',
         ]);
+
+        // 1. Normalisasi: Mapping duration_minutes ke duration
+        if (isset($validated['duration_minutes'])) {
+            $validated['duration'] = $validated['duration_minutes'];
+            unset($validated['duration_minutes']); // PENTING: Hapus key ini!
+        }
 
         $tryout->update($validated);
 

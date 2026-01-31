@@ -14,113 +14,111 @@ const formatNum = (num) => new Intl.NumberFormat('id-ID').format(num || 0);
     <Head :title="'Persiapan: ' + tryout.title" />
 
     <AuthenticatedLayout>
-        <div class="min-h-screen bg-slate-50/50 pb-20">
+        
+        <div class="relative bg-[#0F172A] text-white overflow-hidden py-10 px-4 sm:px-6 lg:px-8 border-b border-gray-800 font-sans">
+            <div class="absolute top-0 right-0 -mr-10 -mt-10 w-64 h-64 bg-amber-500/5 rounded-full blur-[80px]"></div>
             
-            <div class="bg-slate-900 pt-12 pb-24 md:pt-20 md:pb-40 px-6 rounded-b-[3.5rem] md:rounded-b-[5rem] -mt-2 relative overflow-hidden text-center text-white shadow-2xl">
-                <div class="absolute top-0 left-0 w-96 h-96 bg-indigo-600 rounded-full blur-[120px] opacity-20 -ml-20 -mt-20"></div>
-                <div class="absolute bottom-0 right-0 w-64 h-64 bg-indigo-500 rounded-full blur-[100px] opacity-10 -mr-10 -mb-10"></div>
-                
-                <div class="max-w-7xl mx-auto relative z-10">
-                    <Link :href="route('tryout.index')" class="inline-flex items-center gap-2 text-indigo-400 text-[10px] font-black uppercase tracking-[0.3em] mb-6 hover:text-white transition-colors">
-                        <span class="text-lg">←</span> Kembali ke Katalog
-                    </Link>
-                    <h2 class="text-3xl md:text-5xl font-black uppercase italic tracking-tighter leading-none">{{ tryout.title }}</h2>
-                    <p class="text-[10px] md:text-xs text-slate-400 font-bold uppercase tracking-[0.4em] mt-3">Konfirmasi Keikutsertaan Ujian</p>
+            <div class="relative z-10 max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+                <div>
+                    <h1 class="text-2xl md:text-3xl font-bold text-white leading-tight mb-1 tracking-tight">
+                        Persiapan <span class="text-amber-400">Ujian</span>
+                    </h1>
+                    <p class="text-slate-400 text-xs md:text-sm max-w-lg font-normal">
+                        Pastikan koneksi internet stabil sebelum memulai.
+                    </p>
                 </div>
+
+                <Link :href="route('tryout.my')" 
+                    class="group flex items-center gap-2 px-5 py-2.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition-all text-xs font-bold uppercase tracking-widest text-slate-300 hover:text-white"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-300 group-hover:-translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                    Kembali
+                </Link>
             </div>
+        </div>
 
-            <div class="max-w-5xl mx-auto px-4 sm:px-6 -mt-16 md:-mt-24 relative z-20">
-                <div class="bg-white rounded-[2.5rem] md:rounded-[3.5rem] shadow-2xl shadow-slate-200/60 overflow-hidden border border-slate-100 animate-in fade-in zoom-in-95 duration-500">
+        <div class="min-h-screen bg-[#F8F9FA] relative z-20 py-8 font-sans">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
                     
-                    <div class="flex flex-col md:flex-row">
+                    <div class="lg:col-span-7 space-y-6">
                         
-                        <div class="flex-1 p-8 md:p-12 bg-slate-50/50 border-b md:border-b-0 md:border-r border-slate-100">
-                            <h3 class="font-black text-slate-900 uppercase tracking-tight text-lg mb-8 flex items-center gap-3">
-                                <span class="w-8 h-8 bg-indigo-600 text-white rounded-xl flex items-center justify-center text-sm shadow-lg shadow-indigo-100">i</span>
-                                Ringkasan Ujian
-                            </h3>
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 relative overflow-hidden">
+                            <div class="h-0.5 w-full bg-gradient-to-r from-[#0F172A] via-amber-500 to-[#0F172A] absolute top-0 left-0"></div>
+                            
+                            <h2 class="text-xl font-bold text-[#0F172A] leading-snug mb-2 tracking-tight">{{ tryout.title }}</h2>
+                            <p class="text-slate-500 text-xs mb-6">Simulasi Computer Assisted Test (CAT) BKN</p>
 
-                            <div class="grid grid-cols-1 gap-4">
-                                <div class="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm flex items-center gap-5 group hover:border-indigo-500 transition-all">
-                                    <div class="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-2xl">⏱️</div>
-                                    <div>
-                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Durasi Pengerjaan</p>
-                                        <p class="text-xl font-black text-slate-900 leading-none">{{ tryout.duration_minutes }} <span class="text-xs font-bold text-slate-400">Menit</span></p>
-                                    </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="bg-[#F8F9FA] p-4 rounded-xl border border-gray-100">
+                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Durasi</p>
+                                    <p class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                        {{ tryout.duration }} Menit
+                                    </p>
                                 </div>
-
-                                <div class="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm flex items-center gap-5 group hover:border-indigo-500 transition-all">
-                                    <div class="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-2xl">📚</div>
-                                    <div>
-                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Soal</p>
-                                        <p class="text-xl font-black text-slate-900 leading-none">{{ formatNum(tryout.questions_count) }} <span class="text-xs font-bold text-slate-400">Butir</span></p>
-                                    </div>
+                                <div class="bg-[#F8F9FA] p-4 rounded-xl border border-gray-100">
+                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Total Soal</p>
+                                    <p class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                        {{ formatNum(tryout.questions_count) }} Butir
+                                    </p>
                                 </div>
-                            </div>
-
-                            <div class="mt-8 p-6 bg-amber-50 rounded-3xl border border-amber-100 flex gap-4">
-                                <span class="text-xl">⚠️</span>
-                                <p class="text-[10px] text-amber-800 font-bold leading-relaxed uppercase tracking-wide">
-                                    Pilih mode pengerjaan yang sesuai dengan kenyamanan Anda sebelum memulai.
-                                </p>
                             </div>
                         </div>
 
-                        <div class="flex-1 p-8 md:p-12 flex flex-col justify-between">
+                        <div class="bg-amber-50 rounded-xl border border-amber-100 p-6 flex gap-4 items-start">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             <div>
-                                <h3 class="font-black text-slate-900 uppercase tracking-tight text-lg mb-8">Pilih Mode Mulai</h3>
-                                
-                                <ul class="space-y-6 mb-10">
-                                    <li class="flex gap-4 items-start">
-                                        <div class="w-6 h-6 rounded-lg bg-indigo-600 text-white flex-shrink-0 flex items-center justify-center text-[10px] font-black shadow-lg">1</div>
-                                        <p class="text-[11px] md:text-xs text-slate-600 leading-relaxed font-bold uppercase tracking-wide">
-                                            **Mode CAT BKN**: Tampilan simulasi resmi yang mirip dengan ujian aslinya.
-                                        </p>
-                                    </li>
-                                    <li class="flex gap-4 items-start">
-                                        <div class="w-6 h-6 rounded-lg bg-slate-400 text-white flex-shrink-0 flex items-center justify-center text-[10px] font-black shadow-lg">2</div>
-                                        <p class="text-[11px] md:text-xs text-slate-600 leading-relaxed font-bold uppercase tracking-wide">
-                                            **Mode Standar**: Tampilan modern yang lebih ringan dan fokus pada teks soal.
-                                        </p>
-                                    </li>
-                                </ul>
+                                <h3 class="text-sm font-bold text-amber-800 uppercase tracking-wide mb-1">Perhatian</h3>
+                                <p class="text-xs text-amber-700 leading-relaxed font-medium">
+                                    Waktu ujian akan otomatis berjalan segera setelah Anda menekan tombol mulai di sebelah kanan. Pastikan Anda sudah siap dan tidak ada gangguan selama pengerjaan.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-5 space-y-6 lg:sticky lg:top-6">
+                        
+                        <div class="bg-white rounded-xl shadow-lg shadow-gray-200/50 border border-gray-100 overflow-hidden">
+                            <div class="bg-[#0F172A] p-6 relative overflow-hidden">
+                                <div class="absolute right-0 top-0 w-20 h-20 bg-white/5 rounded-bl-full"></div>
+                                <div class="relative z-10">
+                                    <h2 class="text-sm font-bold text-white uppercase tracking-widest">Pilih Tampilan</h2>
+                                    <p class="text-slate-400 text-[10px] font-bold uppercase tracking-wider mt-1 opacity-80">Sesuaikan dengan preferensi Anda</p>
+                                </div>
                             </div>
 
-                            <div class="space-y-3">
-                                <Link 
-                                    :href="route('tryout.exam.bkn', tryout.id)"
-                                    class="flex items-center justify-center w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-[0.3em] shadow-xl hover:bg-indigo-700 transition-all active:scale-95 gap-3"
-                                >
-                                    <span>🖥️</span> Mulai Mode CAT BKN
-                                </Link>
-
-                                <Link 
-                                    :href="route('tryout.exam', tryout.id)"
-                                    class="flex items-center justify-center w-full py-5 bg-slate-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-[0.3em] shadow-xl hover:bg-slate-800 transition-all active:scale-95 gap-3"
-                                >
-                                    <span>📱</span> Mulai Mode Standar
-                                </Link>
-
-                                <Link 
-                                    :href="route('tryout.index')"
-                                    class="flex items-center justify-center w-full py-4 text-slate-400 font-black text-[10px] uppercase tracking-widest"
-                                >
-                                    Batal
-                                </Link>
+                            <div class="p-6 space-y-4">
                                 
-                                <p class="text-[8px] text-center text-slate-400 font-black uppercase tracking-[0.2em]">
-                                    Waktu akan otomatis berjalan setelah tombol ditekan.
-                                </p>
+                                <Link :href="route('tryout.exam.bkn', tryout.id)"
+                                    class="group relative w-full overflow-hidden bg-[#0F172A] text-white py-4 rounded-xl text-xs font-bold uppercase tracking-[0.15em] transition-all shadow-lg hover:shadow-xl active:scale-[0.98] flex items-center justify-center gap-3"
+                                >
+                                    <span class="text-lg">🖥️</span>
+                                    <span class="relative z-10">Mode CAT BKN</span>
+                                    <div class="absolute inset-0 bg-gradient-to-r from-indigo-900 to-[#0F172A] opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                </Link>
+
+                                <Link :href="route('tryout.exam', tryout.id)"
+                                    class="w-full py-4 bg-white text-[#0F172A] border border-gray-200 hover:border-[#0F172A] rounded-xl text-xs font-bold uppercase tracking-[0.15em] transition-all flex items-center justify-center gap-3 hover:bg-gray-50"
+                                >
+                                    <span class="text-lg">📱</span>
+                                    <span>Mode Modern (Lite)</span>
+                                </Link>
+
+                                <div class="pt-4 border-t border-dashed border-gray-200">
+                                    <p class="text-[10px] text-center text-slate-400 font-medium">
+                                        Mode CAT BKN direkomendasikan untuk pengalaman simulasi yang lebih nyata.
+                                    </p>
+                                </div>
                             </div>
                         </div>
 
                     </div>
+
                 </div>
             </div>
         </div>
     </AuthenticatedLayout>
 </template>
-
-<style scoped>
-.transition-all { transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-</style>

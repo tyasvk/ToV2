@@ -1,6 +1,6 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, useForm, Link, router } from '@inertiajs/vue3';
+import { Head, useForm, Link, router } from '@inertiajs/vue3'; // Pastikan router diimport
 import { ref, watch } from 'vue';
 import draggable from 'vuedraggable';
 
@@ -13,11 +13,41 @@ const props = defineProps({
 const localQuestions = ref([...props.questions]);
 const expandedId = ref(null);
 const isModalOpen = ref(false);
+const fileInput = ref(null);
 
-// Sinkronisasi data lokal jika ada perubahan dari server (misal: setelah hapus/simpan)
+// Sinkronisasi data lokal
 watch(() => props.questions, (newVal) => {
     localQuestions.value = [...newVal];
 }, { deep: true });
+
+// --- LOGIKA IMPORT ---
+const triggerImport = () => {
+    fileInput.value.click();
+};
+
+const handleImport = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!confirm('Apakah Anda yakin ingin mengimpor soal dari file ini?')) {
+        event.target.value = null;
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    router.post(route('admin.tryouts.questions.import', props.tryout.id), formData, {
+        onSuccess: () => {
+            alert('Import berhasil! Halaman akan direfresh.');
+            event.target.value = null;
+        },
+        onError: (errors) => {
+            alert('Gagal import: ' + (errors.file || 'Terjadi kesalahan.'));
+            event.target.value = null;
+        }
+    });
+};
 
 // --- LOGIKA DRAG & DROP ---
 const handleDragEnd = () => {
@@ -30,7 +60,7 @@ const handleDragEnd = () => {
 
 // --- FORM MANAGEMENT ---
 const form = useForm({
-    id: null, // Penentu Mode Edit
+    id: null,
     type: 'TWK',
     content: '',
     image: null,
@@ -58,7 +88,6 @@ const openEditModal = (q) => {
 };
 
 const submit = () => {
-    // Gunakan POST untuk Update juga agar upload gambar lancar (multipart/form-data)
     const url = form.id 
         ? route('admin.questions.update', form.id) 
         : route('admin.questions.store', props.tryout.id);
@@ -73,9 +102,17 @@ const submit = () => {
     });
 };
 
+// --- PERBAIKAN FUNGSI DELETE ---
 const deleteQuestion = (id) => {
-    if (confirm('Hapus soal ini secara permanen?')) {
-        router.delete(route('admin.questions.destroy', id), { preserveScroll: true });
+    if (confirm('Apakah Anda yakin ingin menghapus soal ini? Tindakan ini tidak dapat dibatalkan.')) {
+        router.delete(route('admin.questions.destroy', id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                // Opsional: Hapus manual dari local state agar UI langsung update tanpa nunggu reload
+                localQuestions.value = localQuestions.value.filter(q => q.id !== id);
+            },
+            onError: () => alert('Gagal menghapus soal.')
+        });
     }
 };
 
@@ -89,7 +126,7 @@ const toggleAccordion = (id) => {
 
     <AuthenticatedLayout>
         <template #header>
-            <div class="flex items-center justify-between gap-4">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div class="flex items-center gap-4 min-w-0">
                     <Link :href="route('admin.tryouts.index')" class="bg-white p-2.5 rounded-2xl border border-gray-100 shadow-sm hover:bg-gray-50 transition shrink-0">⬅️</Link>
                     <div class="truncate">
@@ -97,9 +134,18 @@ const toggleAccordion = (id) => {
                         <p class="text-[9px] text-indigo-600 font-bold uppercase tracking-widest">Manajemen {{ questions.length }} Butir Soal</p>
                     </div>
                 </div>
-                <button @click="openCreateModal" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-black text-[10px] transition uppercase tracking-widest shadow-lg shadow-indigo-100 active:scale-95">
-                    + Tambah Soal
-                </button>
+                
+                <div class="flex gap-3">
+                    <input type="file" ref="fileInput" class="hidden" accept=".csv, .xlsx" @change="handleImport" />
+                    
+                    <button @click="triggerImport" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-xl font-black text-[10px] transition uppercase tracking-widest shadow-lg shadow-emerald-100 active:scale-95 flex items-center gap-2">
+                        <span>📥</span> Import Excel
+                    </button>
+
+                    <button @click="openCreateModal" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-black text-[10px] transition uppercase tracking-widest shadow-lg shadow-indigo-100 active:scale-95">
+                        + Tambah Soal
+                    </button>
+                </div>
             </div>
         </template>
 
@@ -124,7 +170,7 @@ const toggleAccordion = (id) => {
                             </div>
                             <div class="flex items-center gap-3 shrink-0 ml-4">
                                 <button @click.stop="openEditModal(q)" class="text-gray-300 hover:text-indigo-600 transition text-xs">✏️</button>
-                                <button @click.stop="deleteQuestion(q.id)" class="text-gray-300 hover:text-red-500 transition text-xs">🗑️</button>
+                                <button type="button" @click.stop="deleteQuestion(q.id)" class="text-gray-300 hover:text-red-500 transition text-xs">🗑️</button>
                                 <span @click="toggleAccordion(q.id)" :class="{'rotate-180': expandedId === q.id}" class="text-gray-300 transition-transform duration-300 text-[10px] cursor-pointer">▼</span>
                             </div>
                         </div>
@@ -220,7 +266,6 @@ const toggleAccordion = (id) => {
 .custom-scrollbar::-webkit-scrollbar { width: 4px; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
 
-/* Menghilangkan panah input number secara global di modal ini */
 input[type=number]::-webkit-inner-spin-button, 
 input[type=number]::-webkit-outer-spin-button { 
   -webkit-appearance: none; 

@@ -13,7 +13,10 @@ const page = usePage();
 // --- 1. STATE MANAGEMENT ---
 const currentIndex = ref(0);
 const answers = ref({});
-const timeLeft = ref(props.tryout?.duration_minutes * 60 || 0);
+
+// PERBAIKAN DISINI: Ganti duration_minutes jadi duration
+const timeLeft = ref((props.tryout?.duration || 110) * 60);
+
 const isSubmitting = ref(false);
 const showConfirmModal = ref(false);
 let timer = null;
@@ -211,7 +214,7 @@ const formatTime = (seconds) => {
 
                 <div class="bg-white border-t border-slate-200 p-4 shadow-sm">
                     <div class="max-w-[1000px] mx-auto flex justify-start items-center gap-3">
-                        <button @click="next" class="px-5 py-2.5 bg-white border border-slate-300 rounded-xl text-[10px] font-black uppercase text-slate-500 hover:bg-slate-50 transition-all shadow-sm">
+                        <button @click="next" class="px-5 py-2.5 bg-white border border-slate-300 rounded-xl text-[10px] font-black uppercase text-slate-500 hover:bg-slate-100 transition-all shadow-sm">
                             Lewatkan Soal Ini
                         </button>
                         <button @click="next" class="px-8 py-2.5 bg-[#f37021] text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-orange-600 active:scale-95 transition-all">

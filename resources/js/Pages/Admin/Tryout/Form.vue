@@ -2,14 +2,14 @@
 import { useForm } from '@inertiajs/vue3';
 
 const props = defineProps({
-    tryout: Object, // Jika sedang edit, data tryout akan dipassing ke sini
+    tryout: Object, 
 });
 
 // Inisialisasi form dengan data default atau data dari props (untuk edit)
 const form = useForm({
     title: props.tryout?.title ?? '',
     description: props.tryout?.description ?? '',
-    duration_minutes: props.tryout?.duration_minutes ?? 110,
+    duration: props.tryout?.duration ?? 110, // <--- UBAH DARI duration_minutes
     is_paid: props.tryout?.is_paid ?? false,
     price: props.tryout?.price ?? 0,
 });
@@ -42,7 +42,7 @@ const submit = () => {
                 <div>
                     <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Durasi (Menit)</label>
                     <input 
-                        v-model="form.duration_minutes" 
+                        v-model="form.duration" 
                         type="number" 
                         class="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 transition-all"
                     >

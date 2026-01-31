@@ -68,38 +68,38 @@ const getStatusLabel = (tryout) => {
 
     <AuthenticatedLayout>
         
-        <div class="relative bg-[#0F172A] text-white overflow-hidden py-10 px-4 sm:px-6 lg:px-8 border-b border-gray-800">
+        <div class="relative bg-[#0F172A] text-white overflow-hidden py-10 px-4 sm:px-6 lg:px-8 border-b border-gray-800 font-sans">
             <div class="absolute top-0 right-0 -mr-10 -mt-10 w-64 h-64 bg-amber-500/5 rounded-full blur-[80px]"></div>
             
             <div class="relative z-10 max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
                 <div>
-                    <h1 class="text-2xl md:text-3xl font-serif text-white leading-tight mb-1">
+                    <h1 class="text-2xl md:text-3xl font-bold text-white leading-tight mb-1 tracking-tight">
                         Tryout <span class="text-amber-400">Saya</span>
                     </h1>
-                    <p class="text-slate-400 text-xs md:text-sm max-w-lg font-light">
+                    <p class="text-slate-400 text-xs md:text-sm max-w-lg font-normal">
                         Kelola dan kerjakan paket ujian yang Anda miliki.
                     </p>
                 </div>
 
-                <div class="flex bg-white/5 backdrop-blur-sm p-1 rounded-lg border border-white/10 shadow-xl">
+                <div class="flex bg-white/5 backdrop-blur-sm p-1.5 rounded-lg border border-white/10 shadow-xl">
                     <Link :href="route('tryout.index')" 
-                        class="px-5 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all text-slate-400 hover:text-white hover:bg-white/5">
+                        class="px-7 py-2.5 rounded-md text-xs font-bold uppercase tracking-widest transition-all text-slate-400 hover:text-white hover:bg-white/5">
                         Katalog
                     </Link>
                     <Link :href="route('tryout.my')" 
-                        class="px-5 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all bg-white text-[#0F172A] shadow-lg">
-                        Milik Saya
+                        class="px-7 py-2.5 rounded-md text-xs font-bold uppercase tracking-widest transition-all bg-white text-[#0F172A] shadow-lg">
+                        Tryout Saya
                     </Link>
                 </div>
             </div>
         </div>
 
-        <div class="min-h-screen bg-[#F8F9FA] relative z-20 py-8">
+        <div class="min-h-screen bg-[#F8F9FA] relative z-20 py-8 font-sans">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
                 <div v-if="tryoutList.length === 0" class="py-20 text-center bg-white rounded-xl shadow-sm border border-gray-100">
                     <div class="w-14 h-14 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl text-gray-300">📂</div>
-                    <h3 class="text-gray-900 font-serif text-lg mb-1">Belum Ada Paket</h3>
+                    <h3 class="text-gray-900 font-bold text-lg mb-1">Belum Ada Paket</h3>
                     <p class="text-gray-500 text-xs mb-6">Anda belum memiliki paket tryout apapun.</p>
                     <Link :href="route('tryout.index')" class="text-xs font-bold uppercase tracking-widest text-[#0F172A] border-b-2 border-[#0F172A] pb-0.5 hover:text-amber-600 hover:border-amber-600 transition-colors">
                         Ke Katalog
@@ -115,7 +115,7 @@ const getStatusLabel = (tryout) => {
                         <div class="p-5 flex flex-col h-full">
                             
                             <div class="flex justify-between items-start gap-3 mb-3">
-                                <h3 class="text-base font-serif font-bold text-gray-900 leading-snug line-clamp-2 group-hover:text-amber-700 transition-colors" :title="tryout.title">
+                                <h3 class="text-base font-bold text-gray-900 leading-snug line-clamp-2 group-hover:text-amber-700 transition-colors tracking-tight" :title="tryout.title">
                                     {{ tryout.title }}
                                 </h3>
                                 <span class="shrink-0 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border"
@@ -198,14 +198,14 @@ const getStatusLabel = (tryout) => {
                             <Link v-if="link.url" 
                                 :href="link.url" 
                                 v-html="link.label" 
-                                class="w-8 h-8 flex items-center justify-center text-[10px] font-serif font-bold rounded-full transition-all" 
+                                class="w-8 h-8 flex items-center justify-center text-[10px] font-bold rounded-full transition-all" 
                                 :class="link.active 
                                     ? 'bg-[#0F172A] text-amber-400' 
                                     : 'text-gray-500 hover:bg-gray-50 hover:text-[#0F172A]'" 
                             />
                             <span v-else 
                                 v-html="link.label" 
-                                class="w-8 h-8 flex items-center justify-center text-[10px] text-gray-300 font-serif cursor-default">
+                                class="w-8 h-8 flex items-center justify-center text-[10px] text-gray-300 cursor-default">
                             </span>
                         </template>
                     </div>

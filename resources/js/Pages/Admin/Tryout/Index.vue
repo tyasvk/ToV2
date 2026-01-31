@@ -5,7 +5,7 @@ import { ref } from 'vue';
 import { debounce } from 'lodash'; 
 
 const props = defineProps({
-    tryouts: Object, // Diubah jadi Object karena menggunakan Pagination
+    tryouts: Object,
     filters: Object
 });
 
@@ -26,14 +26,14 @@ const handleSearch = debounce(() => {
 // --- FORM DATA ---
 const form = useForm({
     title: '',
-    duration_minutes: 110,
+    duration: 110, // <--- UBAH DARI duration_minutes KE duration
     description: '',
     is_published: false,
     published_at: '',
     started_at: '',
     is_paid: false,
     price: 0,
-    type: 'general' // Default type
+    type: 'general'
 });
 
 // --- LOGIKA MODAL ---
@@ -49,7 +49,7 @@ const openEditModal = (tryout) => {
     editingId.value = tryout.id;
     
     form.title = tryout.title;
-    form.duration_minutes = tryout.duration_minutes;
+    form.duration = tryout.duration; // <--- UBAH DARI duration_minutes KE duration
     form.description = tryout.description;
     form.is_published = !!tryout.is_published;
     form.published_at = tryout.published_at ? tryout.published_at.substring(0, 16) : '';
@@ -148,7 +148,7 @@ const formatPrice = (price) => {
                                         <div class="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-xl">📑</div>
                                         <div class="min-w-0">
                                             <p class="font-black text-gray-900 uppercase text-sm tracking-tight truncate">{{ tryout.title }}</p>
-                                            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">⏱️ {{ tryout.duration_minutes }} Menit | 📄 {{ tryout.questions_count || 0 }} Soal</p>
+                                            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">⏱️ {{ tryout.duration }} Menit | 📄 {{ tryout.questions_count || 0 }} Soal</p>
                                         </div>
                                     </div>
                                 </td>
@@ -227,7 +227,7 @@ const formatPrice = (price) => {
                         <div class="grid grid-cols-2 gap-4">
                             <div class="space-y-1">
                                 <label class="text-[9px] font-black text-gray-400 uppercase ml-2">Durasi (Menit)</label>
-                                <input v-model="form.duration_minutes" type="number" class="w-full border-gray-100 bg-gray-50 rounded-2xl p-4 focus:ring-indigo-500 font-bold text-sm" required />
+                                <input v-model="form.duration" type="number" class="w-full border-gray-100 bg-gray-50 rounded-2xl p-4 focus:ring-indigo-500 font-bold text-sm" required />
                             </div>
                             <div class="space-y-1">
                                 <label class="text-[9px] font-black text-gray-400 uppercase ml-2">Tipe Akses</label>

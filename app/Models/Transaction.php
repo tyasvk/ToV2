@@ -17,7 +17,9 @@ class Transaction extends Model
         'status', 
         'snap_token',
         'proof_payment', // <--- WAJIB DITAMBAHKAN DI SINI
-        'rejection_note' // <--- TAMBAHKAN INI
+        'rejection_note', // <--- TAMBAHKAN INI
+        'total_amount',     // <--- WAJIB ADA (Untuk harga kolektif)
+        'details',          // <--- WAJIB ADA (Untuk simpan email teman)
     ];
 
     protected $casts = [

@@ -15,70 +15,64 @@ class CheckoutController extends Controller
 {
     /**
      * PROSES 1: MENYIMPAN TRANSAKSI (STORE)
-     * Ini dijalankan saat tombol "Lanjut Pembayaran" diklik.
      */
     public function store(Request $request, Tryout $tryout)
     {
-        // 1. Validasi Input
         $request->validate([
-            'emails' => 'array', // List email teman
+            'emails' => 'array', 
             'payment_method' => 'string'
         ]);
 
         $user = auth()->user();
 
-        // 2. HITUNG HARGA TOTAL (PENTING UNTUK KOLEKTIF)
-        // Jumlah = 1 (Diri sendiri) + Jumlah teman
+        // 1. Hitung Detail Harga & Jumlah
         $jumlahPeserta = 1 + count($request->emails ?? []);
         $totalHarga = $tryout->price * $jumlahPeserta;
 
-        // 3. Buat Reference Unik
-        $reference = 'TRX-' . $user->id . '-' . time() . '-' . strtoupper(Str::random(4));
+        // 2. Buat Invoice Code Unik
+        $invoiceCode = 'TRX-' . $user->id . '-' . time() . '-' . strtoupper(Str::random(4));
 
-        // 4. SIMPAN KE DATABASE
-        // Pastikan model Transaction Anda punya kolom 'total_amount' dan 'details'
+        // 3. SIMPAN KE DATABASE (Sesuai nama kolom di Migration Anda)
         $transaction = Transaction::create([
             'user_id' => $user->id,
             'tryout_id' => $tryout->id,
-            'reference' => $reference,
-            'total_amount' => $totalHarga, // <--- INI KUNCINYA (Harga Kolektif)
+            
+            // Perbaikan Nama Kolom:
+            'invoice_code' => $invoiceCode,       // Database: invoice_code
+            'amount' => $totalHarga,              // Database: amount
+            'unit_price' => $tryout->price,       // Database: unit_price (Wajib)
+            'qty' => $jumlahPeserta,              // Database: qty (Wajib)
+            
             'status' => 'pending',
-            'payment_method' => $request->payment_method ?? 'midtrans',
             'snap_token' => null,
-            'details' => json_encode($request->emails ?? []) // Simpan email teman
+            'participants_data' => $request->emails ?? [] // Database: participants_data
         ]);
 
-        // 5. REDIRECT KE HALAMAN CHECKOUT
-        // Kita arahkan ke route 'checkout.show' dengan membawa ID TRANSAKSI yang baru dibuat
         return redirect()->route('checkout.show', $transaction->id);
     }
 
     /**
      * PROSES 2: MENAMPILKAN HALAMAN BAYAR (SHOW)
-     * URL: /checkout/{id}
      */
     public function show($id)
     {
-        // 1. Cari Transaksi berdasarkan ID (Bukan ID Tryout)
         $transaction = Transaction::with('tryout')->findOrFail($id);
 
-        // 2. Validasi Pemilik (Security Check)
         if ($transaction->user_id !== auth()->id()) {
             abort(403, 'Unauthorized action. Transaksi ini bukan milik Anda.');
         }
 
-        // 3. Konfigurasi Midtrans
+        // Midtrans Config
         Config::$serverKey = config('services.midtrans.server_key');
         Config::$isProduction = config('services.midtrans.is_production');
         Config::$isSanitized = config('services.midtrans.is_sanitized');
         Config::$is3ds = config('services.midtrans.is_3ds');
 
-        // 4. Generate Snap Token (Jika belum ada)
         if (empty($transaction->snap_token)) {
             $params = [
                 'transaction_details' => [
-                    'order_id' => $transaction->reference,
-                    'gross_amount' => (int) $transaction->total_amount, // AMBIL DARI DATABASE
+                    'order_id' => $transaction->invoice_code, // Gunakan invoice_code
+                    'gross_amount' => (int) $transaction->amount, // Gunakan amount
                 ],
                 'customer_details' => [
                     'first_name' => auth()->user()->name,
@@ -87,8 +81,8 @@ class CheckoutController extends Controller
                 'item_details' => [
                     [
                         'id' => $transaction->tryout_id,
-                        'price' => (int) $transaction->total_amount, // Harga Total Paket
-                        'quantity' => 1,
+                        'price' => (int) $transaction->amount, 
+                        'quantity' => 1, // Dianggap 1 bundle transaksi
                         'name' => "Paket Tryout (Kolektif)",
                     ]
                 ]
@@ -103,11 +97,18 @@ class CheckoutController extends Controller
             }
         }
 
-        // 5. Kirim data ke Vue
         return Inertia::render('User/Checkout/Show', [
             'transaction' => $transaction,
             'snapToken' => $transaction->snap_token,
             'midtransClientKey' => config('services.midtrans.client_key')
         ]);
+    }
+    
+    /**
+     * Callback Internal (Opsional)
+     */
+    public function callbackInternal(Request $request)
+    {
+        return redirect()->route('tryout.my')->with('success', 'Pembayaran sedang diproses.');
     }
 }
