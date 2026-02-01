@@ -25,6 +25,7 @@ class User extends Authenticatable
         'password',
         'balance', // <-- Tambahkan ini
         'avatar', // <--- Tambahkan ini
+        'membership_expires_at', // Tambahkan ini
 
     'agency_name', // <--- Tambahkan ini
     // --- TAMBAHKAN KOLOM BARU INI ---
@@ -34,6 +35,22 @@ class User extends Authenticatable
         'province_code',
         'gender',
     ];
+
+    // app/Models/User.php
+protected $casts = [
+    'membership_expires_at' => 'datetime',
+];
+
+
+// Fungsi untuk mengecek apakah user adalah member aktif
+public function isMember()
+{
+    return $this->membership_expires_at && $this->membership_expires_at->isFuture();
+}
+public function getMembershipDaysLeftAttribute(): int
+{
+    return $this->membership_expires_at ? now()->diffInDays($this->membership_expires_at, false) : 0;
+}
 
     /**
      * The attributes that should be hidden for serialization.

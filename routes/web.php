@@ -79,6 +79,9 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     // 3. API Cek Email untuk Kolektif
     Route::post('/check-email-availability', [UserTryoutController::class, 'checkEmail'])->name('api.check.email');
 
+    Route::get('/membership', [MembershipController::class, 'index'])->name('membership.index');
+    Route::post('/membership/buy', [MembershipController::class, 'buy'])->name('membership.buy');
+
     // --- PEMBAYARAN (CHECKOUT) ---
     // Halaman Bayar (Parameter: {transaction} ID Transaksi, bukan Tryout)
     Route::get('/checkout/{transaction}', [CheckoutController::class, 'show'])->name('checkout.show');

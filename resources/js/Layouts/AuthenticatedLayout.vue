@@ -24,7 +24,22 @@ const isUser = computed(() =>
     roles.value.some(r => String(r).toLowerCase() === 'user') || roles.value.length === 0
 );
 
-// --- 4. LOGIKA ACTIVE SIDEBAR (FIXED) ---
+// --- 4. LOGIKA MEMBERSHIP ---
+const isUserMember = computed(() => {
+    if (!user.value?.membership_expires_at) return false;
+    return new Date(user.value.membership_expires_at) > new Date();
+});
+
+const formatDate = (dateString) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+    });
+};
+
+// --- 5. LOGIKA ACTIVE SIDEBAR ---
 const isAkbarActive = computed(() => {
     if (route().current('admin.tryout-akbar.*')) return true;
     if (route().current('admin.tryouts.questions.*') && page.props.tryout?.type === 'akbar') {
@@ -65,8 +80,8 @@ onMounted(() => {
         >
             <div class="h-20 flex items-center px-6 border-b border-gray-100 shrink-0 bg-white">
                 <Link :href="logoRoute" class="flex items-center gap-3 group">
-                    <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black shadow-lg shadow-indigo-100 shrink-0 group-hover:scale-110 transition-transform">
-                        CN
+                    <div class="w-10 h-10 shrink-0 group-hover:scale-110 transition-transform flex items-center justify-center">
+                        <img src="/images/logo.png" alt="Logo" class="w-full h-full object-contain">
                     </div>
                     <span v-if="isSidebarOpen" class="font-black text-sm tracking-tight text-gray-800 uppercase truncate">
                         CPNS NUSANTARA
@@ -74,7 +89,17 @@ onMounted(() => {
                 </Link>
             </div>
 
-            <nav class="flex-1 overflow-y-auto py-6 px-4 space-y-1 custom-scrollbar">
+            <div v-if="isSidebarOpen && user && user.membership_expires_at" class="px-4 mt-6 mb-2">
+                <div :class="isUserMember ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'" class="border rounded-2xl p-3 shadow-sm">
+                    <p :class="isUserMember ? 'text-amber-800' : 'text-gray-500'" class="text-[10px] font-bold uppercase tracking-wider">Status Member</p>
+                    <p v-if="isUserMember" class="text-[11px] font-black text-amber-600">
+                        Aktif s/d {{ formatDate(user.membership_expires_at) }}
+                    </p>
+                    <p v-else class="text-[11px] font-bold text-gray-400 italic">Masa Aktif Habis</p>
+                </div>
+            </div>
+
+            <nav class="flex-1 overflow-y-auto py-4 px-4 space-y-1 custom-scrollbar">
                 
                 <div v-if="isAdmin" class="space-y-1">
                     <p v-if="isSidebarOpen" class="text-[10px] uppercase font-black text-red-500 px-3 mb-2 tracking-widest">Admin Control</p>
@@ -111,6 +136,11 @@ onMounted(() => {
                     <Link :href="route('dashboard')" :class="[route().current('dashboard') ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
                         <span class="text-xl">🏠</span> 
                         <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Dashboard</span>
+                    </Link>
+
+                    <Link :href="route('membership.index')" :class="[route().current('membership.*') ? 'bg-amber-50 text-amber-600' : 'text-gray-500 hover:bg-amber-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
+                        <span class="text-xl">💎</span> 
+                        <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Membership</span>
                     </Link>
 
                     <Link :href="route('tryout-akbar.index')" :class="[route().current('tryout-akbar.*') ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
