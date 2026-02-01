@@ -129,7 +129,7 @@ const closeModal = () => {
                             <h3 class="text-base font-bold text-slate-800 leading-snug mb-0.5 group-hover:text-indigo-600 transition truncate" :title="to.title">
                                 {{ to.title }}
                             </h3>
-                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-4">Official Cat-V2 Event</p>
+                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-4">Official CPNS Nusantara Event</p>
 
                             <div class="mb-4 bg-slate-50/50 p-1 rounded-xl border border-slate-100">
                                 <div class="grid grid-cols-2 gap-px bg-slate-100/50 rounded-lg overflow-hidden">

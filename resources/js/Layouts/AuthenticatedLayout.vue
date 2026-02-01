@@ -25,27 +25,18 @@ const isUser = computed(() =>
 );
 
 // --- 4. LOGIKA ACTIVE SIDEBAR (FIXED) ---
-// Cek apakah halaman ini milik Tryout Akbar (Termasuk halaman soal/questions jika tipenya akbar)
 const isAkbarActive = computed(() => {
-    // 1. Jika rute depannya memang tryout-akbar
     if (route().current('admin.tryout-akbar.*')) return true;
-    
-    // 2. Jika rute soal/questions TAPI data tryout-nya bertipe 'akbar'
     if (route().current('admin.tryouts.questions.*') && page.props.tryout?.type === 'akbar') {
         return true;
     }
     return false;
 });
 
-// Cek apakah halaman ini milik Tryout Biasa
 const isTryoutActive = computed(() => {
-    // Jika sudah dideteksi sebagai Akbar, maka ini false
     if (isAkbarActive.value) return false;
-
-    // Logic default untuk tryout biasa
     return route().current('admin.tryouts.*') || route().current('admin.questions.*');
 });
-
 
 // --- DYNAMIC LOGO ROUTE ---
 const logoRoute = computed(() => {
@@ -75,10 +66,10 @@ onMounted(() => {
             <div class="h-20 flex items-center px-6 border-b border-gray-100 shrink-0 bg-white">
                 <Link :href="logoRoute" class="flex items-center gap-3 group">
                     <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black shadow-lg shadow-indigo-100 shrink-0 group-hover:scale-110 transition-transform">
-                        TO
+                        CN
                     </div>
-                    <span v-if="isSidebarOpen" class="font-black text-xl tracking-tighter text-gray-800 uppercase truncate">
-                        CAT-V2
+                    <span v-if="isSidebarOpen" class="font-black text-sm tracking-tight text-gray-800 uppercase truncate">
+                        CPNS NUSANTARA
                     </span>
                 </Link>
             </div>

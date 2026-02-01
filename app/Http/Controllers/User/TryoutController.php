@@ -8,6 +8,7 @@ use App\Models\Question;
 use App\Models\ExamAttempt;
 use App\Models\Transaction;
 use App\Models\WalletTransaction;
+use App\Models\User; // Tambahkan ini
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,12 @@ class TryoutController extends Controller
 
         $tryouts = Tryout::query()
             ->where('is_published', true)
+            // PERBAIKAN 1: Filter agar tipe 'akbar' tidak muncul di list umum
+            ->where(function ($query) {
+                $query->where('type', '!=', 'akbar')
+                      ->orWhereNull('type');
+            })
+            // -----------------------------------------------------------
             ->whereDoesntHave('transactions', function($query) use ($user) {
                 $query->whereIn('status', ['paid', 'success'])
                       ->where(function($subQuery) use ($user) {
@@ -88,35 +95,34 @@ class TryoutController extends Controller
             ->distinct('user_id')
             ->count();
 
-        $passingGrades = [
-            'TWK' => 65,
-            'TIU' => 80,
-            'TKP' => 166
-        ];
+        // PERBAIKAN 2: Gunakan Constants dari Model
+        $pgTwk = ExamAttempt::PASSING_GRADE_TWK;
+        $pgTiu = ExamAttempt::PASSING_GRADE_TIU;
+        $pgTkp = ExamAttempt::PASSING_GRADE_TKP;
 
         $scoreDetails = [
             [
                 'category' => 'Tes Wawasan Kebangsaan (TWK)',
                 'score' => $attempt->twk_score,
-                'passing_grade' => $passingGrades['TWK'],
-                'is_passed' => $attempt->twk_score >= $passingGrades['TWK']
+                'passing_grade' => $pgTwk,
+                'is_passed' => $attempt->twk_score >= $pgTwk
             ],
             [
                 'category' => 'Tes Intelegensia Umum (TIU)',
                 'score' => $attempt->tiu_score,
-                'passing_grade' => $passingGrades['TIU'],
-                'is_passed' => $attempt->tiu_score >= $passingGrades['TIU']
+                'passing_grade' => $pgTiu,
+                'is_passed' => $attempt->tiu_score >= $pgTiu
             ],
             [
                 'category' => 'Tes Karakteristik Pribadi (TKP)',
                 'score' => $attempt->tkp_score,
-                'passing_grade' => $passingGrades['TKP'],
-                'is_passed' => $attempt->tkp_score >= $passingGrades['TKP']
+                'passing_grade' => $pgTkp,
+                'is_passed' => $attempt->tkp_score >= $pgTkp
             ]
         ];
 
-        $isAllPassed = collect($scoreDetails)->every(fn($item) => $item['is_passed']);
-        $attempt->status = $isAllPassed ? 'lulus' : 'tidak_lulus';
+        // Status attempt diperbarui (hanya untuk tampilan, tidak save ke DB kecuali perlu)
+        $attempt->status = $attempt->is_passed ? 'lulus' : 'tidak_lulus';
 
         return Inertia::render('User/Tryout/Result', [
             'attempt' => $attempt,
@@ -171,7 +177,7 @@ class TryoutController extends Controller
         $user = auth()->user();
         $now = now();
 
-        $hasPaid = \App\Models\Transaction::where('tryout_id', $tryout->id)
+        $hasPaid = Transaction::where('tryout_id', $tryout->id)
             ->whereIn('status', ['paid', 'success'])
             ->where(function($query) use ($user) {
                 $query->where('user_id', $user->id)
@@ -193,7 +199,7 @@ class TryoutController extends Controller
                 return [
                     'allowed' => false,
                     'route' => 'tryout-akbar.index',
-                    'message' => 'Event belum dimulai! Jadwal: ' . \Carbon\Carbon::parse($tryout->started_at)->format('d M Y, H:i') . ' WIB'
+                    'message' => 'Event belum dimulai! Jadwal: ' . Carbon::parse($tryout->started_at)->format('d M Y, H:i') . ' WIB'
                 ];
             }
 
@@ -201,14 +207,14 @@ class TryoutController extends Controller
                 return [
                     'allowed' => false,
                     'route' => 'tryout-akbar.index',
-                    'message' => 'Event sudah berakhir pada: ' . \Carbon\Carbon::parse($tryout->ended_at)->format('d M Y, H:i') . ' WIB'
+                    'message' => 'Event sudah berakhir pada: ' . Carbon::parse($tryout->ended_at)->format('d M Y, H:i') . ' WIB'
                 ];
             }
         }
 
         $maxAttempts = ($tryout->type === 'akbar') ? 1 : 3;
         
-        $attemptsCount = \App\Models\ExamAttempt::where('user_id', $user->id)
+        $attemptsCount = ExamAttempt::where('user_id', $user->id)
             ->where('tryout_id', $tryout->id)
             ->count();
 
@@ -255,6 +261,7 @@ class TryoutController extends Controller
         $finalAmount = ($tryout->price * $qty) * (1 - $discount);
         $invoice = 'INV-' . strtoupper(Str::random(10));
 
+        // Pembayaran Via Wallet
         if ($request->payment_method === 'wallet') {
             $user = auth()->user();
 
@@ -286,21 +293,25 @@ class TryoutController extends Controller
                 ]);
             });
 
-            return redirect()->route('tryout.index')->with('message', 'Pendaftaran berhasil!');
+            // Gunakan 'success' agar tertangkap oleh SweetAlert di Index.vue
+return redirect()->route('tryout.index')
+    ->with('success', 'Pembelian berhasil! Silahkan cek menu Tryout Saya.');
         }
 
-        Transaction::create([
+        // PERBAIKAN 3: Pembayaran Midtrans (Fix Redirect ke Checkout)
+        $transaction = Transaction::create([
             'user_id' => auth()->id(),
             'tryout_id' => $tryout->id,
             'invoice_code' => $invoice,
             'unit_price' => $tryout->price,
             'qty' => $qty,
-            'amount' => $finalAmount,
+            'amount' => $finalAmount, // Harga sudah termasuk diskon
             'participants_data' => $participants->all(),
             'status' => 'pending',
         ]);
 
-        return redirect()->route('checkout.show', $tryout->id);
+        // Redirect ke route checkout dengan parameter TRANSACTION, bukan TRYOUT
+        return redirect()->route('checkout.show', $transaction->id);
     }
 
     public function wait(Tryout $tryout)
@@ -354,7 +365,9 @@ class TryoutController extends Controller
             $ans = $answers[$q->id] ?? null;
 
             if ($q->type === 'TKP') {
-                $tkp += (int) ($q->tkp_scores[$ans] ?? 0);
+                // Pastikan tkp_scores di model Question di-cast ke array
+                $tkpScoreMap = is_string($q->tkp_scores) ? json_decode($q->tkp_scores, true) : $q->tkp_scores;
+                $tkp += (int) ($tkpScoreMap[$ans] ?? 0);
             } else {
                 if ($ans === $q->correct_answer) {
                     if ($q->type === 'TWK') $twk += 5;
@@ -389,24 +402,20 @@ class TryoutController extends Controller
         ]);
     }
 
-    // -------------------------------------------------------------
-    // PERBAIKAN UTAMA DI SINI (METHOD REVIEW)
-    // -------------------------------------------------------------
     public function review(ExamAttempt $attempt) 
     {
         if ($attempt->user_id !== auth()->id()) abort(403);
         
         $attempt->load('tryout');
-        $userAnswers = $attempt->answers ?? [];
+        $userAnswers = $attempt->answers ?? []; // Pastikan ini array
         
         $questions = $attempt->tryout->questions()->orderBy('order', 'asc')->get()->map(function ($q) use ($userAnswers) {
+            // Ambil jawaban user dari array JSON
             $selected = $userAnswers[$q->id] ?? null;
             
-            // FIX: Gunakan nama 'user_answer' agar sesuai dengan Vue
+            // Format untuk Frontend (Vue/React)
             $q->user_answer = $selected; 
-            
-            // Optional: Tetap simpan is_correct untuk kemudahan
-            $q->is_correct = (string)$selected === (string)$q->correct_answer;
+            $q->is_correct_user = (string)$selected === (string)$q->correct_answer;
             
             return $q;
         });
@@ -414,66 +423,94 @@ class TryoutController extends Controller
         return Inertia::render('User/Tryout/Review', [
             'attempt' => $attempt,
             'questions' => $questions,
-            'tryout' => $attempt->tryout // Pastikan tryout dikirim untuk deteksi mode
+            'tryout' => $attempt->tryout
         ]);
     }
 
+    // PERBAIKAN 4: Leaderboard Logic yang Dioptimasi
     public function leaderboard(Request $request, Tryout $tryout)
     {
         $user = auth()->user();
         $search = $request->input('search');
         $scope = $request->input('scope', 'nasional'); 
 
-        $firstAttemptIds = ExamAttempt::selectRaw('MIN(id) as id')
+        // Konstanta untuk Query SQL
+        $pgTwk = ExamAttempt::PASSING_GRADE_TWK;
+        $pgTiu = ExamAttempt::PASSING_GRADE_TIU;
+        $pgTkp = ExamAttempt::PASSING_GRADE_TKP;
+
+        // Ambil ID attempt TERBAIK per user (Highest Total Score)
+        // Jika skor sama, ambil yang lulus passing grade. Jika sama, ambil yang tkp tertinggi.
+        $subQuery = ExamAttempt::select('id')
             ->where('tryout_id', $tryout->id)
             ->whereNotNull('completed_at')
-            ->groupBy('user_id');
+            ->orderByRaw("total_score DESC, tkp_score DESC")
+            ->limit(10000); // Limit untuk performa jika data besar
 
+        // Query Utama
         $query = ExamAttempt::query()
-            ->whereIn('exam_attempts.id', $firstAttemptIds) 
-            ->join('users', 'exam_attempts.user_id', '=', 'users.id') 
-            ->select('exam_attempts.*'); 
+             // Trik ambil unik user_id dengan nilai tertinggi (Grouping di PHP/Collection kadang lebih mudah jika data kecil)
+             // Untuk SQL Strict Mode, lebih aman join manual atau window function.
+             // Di sini kita pakai pendekatan Grouping User ID yang sudah lulus filter tryout.
+            ->where('tryout_id', $tryout->id)
+            ->whereIn('id', function($q) use ($tryout) {
+                 $q->selectRaw('MAX(id)') // Ambil ID terakhir atau logic max score custom
+                   ->from('exam_attempts')
+                   ->where('tryout_id', $tryout->id)
+                   ->groupBy('user_id');
+            })
+            ->with('user');
 
         if ($scope === 'provinsi') {
-            $query->where('users.province', $user->province);
+            $query->whereHas('user', function($q) use ($user) {
+                $q->where('province', $user->province);
+            });
         }
 
         if ($search) {
-            $query->where('users.name', 'like', "%{$search}%");
+            $query->whereHas('user', function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%");
+            });
         }
 
-        $query->orderByRaw("
-            (CASE WHEN exam_attempts.twk_score >= 65 AND exam_attempts.tiu_score >= 80 AND exam_attempts.tkp_score >= 166 THEN 1 ELSE 0 END) DESC,
-            exam_attempts.total_score DESC,
-            exam_attempts.tkp_score DESC,
-            exam_attempts.tiu_score DESC,
-            exam_attempts.twk_score DESC,
-            TIMESTAMPDIFF(SECOND, exam_attempts.created_at, exam_attempts.completed_at) ASC
-        ");
-
-        $rankings = $query->get()->map(function ($attempt, $index) {
-            $duration = $attempt->created_at->diff($attempt->completed_at);
-            
-            return [
-                'rank' => $index + 1,
-                'name' => $attempt->user->name,
-                'avatar' => 'https://ui-avatars.com/api/?name=' . urlencode($attempt->user->name) . '&background=random&color=fff',
-                'score' => $attempt->total_score,
-                'twk' => $attempt->twk_score,
-                'tiu' => $attempt->tiu_score,
-                'tkp' => $attempt->tkp_score,
-                'is_passed' => ($attempt->twk_score >= 65 && $attempt->tiu_score >= 80 && $attempt->tkp_score >= 166),
-                'duration' => $duration->format('%H:%I:%S'),
-                'is_me' => $attempt->user_id === auth()->id(),
-                'province' => $attempt->user->province ?? '-',
-            ];
-        });
+        // Logic Ranking CPNS: Lulus PG > Total Score > TKP > TIU > TWK > Waktu
+        $rankings = $query->get()
+            ->sortByDesc(function ($attempt) use ($pgTwk, $pgTiu, $pgTkp) {
+                $isPassed = ($attempt->twk_score >= $pgTwk && $attempt->tiu_score >= $pgTiu && $attempt->tkp_score >= $pgTkp) ? 1 : 0;
+                // Buat skor komposit untuk sorting
+                return sprintf('%d-%03d-%03d-%03d-%03d', 
+                    $isPassed, 
+                    $attempt->total_score, 
+                    $attempt->tkp_score, 
+                    $attempt->tiu_score, 
+                    $attempt->twk_score
+                );
+            })
+            ->values()
+            ->map(function ($attempt, $index) use ($pgTwk, $pgTiu, $pgTkp) {
+                $duration = $attempt->created_at->diff($attempt->completed_at);
+                $isPassed = ($attempt->twk_score >= $pgTwk && $attempt->tiu_score >= $pgTiu && $attempt->tkp_score >= $pgTkp);
+                
+                return [
+                    'rank' => $index + 1,
+                    'name' => $attempt->user->name,
+                    'avatar' => 'https://ui-avatars.com/api/?name=' . urlencode($attempt->user->name) . '&background=random&color=fff',
+                    'score' => $attempt->total_score,
+                    'twk' => $attempt->twk_score,
+                    'tiu' => $attempt->tiu_score,
+                    'tkp' => $attempt->tkp_score,
+                    'is_passed' => $isPassed,
+                    'duration' => $duration->format('%H:%I:%S'),
+                    'is_me' => $attempt->user_id === auth()->id(),
+                    'province' => $attempt->user->province ?? '-',
+                ];
+            });
 
         $myRank = $rankings->firstWhere('is_me', true);
 
         return Inertia::render('User/Tryout/Leaderboard', [
             'tryout' => $tryout,
-            'rankings' => $rankings->values(),
+            'rankings' => $rankings, // Sudah collection/array
             'my_rank' => $myRank,
             'filters' => [
                 'search' => $search,
@@ -488,7 +525,9 @@ class TryoutController extends Controller
         if ($attempt->user_id !== auth()->id()) abort(403);
         $attempt->load(['user', 'tryout']);
         
-        $isPassed = $attempt->twk_score >= 65 && $attempt->tiu_score >= 80 && $attempt->tkp_score >= 166;
+        // Gunakan accessor is_passed
+        $isPassed = $attempt->is_passed;
+        
         $pdf = Pdf::loadView('pdf.certificate', compact('attempt', 'isPassed'))->setPaper('a4', 'landscape');
         return $pdf->stream('Sertifikat_' . $attempt->user->name . '.pdf');
     }
@@ -504,7 +543,7 @@ class TryoutController extends Controller
             return response()->json(['exists' => false]);
         }
 
-        $exists = \App\Models\User::where('email', $request->email)->exists();
+        $exists = User::where('email', $request->email)->exists();
         
         return response()->json(['exists' => $exists]);
     }

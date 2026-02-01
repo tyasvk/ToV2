@@ -11,6 +11,7 @@ use App\Http\Controllers\User\TryoutController as UserTryoutController;
 use App\Http\Controllers\User\CheckoutController;
 use App\Http\Controllers\User\WalletController;
 use App\Http\Controllers\User\TryoutAkbarController as UserTryoutAkbarController;
+use App\Http\Controllers\User\TryoutController; // Pastikan di-use
 
 // Import Controller Admin
 use App\Http\Controllers\Admin\AdminDashboardController;
@@ -66,6 +67,14 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     
     // 2. Proses Simpan Pendaftaran (Masuk ke Logic CheckoutController@store)
     Route::post('/tryout/{tryout}/register', [CheckoutController::class, 'store'])->name('tryout.processRegistration');
+
+    // PERBAIKAN DI SINI:
+    Route::post('/tryout/{tryout}/register', [TryoutController::class, 'processRegistration'])
+        ->name('tryout.processRegistration');
+
+    // Route Checkout (Hanya method show)
+    Route::get('/checkout/{transaction}', [CheckoutController::class, 'show'])
+        ->name('checkout.show');
     
     // 3. API Cek Email untuk Kolektif
     Route::post('/check-email-availability', [UserTryoutController::class, 'checkEmail'])->name('api.check.email');

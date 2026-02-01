@@ -1,11 +1,15 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { Head, Link, usePage, router } from '@inertiajs/vue3';
+import { computed, onMounted, watch } from 'vue';
+import Swal from 'sweetalert2';
 
 const props = defineProps({
     tryouts: [Object, Array], 
+    filters: Object, // Added filters prop if you use search later
 });
+
+const page = usePage();
 
 const tryoutList = computed(() => {
     if (props.tryouts && props.tryouts.data) return props.tryouts.data;
@@ -26,6 +30,35 @@ const formatDateTime = (dateTime) => {
         day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
     });
 };
+
+// --- SWEETALERT LOGIC START ---
+const showSuccessAlert = (message) => {
+    Swal.fire({
+        title: 'Berhasil!',
+        text: message,
+        icon: 'success',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#0F172A', // Matches your dark theme
+        background: '#fff',
+        iconColor: '#10B981' // Emerald-500
+    });
+};
+
+// Check flash message on mount (initial load/redirect)
+onMounted(() => {
+    if (page.props.flash.success) {
+        showSuccessAlert(page.props.flash.success);
+    }
+});
+
+// Watch for flash message changes (reactive Inertia visits)
+watch(() => page.props.flash.success, (newMessage) => {
+    if (newMessage) {
+        showSuccessAlert(newMessage);
+    }
+}, { deep: true });
+// --- SWEETALERT LOGIC END ---
+
 </script>
 
 <template>
