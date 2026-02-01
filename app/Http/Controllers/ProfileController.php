@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Storage; // Penting untuk hapus file lama
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -27,23 +28,35 @@ class ProfileController extends Controller
     /**
      * Update the user's profile information.
      */
-public function update(ProfileUpdateRequest $request): RedirectResponse
-{
-    // Pastikan 'province' masuk dalam validasi di ProfileUpdateRequest 
-    // atau validasi langsung di sini:
-    $request->user()->fill($request->validated());
+    public function update(ProfileUpdateRequest $request): RedirectResponse
+    {
+        $user = $request->user();
 
-    if ($request->user()->isDirty('email')) {
-        $request->user()->email_verified_at = null;
+        // 1. Isi model user dengan data yang sudah divalidasi (name, email, province, dll)
+        $user->fill($request->validated());
+
+        // 2. Cek jika email berubah, reset status verifikasi
+        if ($user->isDirty('email')) {
+            $user->email_verified_at = null;
+        }
+
+        // 3. Logika Upload Avatar
+        if ($request->hasFile('avatar')) {
+            // Hapus avatar lama dari storage jika ada
+            if ($user->avatar) {
+                Storage::disk('public')->delete($user->avatar);
+            }
+
+            // Simpan file baru ke folder 'avatars' di disk public
+            $path = $request->file('avatar')->store('avatars', 'public');
+            $user->avatar = $path;
+        }
+
+        // 4. Simpan ke database
+        $user->save();
+
+        return Redirect::route('profile.edit');
     }
-
-    // Pastikan kolom province ikut disimpan
-    $request->user()->province = $request->province; 
-    
-    $request->user()->save();
-
-    return Redirect::route('profile.edit');
-}
 
     /**
      * Delete the user's account.

@@ -17,18 +17,17 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class TryoutController extends Controller
 {
-public function index(Request $request)
+    public function index(Request $request)
     {
         $user = auth()->user();
 
         $tryouts = Tryout::query()
             ->where('is_published', true)
-            // PERBAIKAN: Sembunyikan jika user adalah PEMBAYAR atau PESERTA KOLEKTIF
             ->whereDoesntHave('transactions', function($query) use ($user) {
                 $query->whereIn('status', ['paid', 'success'])
                       ->where(function($subQuery) use ($user) {
-                          $subQuery->where('user_id', $user->id) // Cek jika dia yang beli
-                                   ->orWhereJsonContains('participants_data', $user->email); // Cek jika dia ditebengi
+                          $subQuery->where('user_id', $user->id)
+                                   ->orWhereJsonContains('participants_data', $user->email);
                       });
             })
             ->when($request->search, fn($q, $s) => $q->where('title', 'like', "%{$s}%"))
@@ -49,17 +48,15 @@ public function index(Request $request)
 
         $tryouts = Tryout::query()
             ->where('is_published', true)
-            // FILTER BARU: Sembunyikan Tryout Akbar dari halaman ini
             ->where(function ($query) {
                 $query->where('type', '!=', 'akbar')
-                      ->orWhereNull('type'); // Jaga-jaga jika tipe reguler bernilai NULL
+                      ->orWhereNull('type');
             })
-            // Logika Pembayaran (Tetap)
             ->whereHas('transactions', function($query) use ($userId, $userEmail) {
                 $query->whereIn('status', ['paid', 'success'])
                       ->where(function($q) use ($userId, $userEmail) {
-                          $q->where('user_id', $userId) // Cek jika dia pembayar
-                            ->orWhereJsonContains('participants_data', $userEmail); // Cek jika dia anggota tebengan
+                          $q->where('user_id', $userId)
+                            ->orWhereJsonContains('participants_data', $userEmail);
                       });
             })
             ->withCount(['examAttempts' => function($q) use ($userId) {
@@ -78,15 +75,11 @@ public function index(Request $request)
 
     public function result(ExamAttempt $attempt)
     {
-        // 1. Validasi User
         if ($attempt->user_id !== auth()->id()) abort(403);
         
-        // 2. Load Data Tryout
         $attempt->load('tryout');
         $tryout = $attempt->tryout;
 
-        // 3. Hitung Ranking (Sederhana)
-        // Menghitung berapa orang yang nilainya lebih tinggi dari user ini
         $rank = ExamAttempt::where('tryout_id', $tryout->id)
             ->where('total_score', '>', $attempt->total_score)
             ->count() + 1;
@@ -95,15 +88,12 @@ public function index(Request $request)
             ->distinct('user_id')
             ->count();
 
-        // 4. Definisi Passing Grade (SKD Standar 2024)
-        // Anda bisa sesuaikan angka ini atau ambil dari database jika ada kolomnya
         $passingGrades = [
             'TWK' => 65,
             'TIU' => 80,
             'TKP' => 166
         ];
 
-        // 5. Susun Rincian Skor
         $scoreDetails = [
             [
                 'category' => 'Tes Wawasan Kebangsaan (TWK)',
@@ -125,16 +115,12 @@ public function index(Request $request)
             ]
         ];
 
-        // 6. Tentukan Status Lulus/Tidak (Logic di Controller)
         $isAllPassed = collect($scoreDetails)->every(fn($item) => $item['is_passed']);
-        
-        // Inject status ke object attempt agar bisa dibaca Vue (tanpa simpan ke DB)
         $attempt->status = $isAllPassed ? 'lulus' : 'tidak_lulus';
 
-        // 7. Kirim Data Lengkap ke Inertia
         return Inertia::render('User/Tryout/Result', [
             'attempt' => $attempt,
-            'tryout' => $tryout, // <--- Ini yang sebelumnya missing (undefined)
+            'tryout' => $tryout,
             'totalScore' => $attempt->total_score,
             'scoreDetails' => $scoreDetails,
             'ranking' => [
@@ -148,7 +134,6 @@ public function index(Request $request)
     {
         $user = auth()->user();
 
-        // 1. Cek Validasi Pembayaran (Kode Asli)
         $hasPaid = Transaction::where('tryout_id', $tryout->id)
             ->whereIn('status', ['paid', 'success'])
             ->where(function($query) use ($user) {
@@ -159,24 +144,17 @@ public function index(Request $request)
 
         if (!$hasPaid) abort(403, 'Akses ditolak.');
 
-        // -----------------------------------------------------------
-        // LOGIKA BARU: REDIRECT KHUSUS TRYOUT AKBAR
-        // -----------------------------------------------------------
         if ($tryout->type === 'akbar') {
-            // Cari attempt terakhir (seharusnya cuma satu untuk Akbar)
             $attempt = ExamAttempt::where('user_id', $user->id)
                 ->where('tryout_id', $tryout->id)
                 ->latest()
                 ->first();
 
-            // Jika ada data pengerjaan, langsung lempar ke halaman Result
             if ($attempt) {
                 return redirect()->route('tryout.result', $attempt->id);
             }
         }
-        // -----------------------------------------------------------
 
-        // Kode Asli (Untuk Tryout Reguler / Bisa dikerjakan berkali-kali)
         $attempts = ExamAttempt::where('user_id', $user->id)
             ->where('tryout_id', $tryout->id)
             ->orderBy('created_at', 'desc')
@@ -188,13 +166,11 @@ public function index(Request $request)
         ]);
     }
 
-    // Method ini dipanggil saat user klik "Kerjakan"
     private function validateAccess(Tryout $tryout)
     {
         $user = auth()->user();
-        $now = now(); // Waktu server saat ini
+        $now = now();
 
-        // 1. CEK APAKAH SUDAH DAFTAR/BAYAR
         $hasPaid = \App\Models\Transaction::where('tryout_id', $tryout->id)
             ->whereIn('status', ['paid', 'success'])
             ->where(function($query) use ($user) {
@@ -212,19 +188,15 @@ public function index(Request $request)
             ];
         }
 
-        // 2. KHUSUS TRYOUT AKBAR: CEK WAKTU EVENT
         if ($tryout->type === 'akbar') {
-            
-            // Jika waktu sekarang KURANG DARI waktu mulai
             if ($now->lt($tryout->started_at)) {
                 return [
                     'allowed' => false,
-                    'route' => 'tryout-akbar.index', // Redirect balik ke list
+                    'route' => 'tryout-akbar.index',
                     'message' => 'Event belum dimulai! Jadwal: ' . \Carbon\Carbon::parse($tryout->started_at)->format('d M Y, H:i') . ' WIB'
                 ];
             }
 
-            // Jika waktu sekarang LEBIH DARI waktu selesai
             if ($now->gt($tryout->ended_at)) {
                 return [
                     'allowed' => false,
@@ -234,8 +206,6 @@ public function index(Request $request)
             }
         }
 
-        // 3. CEK LIMIT MENGERJAKAN (Misal maks 1x untuk Akbar, atau 3x untuk umum)
-        // Biasanya Tryout Akbar cuma boleh 1x
         $maxAttempts = ($tryout->type === 'akbar') ? 1 : 3;
         
         $attemptsCount = \App\Models\ExamAttempt::where('user_id', $user->id)
@@ -245,7 +215,7 @@ public function index(Request $request)
         if ($attemptsCount >= $maxAttempts) {
             return [
                 'allowed' => false,
-                'route' => 'tryout.history', // Redirect ke riwayat
+                'route' => 'tryout.history',
                 'message' => 'Anda sudah menyelesaikan ujian ini.'
             ];
         }
@@ -311,7 +281,7 @@ public function index(Request $request)
                     'unit_price' => $tryout->price,
                     'qty' => $qty,
                     'amount' => $finalAmount,
-                    'participants_data' => $participants->all(), // Data peserta disimpan di sini
+                    'participants_data' => $participants->all(),
                     'status' => 'paid',
                 ]);
             });
@@ -419,22 +389,32 @@ public function index(Request $request)
         ]);
     }
 
+    // -------------------------------------------------------------
+    // PERBAIKAN UTAMA DI SINI (METHOD REVIEW)
+    // -------------------------------------------------------------
     public function review(ExamAttempt $attempt) 
     {
         if ($attempt->user_id !== auth()->id()) abort(403);
         
         $attempt->load('tryout');
         $userAnswers = $attempt->answers ?? [];
+        
         $questions = $attempt->tryout->questions()->orderBy('order', 'asc')->get()->map(function ($q) use ($userAnswers) {
             $selected = $userAnswers[$q->id] ?? null;
-            $q->user_selected_answer = $selected;
+            
+            // FIX: Gunakan nama 'user_answer' agar sesuai dengan Vue
+            $q->user_answer = $selected; 
+            
+            // Optional: Tetap simpan is_correct untuk kemudahan
             $q->is_correct = (string)$selected === (string)$q->correct_answer;
+            
             return $q;
         });
 
         return Inertia::render('User/Tryout/Review', [
             'attempt' => $attempt,
-            'questions' => $questions
+            'questions' => $questions,
+            'tryout' => $attempt->tryout // Pastikan tryout dikirim untuk deteksi mode
         ]);
     }
 
@@ -518,9 +498,6 @@ public function index(Request $request)
         return Inertia::render('User/Tryout/CollectiveRegister', ['tryout' => $tryout]);
     }
 
-    /**
-     * API Check Email
-     */
     public function checkEmail(Request $request)
     {
         if (!$request->has('email')) {

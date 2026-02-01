@@ -24,6 +24,15 @@ class User extends Authenticatable
         'email',
         'password',
         'balance', // <-- Tambahkan ini
+        'avatar', // <--- Tambahkan ini
+
+    'agency_name', // <--- Tambahkan ini
+    // --- TAMBAHKAN KOLOM BARU INI ---
+        'participant_number',
+        'instance_type',
+        'agency_name',
+        'province_code',
+        'gender',
     ];
 
     /**

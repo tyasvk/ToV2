@@ -25,6 +25,14 @@ class ProfileUpdateRequest extends FormRequest
                 'max:255',
                 Rule::unique(User::class)->ignore($this->user()->id),
             ],
+            // Validasi Foto Profil
+            'avatar' => ['nullable', 'image', 'max:2048'], // Max 2MB
+
+            // Validasi Data Informasi Pendaftaran
+            'province_code' => ['required', 'string', 'size:2'],
+            'agency_name' => ['required', 'string', 'max:255'],
+            'instance_type' => ['required', 'in:1,2'], // 1=Pusat, 2=Daerah
+            'gender' => ['required', 'in:1,2'],
         ];
     }
 }

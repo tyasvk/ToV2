@@ -1,6 +1,6 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link, usePage } from '@inertiajs/vue3'; // Tambahkan usePage
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -10,12 +10,13 @@ const props = defineProps({
 
 const page = usePage();
 
-// --- PERBAIKAN: SAFE USER ACCESS ---
-// Kita buat computed property agar aman jika user undefined
+// --- SAFE USER ACCESS ---
+// Menggunakan computed agar aman jika data user belum siap
 const user = computed(() => {
     return page.props.auth?.user || {
         name: 'Peserta',
         id: 0,
+        participant_number: null, // Default null jika belum ada
         created_at: new Date(),
         email: ''
     };
@@ -31,7 +32,6 @@ const formatDate = (dateString) => {
 };
 
 const getInitials = (name) => {
-    // Tambahkan pengecekan keamanan agar tidak error jika name kosong
     if (!name) return 'TO';
     return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 };
@@ -40,7 +40,6 @@ const motivation = "Masa depan adalah milik mereka yang menyiapkan diri hari ini
 
 // Kalkulasi Lingkaran Progres (Keliling lingkaran r=34 adalah 213.6)
 const strokeDashoffset = computed(() => {
-    // Tambahkan optional chaining pada stats juga
     const score = props.stats?.average_score || 0;
     return 213.6 - (score / 100) * 213.6;
 });
@@ -71,8 +70,13 @@ const strokeDashoffset = computed(() => {
                                     Akun Terverifikasi
                                 </span>
                             </div>
-                            <p class="text-[10px] font-bold text-indigo-300/60 uppercase tracking-[0.3em]">
-                                ID Peserta: #{{ String(user.id).padStart(5, '0') }} — Bergabung {{ formatDate(user.created_at) }}
+                            
+                            <p class="text-[12px] font-mono font-bold text-indigo-300/80 uppercase tracking-[0.15em] bg-white/5 px-3 py-1 rounded-lg inline-block mt-2">
+                                NO. PESERTA: {{ user.participant_number || 'BELUM TERDAFTAR' }}
+                            </p>
+                            
+                            <p class="text-[10px] font-bold text-indigo-300/60 uppercase tracking-[0.3em] mt-1">
+                                Bergabung sejak {{ formatDate(user.created_at) }}
                             </p>
                         </div>
 
