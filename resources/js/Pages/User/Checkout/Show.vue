@@ -1,219 +1,270 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link, router } from '@inertiajs/vue3';
-import { computed, onMounted } from 'vue';
+import { Head, router } from '@inertiajs/vue3';
+import { ref, computed, onMounted, watch } from 'vue';
+import Swal from 'sweetalert2';
 
-// MENERIMA PROPS DARI CHECKOUTCONTROLLER
 const props = defineProps({
-    transaction: Object, 
-    item_name: String,    // Nama produk (Tryout atau Membership)
-    snap_token: String,   // Token dari Midtrans
-    midtransClientKey: String // Opsional: jika ingin inject script via Vue
+    transaction: Object,
+    user_balance: [Number, String],
 });
 
-// COMPUTED: Normalisasi Data Transaksi
-const trx = computed(() => {
-    const base = props.transaction || {};
-    
-    return {
-        id: base.id || 0,
-        tryout_id: base.tryout_id || null, // Null jika Membership
-        reference: base.invoice_code || base.reference || `TRX-${base.id}`,
-        title: props.item_name || base.description || 'Produk CPNS Nusantara',
-        
-        // Harga Final (diambil langsung dari database amount)
-        total_pay: Number(base.amount || 0),
-        
-        status: base.status || 'pending',
-        payment_method: base.payment_method || 'Otomatis (Midtrans)',
-        created_at: base.created_at || new Date(),
-        snap_token: props.snap_token || base.snap_token
-    };
+const selectedMethod = ref(null);
+const isProcessing = ref(false);
+
+// --- 1. DETEKSI TIPE TRANSAKSI (Membership vs Tryout) ---
+const isMembership = computed(() => {
+    // Jika tryout_id kosong, berarti ini Membership
+    return !props.transaction?.tryout_id;
 });
 
-// INJECT SCRIPT MIDTRANS (Jika belum ada di app.blade.php)
+// --- 2. AUTO-SELECT METODE ---
+const setAutoMethod = () => {
+    if (props.transaction) {
+        // Jika bukan membership (beli Tryout eceran), otomatis pilih Midtrans
+        if (!isMembership.value) {
+            selectedMethod.value = 'midtrans';
+        }
+    }
+};
+
 onMounted(() => {
-    const snapScriptUrl = "https://app.sandbox.midtrans.com/snap/snap.js"; // Ganti ke app.midtrans.com untuk Production
-    const clientKey = props.midtransClientKey || 'YOUR_CLIENT_KEY_HERE';
-
-    if (!document.getElementById('midtrans-script')) {
-        const script = document.createElement('script');
-        script.src = snapScriptUrl;
-        script.setAttribute('data-client-key', clientKey);
-        script.id = 'midtrans-script';
-        document.head.appendChild(script);
+    setAutoMethod();
+    // Cek apakah Snap JS sudah dimuat
+    if (typeof window.snap === 'undefined') {
+        console.warn('Midtrans Snap JS belum dimuat. Pastikan Anda memasang script Snap di app.blade.php');
     }
 });
 
-// FUNGSI BAYAR MIDTRANS
-const payNow = () => {
-    const token = trx.value.snap_token; 
-    if (!token) {
-        alert("Token pembayaran tidak ditemukan. Silakan refresh halaman.");
+watch(() => props.transaction, setAutoMethod, { immediate: true });
+
+// --- 3. HELPER FORMATTER ---
+const formatRupiah = (num) => {
+    const value = Number(num) || 0;
+    return new Intl.NumberFormat('id-ID', {
+        style: 'currency', currency: 'IDR', minimumFractionDigits: 0
+    }).format(value);
+};
+
+const isBalanceEnough = computed(() => {
+    return Number(props.user_balance) >= (Number(props.transaction?.amount) || 0);
+});
+
+// --- 4. LOGIKA PEMBAYARAN (FIXED) ---
+const processPayment = () => {
+    console.log("Tombol Konfirmasi Ditekan. Metode:", selectedMethod.value);
+
+    // Cek apakah metode sudah dipilih
+    if (!selectedMethod.value) {
+        Swal.fire({
+            title: 'Pilih Metode Dulu',
+            text: 'Silakan klik salah satu kotak metode pembayaran di atas (Dompet atau Transfer).',
+            icon: 'warning',
+            confirmButtonText: 'Oke, Paham',
+            confirmButtonColor: '#1e293b',
+            customClass: { popup: 'rounded-2xl' }
+        });
         return;
     }
 
-    window.snap.pay(token, {
-        onSuccess: (result) => { 
-            // Redirect berdasarkan jenis produk
-            if (trx.value.tryout_id) {
-                router.visit(route('tryout.my'), { method: 'get' });
-            } else {
-                router.visit(route('dashboard'), { method: 'get' });
-            }
-        },
-        onPending: (result) => { 
-            alert("Menunggu pembayaran Anda!"); 
-        },
-        onError: (result) => { 
-            alert("Pembayaran gagal! Silakan coba lagi."); 
-        },
-        onClose: () => { 
-            console.log('Customer closed the popup without finishing the payment'); 
+    if (selectedMethod.value === 'wallet') {
+        handleWalletPayment();
+    } else {
+        handleMidtransPayment();
+    }
+};
+
+const handleWalletPayment = () => {
+    Swal.fire({
+        title: 'Bayar pakai Dompet?',
+        text: `Saldo akan terpotong ${formatRupiah(props.transaction?.amount)}`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Ya, Bayar Sekarang',
+        cancelButtonText: 'Batal',
+        confirmButtonColor: '#1e293b',
+        reverseButtons: true,
+        customClass: { popup: 'rounded-2xl' }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            isProcessing.value = true;
+            router.post(route('checkout.process', props.transaction.id), {
+                payment_method: 'wallet'
+            }, {
+                onFinish: () => isProcessing.value = false,
+                onSuccess: () => {
+                    // Redirect otomatis ditangani oleh Controller
+                },
+                onError: (errors) => {
+                    Swal.fire({ title: 'Gagal', text: errors.message || 'Terjadi kesalahan.', icon: 'error' });
+                }
+            });
         }
     });
 };
 
-// FORMATTER
-const formatRupiah = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
-const formatDateTime = (dateString) => {
-    if (!dateString) return '-';
-    return new Date(dateString).toLocaleString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-};
+const handleMidtransPayment = () => {
+    // Cek Ketersediaan Snap Midtrans
+    if (typeof window.snap === 'undefined') {
+        Swal.fire({
+            title: 'Sistem Belum Siap',
+            text: 'Gagal memuat sistem pembayaran Midtrans. Coba refresh halaman.',
+            icon: 'error',
+            confirmButtonColor: '#1e293b'
+        });
+        return;
+    }
 
-// STATUS HELPER
-const getStatusColor = (status) => {
-    const s = status ? status.toLowerCase() : '';
-    if (['paid', 'settlement', 'success', 'capture'].includes(s)) return 'bg-emerald-50 text-emerald-700 border-emerald-100';
-    if (['pending', 'challenge'].includes(s)) return 'bg-amber-50 text-amber-700 border-amber-100';
-    return 'bg-red-50 text-red-700 border-red-100';
-};
-const getStatusLabel = (status) => {
-    const s = status ? status.toLowerCase() : '';
-    if (['paid', 'settlement', 'success', 'capture'].includes(s)) return 'Lunas';
-    if (['pending', 'challenge'].includes(s)) return 'Menunggu';
-    return 'Gagal/Expired';
+    isProcessing.value = true;
+
+    window.snap.pay(props.transaction.snap_token, {
+        onSuccess: function(result) {
+            isProcessing.value = false;
+            // Arahkan ke dashboard atau halaman riwayat
+            router.visit(route('dashboard'));
+            Swal.fire('Berhasil!', 'Pembayaran Anda sedang diproses.', 'success');
+        },
+        onPending: function(result) {
+            isProcessing.value = false;
+            Swal.fire('Menunggu Pembayaran', 'Silakan selesaikan pembayaran sesuai instruksi.', 'info');
+        },
+        onError: function(result) {
+            isProcessing.value = false;
+            Swal.fire('Gagal', 'Pembayaran gagal atau dibatalkan.', 'error');
+        },
+        onClose: function() {
+            isProcessing.value = false;
+        }
+    });
 };
 </script>
 
 <template>
-    <Head title="Pembayaran" />
+    <Head title="Checkout - Nusantara Adidaya" />
 
     <AuthenticatedLayout>
-        <div class="relative bg-[#0F172A] text-white py-12 px-4 border-b border-gray-800">
-            <div class="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-[100px]"></div>
-            <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
-                <div>
-                    <h1 class="text-3xl font-black mb-2">Selesaikan <span class="text-indigo-400">Pembayaran</span></h1>
-                    <p class="text-slate-400 text-sm">Hanya selangkah lagi untuk menikmati fitur premium.</p>
-                </div>
-                <Link :href="trx.tryout_id ? route('tryout.index') : route('membership.index')" 
-                    class="px-6 py-2.5 bg-white/5 border border-white/10 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-white/10 transition-all"
-                >
-                    Kembali
-                </Link>
+        <div class="relative bg-slate-900 overflow-hidden shadow-md z-0 -mx-6 -mt-6 md:-mx-12 md:-mt-12 mb-10 pb-10 pt-10 md:pt-16 text-center">
+            <div class="absolute inset-0">
+                <div class="absolute inset-0 bg-gradient-to-r from-indigo-950 to-slate-900 opacity-95"></div>
+                <div class="absolute top-0 right-0 w-80 h-80 bg-indigo-500/20 rounded-full blur-[100px]"></div>
+                <div class="absolute inset-0 opacity-[0.03]" style="background-image: radial-gradient(#ffffff 1px, transparent 1px); background-size: 24px 24px;"></div>
+            </div>
+
+            <div class="relative max-w-5xl mx-auto px-6 z-10">
+                <span class="inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-indigo-500/20 border border-indigo-400/20 text-indigo-200 text-[10px] font-black tracking-[0.2em] uppercase mb-6 backdrop-blur-sm shadow-lg">
+                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span> Gerbang Pembayaran Aman
+                </span>
+                
+                <h1 class="text-3xl md:text-5xl font-black text-white tracking-tighter mb-4 leading-tight uppercase">
+                    SELESAIKAN <span class="font-['Instrument_Serif'] italic text-indigo-200 font-normal">INVESTASI ANDA.</span>
+                </h1>
+                
+                <p class="mt-4 max-w-2xl mx-auto text-sm text-slate-400 font-medium leading-relaxed opacity-80">
+                    Satu langkah terakhir menuju persiapan ASN terbaik bersama Nusantara Adidaya.
+                </p>
             </div>
         </div>
 
-        <div class="py-10 bg-[#F8F9FA] min-h-screen">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                    
-                    <div class="lg:col-span-7 space-y-6">
-                        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-                            <div class="flex justify-between items-start mb-8">
-                                <div>
-                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">ID Invoice</p>
-                                    <h3 class="text-xl font-mono font-bold text-gray-900">{{ trx.reference }}</h3>
+        <div class="max-w-6xl mx-auto px-4 sm:px-0 -mt-16 relative z-10 pb-20 font-sans">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                
+                <div class="lg:col-span-7 space-y-6">
+                    <div class="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-slate-100 relative z-20">
+                        <h3 class="text-[10px] font-black text-slate-900 uppercase tracking-[0.3em] mb-8 flex items-center gap-3">
+                            <span class="w-7 h-7 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center italic text-[10px] shadow-sm font-black">01</span>
+                            Metode Pembayaran
+                        </h3>
+
+                        <div class="space-y-3">
+                            <div v-if="isMembership"
+                                @click="isBalanceEnough && !isProcessing ? selectedMethod = 'wallet' : null"
+                                :class="[
+                                    'p-4 md:p-5 rounded-2xl border-2 transition-all duration-300 flex items-center justify-between group select-none',
+                                    selectedMethod === 'wallet' ? 'border-indigo-600 bg-indigo-50/30 shadow-md shadow-indigo-100/20' : 'border-slate-50 bg-white hover:border-indigo-200',
+                                    !isBalanceEnough ? 'opacity-50 grayscale cursor-not-allowed' : 'cursor-pointer'
+                                ]"
+                            >
+                                <div class="flex items-center gap-4">
+                                    <div :class="['w-12 h-12 rounded-xl flex items-center justify-center text-2xl transition-all shadow-sm', selectedMethod === 'wallet' ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 border border-indigo-50']">
+                                        💳
+                                    </div>
+                                    <div>
+                                        <p class="text-[11px] font-black text-slate-900 uppercase tracking-widest">Dompet Nusantara</p>
+                                        <p v-if="isBalanceEnough" class="text-[10px] font-bold text-slate-500 mt-0.5">Saldo: {{ formatRupiah(user_balance) }}</p>
+                                        <p v-else class="text-[10px] font-bold text-rose-500 mt-0.5">Saldo Tidak Cukup ({{ formatRupiah(user_balance) }})</p>
+                                    </div>
                                 </div>
-                                <span class="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-tighter border-2" :class="getStatusColor(trx.status)">
-                                    {{ getStatusLabel(trx.status) }}
+                                
+                                <div v-if="selectedMethod === 'wallet'" class="w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center shadow-md animate-in zoom-in">
+                                    <svg class="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="4"><path d="M5 13l4 4L19 7" /></svg>
+                                </div>
+                            </div>
+
+                            <div @click="!isProcessing ? selectedMethod = 'midtrans' : null"
+                                class="p-4 md:p-5 rounded-2xl border-2 transition-all duration-300 flex items-center justify-between cursor-pointer group shadow-sm select-none"
+                                :class="selectedMethod === 'midtrans' ? 'border-indigo-600 bg-indigo-50/30 shadow-md shadow-indigo-100/20' : 'border-slate-50 bg-white hover:border-indigo-200'"
+                            >
+                                <div class="flex items-center gap-4">
+                                    <div :class="['w-12 h-12 rounded-xl flex items-center justify-center text-2xl transition-all shadow-sm', selectedMethod === 'midtrans' ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 border border-indigo-50']">
+                                        📱
+                                    </div>
+                                    <div>
+                                        <p class="text-[11px] font-black text-slate-900 uppercase tracking-widest">Transfer & QRIS</p>
+                                        <p class="text-[10px] font-bold text-slate-500 mt-0.5">Otomatis • Terpercaya • Instan</p>
+                                    </div>
+                                </div>
+                                <div v-if="selectedMethod === 'midtrans'" class="w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center shadow-md animate-in zoom-in">
+                                    <svg class="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="4"><path d="M5 13l4 4L19 7" /></svg>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-5 sticky top-8">
+                    <div class="bg-white p-10 rounded-[3rem] shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden relative z-20">
+                         <div class="absolute inset-0 opacity-[0.02] bg-[radial-gradient(#4f46e5_1.5px,transparent_1.5px)] [background-size:24px_24px] pointer-events-none"></div>
+
+                        <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-10 text-center relative z-10">Rincian Pembayaran</h3>
+                        
+                        <div class="space-y-6 mb-12 relative z-10">
+                            <div class="flex flex-col gap-1">
+                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Produk Layanan</span>
+                                <span class="text-[11px] font-black text-slate-900 uppercase italic leading-tight">
+                                    {{ props.transaction?.description || 'Memuat...' }}
                                 </span>
                             </div>
-
-                            <div class="grid grid-cols-2 gap-6 pb-8 border-b border-gray-100">
-                                <div>
-                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Tanggal</p>
-                                    <p class="text-sm font-bold text-gray-800">{{ formatDateTime(trx.created_at) }}</p>
-                                </div>
-                                <div>
-                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Metode</p>
-                                    <p class="text-sm font-bold text-gray-800">{{ trx.payment_method }}</p>
-                                </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">No. Invoice</span>
+                                <span class="text-[9px] font-black text-indigo-600 tracking-wider">
+                                    #{{ props.transaction?.invoice_code }}
+                                </span>
                             </div>
-
-                            <div class="pt-8">
-                                <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Rincian Produk</h4>
-                                <div class="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                    <div class="w-12 h-12 bg-indigo-600 text-white flex items-center justify-center rounded-lg text-xl shadow-lg">
-                                        {{ trx.tryout_id ? '📝' : '💎' }}
-                                    </div>
-                                    <div class="flex-1">
-                                        <p class="font-bold text-gray-900 leading-tight">{{ trx.title }}</p>
-                                        <p class="text-xs text-gray-500 mt-0.5">Akses Premium CPNS Nusantara</p>
-                                    </div>
-                                    <p class="font-bold text-gray-900">{{ formatRupiah(trx.total_pay) }}</p>
-                                </div>
+                            <div class="pt-8 border-t-2 border-dashed border-slate-100 flex justify-between items-end">
+                                <span class="text-[10px] font-black text-slate-900 uppercase">Total Bayar</span>
+                                <span class="text-3xl font-black text-slate-900 tracking-tighter leading-none">
+                                    {{ formatRupiah(props.transaction?.amount) }}
+                                </span>
                             </div>
                         </div>
 
-                        <div class="bg-indigo-50 border border-indigo-100 p-6 rounded-2xl flex gap-4">
-                            <div class="shrink-0 text-indigo-600">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            </div>
-                            <p class="text-xs text-indigo-700 leading-relaxed font-medium">
-                                Pembayaran diproses secara otomatis. Jangan menutup halaman ini sampai Anda diarahkan kembali ke aplikasi setelah membayar di jendela Midtrans.
-                            </p>
-                        </div>
+                        <button 
+                            @click="processPayment"
+                            :disabled="isProcessing"
+                            type="button"
+                            class="w-full py-6 rounded-2xl font-black text-[11px] uppercase tracking-[0.3em] transition-all duration-300 flex items-center justify-center gap-3 relative z-50 shadow-xl cursor-pointer"
+                            :class="[
+                                isProcessing 
+                                    ? 'bg-slate-800 text-slate-400 cursor-wait' 
+                                    : 'bg-slate-900 text-white hover:bg-indigo-600 active:scale-95'
+                            ]"
+                        >
+                            <template v-if="isProcessing">Menghubungkan...</template>
+                            <template v-else>Konfirmasi Pembayaran</template>
+                        </button>
                     </div>
-
-                    <div class="lg:col-span-5 lg:sticky lg:top-8">
-                        <div class="bg-white rounded-3xl shadow-xl shadow-slate-200 border border-gray-100 overflow-hidden">
-                            <div class="bg-gray-900 p-8 text-white text-center relative overflow-hidden">
-                                <div class="absolute inset-0 bg-gradient-to-br from-indigo-600/20 to-transparent"></div>
-                                <h3 class="text-sm font-bold uppercase tracking-widest text-slate-400 mb-2 relative z-10">Total Bayar</h3>
-                                <p class="text-4xl font-black text-white relative z-10">{{ formatRupiah(trx.total_pay) }}</p>
-                            </div>
-
-                            <div class="p-8">
-                                <div v-if="['pending', 'challenge'].includes(trx.status)" class="space-y-4">
-                                    <button @click="payNow" 
-                                        class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all active:scale-95"
-                                    >
-                                        Bayar Sekarang
-                                    </button>
-                                    <p class="text-center text-[10px] text-gray-400 font-medium">
-                                        Mendukung QRIS, Bank Transfer, & E-Wallet
-                                    </p>
-                                </div>
-
-                                <div v-else-if="['paid', 'settlement', 'success', 'capture'].includes(trx.status)" class="text-center">
-                                    <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
-                                    </div>
-                                    <p class="font-bold text-gray-900 mb-4">Pembayaran Berhasil!</p>
-                                    <Link :href="trx.tryout_id ? route('tryout.my') : route('dashboard')" 
-                                        class="inline-block w-full py-4 bg-emerald-600 text-white rounded-2xl font-bold uppercase tracking-widest text-xs"
-                                    >
-                                        Mulai Gunakan Fitur
-                                    </Link>
-                                </div>
-
-                                <div v-else class="text-center p-4 bg-red-50 rounded-xl border border-red-100">
-                                    <p class="text-xs font-bold text-red-700">Transaksi Kadaluarsa atau Dibatalkan</p>
-                                    <Link :href="route('tryout.index')" class="text-[10px] text-red-500 underline mt-2 block font-bold uppercase">Coba Lagi</Link>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="mt-6 flex items-center justify-center gap-3 opacity-40">
-                            <img src="https://upload.wikimedia.org/wikipedia/commons/a/a2/Logo_Midtrans.png" class="h-4" alt="Midtrans">
-                            <div class="h-3 w-[1px] bg-gray-300"></div>
-                            <p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Secure Payment</p>
-                        </div>
-                    </div>
-
                 </div>
+
             </div>
         </div>
     </AuthenticatedLayout>

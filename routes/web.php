@@ -58,8 +58,8 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     Route::get('/wallet', [WalletController::class, 'index'])->name('wallet.index');
     Route::post('/wallet/topup', [WalletController::class, 'topup'])->name('wallet.topup');
 
-    // Tambahkan baris ini:
-    Route::get('/tryout/quantum', [TryoutController::class, 'quantum'])->name('tryout.quantum');
+// Ganti baris ini di web.php
+Route::get('/tryout/adidaya', [TryoutController::class, 'adidaya'])->name('tryout.adidaya');
 
     // --- TRYOUT KATALOG & DETAIL ---
     Route::get('/tryouts', [UserTryoutController::class, 'index'])->name('tryout.index');
@@ -89,6 +89,9 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     // --- PEMBAYARAN (CHECKOUT) ---
     // Halaman Bayar (Parameter: {transaction} ID Transaksi, bukan Tryout)
     Route::get('/checkout/{transaction}', [CheckoutController::class, 'show'])->name('checkout.show');
+
+    // Pastikan menggunakan POST karena kita mengirim data (payment_method)
+Route::post('/checkout/{transaction}/process', [CheckoutController::class, 'process'])->name('checkout.process');
     
     // Callback Internal setelah bayar sukses di Frontend
     Route::post('/checkout/callback', [CheckoutController::class, 'callbackInternal'])->name('checkout.callback.internal');

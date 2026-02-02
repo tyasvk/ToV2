@@ -1,73 +1,125 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { Head, Link, usePage } from '@inertiajs/vue3';
+import { ref, computed } from 'vue';
 
 const props = defineProps({ exclusiveTryouts: Array, generalTryouts: Array });
-const activeTab = ref('exclusive');
+const page = usePage();
+
+// --- LOGIKA MEMBERSHIP ---
+const user = computed(() => page.props.auth?.user ?? null);
+const isPremium = computed(() => {
+    if (!user.value?.membership_expires_at) return false;
+    return new Date(user.value.membership_expires_at) > new Date();
+});
 </script>
 
 <template>
     <Head title="Nusantara Adidaya - Akses Premium" />
 
     <AuthenticatedLayout>
-        <div class="space-y-12">
-            <div class="relative rounded-[4rem] bg-slate-900 p-12 md:p-20 overflow-hidden shadow-2xl">
-                <div class="absolute top-0 right-0 w-1/2 h-full bg-indigo-500/5 -skew-x-12 translate-x-20"></div>
-                <div class="relative z-10 flex flex-col md:flex-row justify-between items-center gap-10">
-                    <div class="text-center md:text-left space-y-6">
-                        <div class="inline-flex items-center px-4 py-1.5 bg-indigo-500/20 border border-indigo-400/30 rounded-full">
-                            <span class="text-[10px] font-black text-indigo-300 uppercase tracking-[0.4em]">Akses Terbatas VIP</span>
-                        </div>
-                        <h1 class="text-5xl md:text-7xl font-black text-white tracking-tighter leading-none">
-                            NUSANTARA <br> <span class="italic text-indigo-500 text-6xl md:text-8xl">ADIDAYA.</span>
-                        </h1>
-                        <p class="text-slate-400 text-sm max-w-lg font-medium leading-relaxed italic">
-                            "Persiapan tanpa batas dengan kurasi simulasi paling akurat berbasis Field Report terbaru."
-                        </p>
-                    </div>
+        
+        <div class="relative bg-slate-900 overflow-hidden shadow-md z-0 -mx-6 -mt-6 md:-mx-12 md:-mt-12 mb-10 pb-10 pt-10 md:pt-16">
+            <div class="absolute inset-0">
+                <div class="absolute inset-0 bg-gradient-to-r from-indigo-950 to-slate-900 opacity-95"></div>
+                <div class="absolute top-0 right-0 w-96 h-96 bg-indigo-500/20 rounded-full blur-[100px]"></div>
+                <div class="absolute bottom-0 left-0 w-64 h-64 bg-violet-500/10 rounded-full blur-[80px]"></div>
+                <div class="absolute inset-0 opacity-[0.03]" style="background-image: radial-gradient(#ffffff 1px, transparent 1px); background-size: 24px 24px;"></div>
+            </div>
+
+            <div class="relative max-w-7xl mx-auto px-6 lg:px-8 text-center">
+                <span class="inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-indigo-500/20 border border-indigo-400/20 text-indigo-200 text-[10px] font-black tracking-[0.2em] uppercase mb-6 backdrop-blur-sm shadow-lg">
+                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span> 
+                    {{ isPremium ? 'Akses Terbuka' : 'Konten Terbatas' }}
+                </span>
+                
+                <h1 class="text-4xl md:text-6xl font-black text-white tracking-tighter mb-4 leading-tight">
+                    NUSANTARA <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-400 italic">ADIDAYA.</span>
+                </h1>
+                
+                <p class="mt-4 max-w-2xl mx-auto text-sm md:text-base text-slate-400 font-medium leading-relaxed">
+                    Perpustakaan simulasi elite dengan kurasi soal HOTS terbaru. 
+                    Dirancang khusus bagi para pejuang yang mengincar skor tertinggi.
+                </p>
+            </div>
+        </div>
+
+        <div class="flex justify-center -mt-16 relative z-10 mb-10">
+            <div class="bg-white px-10 py-3 rounded-full shadow-2xl shadow-indigo-900/10 border border-white flex items-center gap-3">
+                <span class="text-indigo-600 animate-bounce">⚡</span>
+                <span class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-900">Paket Eksklusif Adidaya</span>
+            </div>
+        </div>
+
+        <div class="max-w-7xl mx-auto px-2 pb-20">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div v-for="i in 10" :key="i" class="group bg-white rounded-[2.5rem] shadow-sm hover:shadow-2xl border border-slate-200 overflow-hidden transition-all duration-500 hover:-translate-y-2 flex flex-col h-full relative">
                     
-                    <div class="bg-white/5 backdrop-blur-xl border border-white/10 p-8 rounded-[3rem] text-center min-w-[200px]">
-                        <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Paket Tersisa</p>
-                        <p class="text-5xl font-black text-white leading-none">10</p>
-                        <p class="text-[9px] font-bold text-slate-500 mt-4 uppercase tracking-widest">Eksklusif HOTS</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="flex justify-center">
-                <div class="bg-white p-2.5 rounded-full shadow-xl border border-white flex gap-2">
-                    <button @click="activeTab = 'exclusive'" :class="[activeTab === 'exclusive' ? 'bg-slate-900 text-white shadow-xl' : 'text-slate-400 hover:text-slate-600']" class="px-10 py-4 rounded-full text-[10px] font-black uppercase tracking-widest transition-all">
-                        ⚡ Paket Adidaya
-                    </button>
-                    <button @click="activeTab = 'general'" :class="[activeTab === 'general' ? 'bg-slate-900 text-white shadow-xl' : 'text-slate-400 hover:text-slate-600']" class="px-10 py-4 rounded-full text-[10px] font-black uppercase tracking-widest transition-all">
-                        🌐 Tryout Umum
-                    </button>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-20">
-                <template v-if="activeTab === 'exclusive'">
-                    <div v-for="i in 10" :key="i" class="bg-white rounded-[3.5rem] p-10 border border-white shadow-sm group hover:shadow-2xl hover:-translate-y-3 transition-all duration-500 relative overflow-hidden">
-                        <div class="absolute -top-6 -right-6 w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center group-hover:bg-indigo-600 transition-colors duration-500">
-                            <span class="text-slate-200 font-black text-4xl group-hover:text-white/20">{{ i }}</span>
+                    <div v-if="!isPremium" class="absolute inset-0 bg-white/40 backdrop-blur-[2px] z-30 flex flex-col items-center justify-center p-6 text-center transition-all group-hover:backdrop-blur-[4px]">
+                        <div class="w-14 h-14 bg-white rounded-2xl shadow-xl flex items-center justify-center text-2xl mb-4 border border-slate-100">
+                            🔒
                         </div>
-                        <div class="relative z-10 space-y-8">
-                            <div class="space-y-3">
-                                <h3 class="text-2xl font-black text-slate-900 tracking-tighter uppercase leading-tight group-hover:text-indigo-600 transition-colors">
-                                    Simulasi Adidaya <br> Utama #{{ i }}
-                                </h3>
-                                <div class="flex items-center gap-3">
-                                    <span class="text-[9px] font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl uppercase tracking-widest">FR 2024 / HOTS</span>
+                        <p class="text-[10px] font-black uppercase tracking-widest text-slate-900 mb-1">Konten Terkunci</p>
+                        <p class="text-[9px] font-bold text-slate-500 leading-tight">Khusus Member Premium Adidaya</p>
+                    </div>
+
+                    <div class="absolute top-4 right-4 z-20">
+                        <span class="px-3 py-1 bg-slate-900/90 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-wider rounded-lg shadow-lg flex items-center gap-1.5">
+                            <span class="text-amber-400 text-xs">👑</span> VIP
+                        </span>
+                    </div>
+
+                    <div class="h-20 bg-gradient-to-br from-indigo-50 via-white to-slate-50 relative overflow-hidden border-b border-slate-100">
+                        <div class="absolute -left-4 -top-4 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition duration-700"></div>
+                        <div class="absolute right-2 top-2 text-6xl opacity-[0.04] font-black text-slate-900 select-none italic tracking-tighter">#{{ i }}</div>
+                    </div>
+
+                    <div class="px-8 pb-8 pt-0 flex-1 flex flex-col -mt-10 relative z-10">
+                        <div class="w-14 h-14 bg-white rounded-2xl shadow-lg border border-slate-100 flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition duration-500 text-indigo-600">
+                            ⚡
+                        </div>
+
+                        <h3 class="text-xl font-black text-slate-800 leading-tight mb-1 group-hover:text-indigo-600 transition truncate">
+                            Simulasi Adidaya #{{ i }}
+                        </h3>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6">Premium Intelligence</p>
+
+                        <div class="mb-8 bg-slate-50 p-1.5 rounded-2xl border border-slate-100 transition-colors">
+                            <div class="grid grid-cols-2 gap-px bg-slate-200/50 rounded-xl overflow-hidden">
+                                <div class="bg-white p-3 text-center">
+                                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Soal</p>
+                                    <p class="text-sm font-black text-slate-800">110</p>
+                                </div>
+                                <div class="bg-white p-3 text-center">
+                                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Waktu</p>
+                                    <p class="text-sm font-black text-slate-800">100m</p>
                                 </div>
                             </div>
-                            <Link href="#" class="block w-full text-center py-5 bg-slate-900 text-white rounded-3xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-indigo-600 transition-all shadow-xl shadow-slate-200">
-                                Mulai Simulasi
+                            <div class="mt-1.5 px-3 py-2 bg-white rounded-xl flex items-center justify-between border border-slate-100">
+                                <span class="text-[9px] font-bold text-slate-400 uppercase">Analisis</span>
+                                <span class="text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-right uppercase">HOTS Premium</span>
+                            </div>
+                        </div>
+
+                        <div class="mt-auto">
+                            <Link 
+                                :href="isPremium ? '#' : route('membership.index')" 
+                                class="block w-full py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] text-center transition-all active:scale-95 flex items-center justify-center gap-2 relative z-40"
+                                :class="isPremium 
+                                    ? 'bg-slate-900 text-white shadow-xl shadow-slate-200 hover:bg-indigo-600 hover:shadow-indigo-200' 
+                                    : 'bg-indigo-600 text-white shadow-xl shadow-indigo-100 hover:bg-indigo-700'"
+                            >
+                                <span v-if="isPremium">Mulai Ujian</span>
+                                <span v-else>Upgrade Ke Adidaya</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                </svg>
                             </Link>
                         </div>
                     </div>
-                </template>
+                </div>
             </div>
         </div>
+
     </AuthenticatedLayout>
 </template>

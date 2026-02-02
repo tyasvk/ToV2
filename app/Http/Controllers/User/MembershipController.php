@@ -13,12 +13,15 @@ use Carbon\Carbon;
 
 class MembershipController extends Controller
 {
-    // Daftar Paket Membership
+    /**
+     * Daftar Paket Premium Nusantara Adidaya
+     * Harga diatur untuk menjaga brand image "High Quality"
+     */
     private $plans = [
-        ['id' => '7_days', 'name' => 'Member Mingguan', 'days' => 7, 'price' => 25000],
-        ['id' => '30_days', 'name' => 'Member Bulanan', 'days' => 30, 'price' => 75000],
-        ['id' => '90_days', 'name' => 'Member 3 Bulan', 'days' => 90, 'price' => 150000],
-        ['id' => '1_year', 'name' => 'Member Tahunan', 'days' => 365, 'price' => 500000],
+        ['id' => '7_days', 'name' => 'Sprint Flash', 'days' => 7, 'price' => 49000],
+        ['id' => '30_days', 'name' => 'Standard Pro', 'days' => 30, 'price' => 99000],
+        ['id' => '90_days', 'name' => 'Mastery Plan', 'days' => 90, 'price' => 199000],
+        ['id' => '1_year', 'name' => 'Ultimate Pass', 'days' => 365, 'price' => 299000], // Menarik di kisaran 200rb++
     ];
 
     public function index()
@@ -41,43 +44,40 @@ class MembershipController extends Controller
         // LOGIKA PEMBAYARAN VIA WALLET
         if ($request->payment_method === 'wallet') {
             if ($user->balance < $plan['price']) {
-                return back()->with('error', 'Saldo wallet tidak cukup');
+                return back()->with('error', 'Saldo dompet tidak mencukupi.');
             }
 
             DB::transaction(function () use ($user, $plan) {
-                // Potong Saldo
                 $user->decrement('balance', $plan['price']);
                 
-                // Catat Transaksi Wallet
                 WalletTransaction::create([
                     'user_id' => $user->id,
                     'type' => 'debit',
                     'amount' => $plan['price'],
-                    'description' => 'Pembelian ' . $plan['name'],
+                    'description' => 'Aktivasi Premium: ' . $plan['name'],
                     'status' => 'success'
                 ]);
 
-                // Update Masa Aktif User
                 $currentExpiry = $user->isMember() ? Carbon::parse($user->membership_expires_at) : now();
                 $user->update([
                     'membership_expires_at' => $currentExpiry->addDays($plan['days'])
                 ]);
             });
 
-            return redirect()->route('dashboard')->with('success', 'Membership ' . $plan['name'] . ' berhasil diaktifkan!');
+            return redirect()->route('dashboard')->with('success', 'Akses ' . $plan['name'] . ' berhasil diaktifkan!');
         }
 
-        // LOGIKA PEMBAYARAN VIA MIDTRANS/BANK TRANSFER
+        // LOGIKA PEMBAYARAN VIA GATEWAY
         $invoice = 'MEMB-' . strtoupper(Str::random(10));
         
         $transaction = Transaction::create([
             'user_id' => $user->id,
-            'tryout_id' => null, // Wajib null untuk membership
+            'tryout_id' => null,
             'invoice_code' => $invoice,
             'amount' => $plan['price'],
-            'unit_price' => $plan['price'], // Mengisi kolom wajib agar tidak 0
+            'unit_price' => $plan['price'],
             'qty' => 1,
-            'description' => 'Pembelian ' . $plan['name'],
+            'description' => 'Investasi Belajar: ' . $plan['name'],
             'status' => 'pending',
             'metadata' => [
                 'type' => 'membership',

@@ -48,17 +48,19 @@ class TryoutController extends Controller
         ]);
     }
 
-    /**
-     * Tampilkan halaman SKD Quantum (Premium Membership)
-     */
-    public function quantum()
-    {
-        // Untuk sementara kita kirim data kosong, nanti bisa ambil dari Database
-        return Inertia::render('Tryout/QuantumIndex', [
-            'exclusiveTryouts' => [], 
-            'generalTryouts' => []
-        ]);
-    }
+// GANTI method quantum() menjadi seperti ini:
+
+/**
+ * Tampilkan halaman Nusantara Adidaya (Premium Membership)
+ */
+public function adidaya()
+{
+    // Arahkan ke file 'resources/js/Pages/User/Tryout/AdidayaIndex.vue'
+    return Inertia::render('User/Tryout/AdidayaIndex', [
+        'exclusiveTryouts' => [], // Nanti isi dari DB
+        'generalTryouts' => []
+    ]);
+}
 
     public function myTryouts(Request $request)
     {
