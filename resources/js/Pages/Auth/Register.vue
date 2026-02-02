@@ -1,7 +1,7 @@
 <script setup>
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
-import { provinces, agencies } from '@/Data/agencies'; // Pastikan file data ini ada
+import { provinces, agencies } from '@/Data/agencies'; 
 
 const form = useForm({
     name: '',
@@ -17,7 +17,7 @@ const form = useForm({
 // --- LOGIC PASSWORD VISIBILITY ---
 const isPasswordVisible = ref(false);
 
-// --- LOGIC DROPDOWN INSTANSI (SAMA SEPERTI SEBELUMNYA) ---
+// --- LOGIC DROPDOWN INSTANSI ---
 const searchAgency = ref('');
 const isDropdownOpen = ref(false);
 
@@ -66,243 +66,182 @@ const submit = () => {
 </script>
 
 <template>
-    <Head title="Daftar Akun Baru" />
+    <Head title="Daftar Akun Premium" />
 
-    <div class="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-6 font-sans selection:bg-indigo-100 selection:text-indigo-700">
+    <div class="min-h-screen bg-[#F1F5F9] flex items-center justify-center p-4 md:p-8 font-sans selection:bg-indigo-100">
         
-        <div class="w-full max-w-[1200px] bg-white rounded-[3rem] shadow-2xl shadow-indigo-100/50 overflow-hidden flex flex-col md:flex-row h-[85vh] min-h-[700px] border border-gray-100">
+        <div class="absolute top-0 right-0 w-[600px] h-[600px] bg-indigo-200/20 rounded-full blur-[120px] pointer-events-none"></div>
+        <div class="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-100/30 rounded-full blur-[120px] pointer-events-none"></div>
+
+        <div class="w-full max-w-[1150px] flex flex-col md:flex-row bg-white rounded-[3.5rem] shadow-[0_40px_100px_-20px_rgba(15,23,42,0.15)] overflow-hidden relative z-10 min-h-[80vh] border border-white">
             
-            <div class="hidden md:flex md:w-5/12 bg-indigo-600 p-16 flex-col justify-between relative overflow-hidden">
-                <div class="absolute top-[-10%] left-[-10%] w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
-                <div class="absolute bottom-[-10%] right-[-10%] w-80 h-80 bg-indigo-400/20 rounded-full blur-3xl"></div>
-                <div class="absolute top-[40%] left-[20%] w-40 h-40 bg-purple-500/20 rounded-full blur-3xl"></div>
-
-                <div class="relative z-10">
-                    <div class="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-xl mb-8">
-                        <span class="text-indigo-600 font-black text-2xl tracking-tighter">TO</span>
+            <div class="hidden md:flex md:w-5/12 bg-[#F8FAFC] p-12 md:p-20 flex-col justify-center items-center relative overflow-hidden border-r border-slate-100">
+                <div class="absolute inset-0 opacity-[0.03] bg-[url('https://www.transparenttextures.com/patterns/gplay.png')]"></div>
+                
+                <div class="relative z-10 flex flex-col items-center text-center">
+                    <div class="transition-all duration-1000 hover:scale-105 group relative mb-12">
+                        <div class="absolute inset-0 bg-indigo-500/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <img src="/images/logo.png" alt="Logo" 
+                             class="h-48 lg:h-56 w-auto object-contain relative z-10 drop-shadow-[0_25px_35px_rgba(0,0,0,0.08)]">
                     </div>
-                    <h1 class="text-4xl font-black text-white leading-tight tracking-tighter uppercase">
-                        Bergabung<br>Sekarang.
-                    </h1>
-                    <p class="text-indigo-100 mt-6 text-sm font-medium leading-relaxed max-w-xs uppercase tracking-widest opacity-80">
-                        Satu akun untuk akses ribuan soal latihan CPNS & Kedinasan dengan sistem CAT terbaru.
-                    </p>
-                </div>
 
-                <div class="relative z-10">
-                    <div class="flex flex-col gap-4">
-                        <div class="flex items-center gap-3 bg-white/10 backdrop-blur-md p-4 rounded-3xl border border-white/10">
-                            <div class="w-10 h-10 bg-amber-400 rounded-full flex items-center justify-center text-xl">🏆</div>
-                            <div>
-                                <p class="text-[10px] font-black text-white uppercase tracking-widest">Ranking Nasional</p>
-                                <p class="text-[9px] text-indigo-100 font-bold uppercase">Bandingkan skor dengan pesaing</p>
-                            </div>
-                        </div>
+                    <div class="flex items-center gap-6 opacity-30 mb-10">
+                        <div class="w-16 h-[1px] bg-gradient-to-r from-transparent to-slate-900"></div>
+                        <div class="w-2 h-2 rounded-full bg-slate-900"></div>
+                        <div class="w-16 h-[1px] bg-gradient-to-l from-transparent to-slate-900"></div>
+                    </div>
+                    
+                    <div class="max-w-sm px-4">
+                        <h2 class="text-2xl md:text-3xl font-light italic text-slate-500 leading-relaxed font-serif">
+                            "Langkah kecil hari ini adalah jembatan menuju <span class="text-indigo-600 font-bold not-italic">Kesuksesan Besar</span> esok hari."
+                        </h2>
+                        <div class="w-12 h-1 bg-indigo-100 mx-auto mt-10 rounded-full"></div>
                     </div>
                 </div>
             </div>
 
-            <div class="w-full md:w-7/12 p-8 md:p-14 flex flex-col overflow-y-auto custom-scrollbar relative">
-                <div class="mb-8">
-                    <h2 class="text-3xl font-black text-gray-900 tracking-tighter uppercase">Buat Akun</h2>
-                    <p class="text-xs text-gray-400 font-bold uppercase tracking-[0.3em] mt-2">Lengkapi data diri Anda</p>
+            <div class="w-full md:w-7/12 p-8 md:p-16 flex flex-col bg-white relative overflow-y-auto custom-scrollbar">
+                
+                <div class="md:hidden flex flex-col items-center mb-8">
+                    <img src="/images/logo.png" alt="Logo" class="h-16 w-auto drop-shadow-md mb-2">
+                    <p class="text-[9px] font-black text-indigo-600 uppercase tracking-[0.4em]">CPNS Nusantara</p>
                 </div>
 
-                <form @submit.prevent="submit" class="space-y-5 pb-4">
-                    
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-black text-gray-400 uppercase ml-2 tracking-widest">Nama Lengkap</label>
-                        <div class="relative group">
-                            <span class="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-indigo-600 transition-colors">👤</span>
-                            <input 
-                                v-model="form.name" 
-                                type="text" 
-                                required 
-                                autofocus
-                                placeholder="Nama sesuai KTP/Ijazah"
-                                class="w-full bg-gray-50 border-gray-100 rounded-2xl py-4 pl-14 pr-6 text-sm font-bold placeholder:text-gray-300 focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 transition-all outline-none"
-                            />
-                        </div>
-                        <p v-if="form.errors.name" class="text-[9px] text-red-500 font-black uppercase ml-2 mt-1 tracking-wider">{{ form.errors.name }}</p>
+                <div class="mb-10 text-center md:text-left">
+                    <h3 class="text-4xl font-black text-slate-900 tracking-tight mb-2 italic leading-none">Sign Up.</h3>
+                    <p class="text-sm text-slate-400 font-medium tracking-wide">Mulai persiapan karir impian Anda di sini.</p>
+                </div>
+
+                <form @submit.prevent="submit" class="space-y-6 pb-6">
+                    <div class="space-y-2 group">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 group-focus-within:text-indigo-600 transition-colors">Nama Lengkap</label>
+                        <input v-model="form.name" type="text" required autofocus placeholder="Nama sesuai KTP/Ijazah"
+                            class="w-full bg-slate-50 border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-800 placeholder:text-slate-300 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 transition-all outline-none border" />
+                        <p v-if="form.errors.name" class="text-[10px] text-red-500 font-bold mt-1 ml-1">{{ form.errors.name }}</p>
                     </div>
 
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-black text-gray-400 uppercase ml-2 tracking-widest">Alamat Email</label>
-                        <div class="relative group">
-                            <span class="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-indigo-600 transition-colors">✉️</span>
-                            <input 
-                                v-model="form.email" 
-                                type="email" 
-                                required 
-                                placeholder="email@contoh.com"
-                                class="w-full bg-gray-50 border-gray-100 rounded-2xl py-4 pl-14 pr-6 text-sm font-bold placeholder:text-gray-300 focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 transition-all outline-none"
-                            />
-                        </div>
-                        <p v-if="form.errors.email" class="text-[9px] text-red-500 font-black uppercase ml-2 mt-1 tracking-wider">{{ form.errors.email }}</p>
+                    <div class="space-y-2 group">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 group-focus-within:text-indigo-600 transition-colors">Alamat Email</label>
+                        <input v-model="form.email" type="email" required placeholder="nama@domain.com"
+                            class="w-full bg-slate-50 border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-800 placeholder:text-slate-300 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 transition-all outline-none border" />
+                        <p v-if="form.errors.email" class="text-[10px] text-red-500 font-bold mt-1 ml-1">{{ form.errors.email }}</p>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div class="space-y-2">
-                            <label class="text-[10px] font-black text-gray-400 uppercase ml-2 tracking-widest">Provinsi Domisili</label>
-                            <div class="relative group">
-                                <span class="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-indigo-600 transition-colors">🗺️</span>
-                                <select 
-                                    v-model="form.province_code" 
-                                    required
-                                    class="w-full bg-gray-50 border-gray-100 rounded-2xl py-4 pl-14 pr-8 text-sm font-bold text-gray-700 focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 transition-all outline-none appearance-none cursor-pointer"
-                                >
-                                    <option value="" disabled selected>Pilih Provinsi</option>
-                                    <option v-for="prov in provinces" :key="prov.code" :value="prov.code">{{ prov.name }}</option>
-                                </select>
-                                <span class="absolute right-5 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none text-xs">▼</span>
-                            </div>
-                            <p v-if="form.errors.province_code" class="text-[9px] text-red-500 font-black uppercase ml-2 mt-1 tracking-wider">{{ form.errors.province_code }}</p>
+                        <div class="space-y-2 group">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 group-focus-within:text-indigo-600 transition-colors">Provinsi Domisili</label>
+                            <select v-model="form.province_code" required
+                                class="w-full bg-slate-50 border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-800 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 transition-all outline-none border appearance-none cursor-pointer">
+                                <option value="" disabled selected>Pilih Provinsi</option>
+                                <option v-for="prov in provinces" :key="prov.code" :value="prov.code">{{ prov.name }}</option>
+                            </select>
                         </div>
 
-                        <div class="space-y-2">
-                            <label class="text-[10px] font-black text-gray-400 uppercase ml-2 tracking-widest">Jenis Kelamin</label>
-                            <div class="relative group">
-                                <span class="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-indigo-600 transition-colors">⚧️</span>
-                                <select 
-                                    v-model="form.gender" 
-                                    required
-                                    class="w-full bg-gray-50 border-gray-100 rounded-2xl py-4 pl-14 pr-8 text-sm font-bold text-gray-700 focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 transition-all outline-none appearance-none cursor-pointer"
-                                >
-                                    <option value="" disabled selected>Pilih</option>
-                                    <option value="1">Laki-laki</option>
-                                    <option value="2">Perempuan</option>
-                                </select>
-                                <span class="absolute right-5 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none text-xs">▼</span>
-                            </div>
-                            <p v-if="form.errors.gender" class="text-[9px] text-red-500 font-black uppercase ml-2 mt-1 tracking-wider">{{ form.errors.gender }}</p>
+                        <div class="space-y-2 group">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 group-focus-within:text-indigo-600 transition-colors">Jenis Kelamin</label>
+                            <select v-model="form.gender" required
+                                class="w-full bg-slate-50 border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-800 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 transition-all outline-none border appearance-none cursor-pointer">
+                                <option value="" disabled selected>Pilih</option>
+                                <option value="1">Laki-laki</option>
+                                <option value="2">Perempuan</option>
+                            </select>
                         </div>
                     </div>
 
-                    <div class="space-y-2 relative">
-                        <label class="text-[10px] font-black text-gray-400 uppercase ml-2 tracking-widest">Instansi Tujuan</label>
-                        <div class="relative group">
-                            <span class="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-indigo-600 transition-colors">🏢</span>
-                            <input 
-                                v-model="searchAgency" 
-                                type="text" 
-                                required 
-                                @input="onSearchInput"
-                                @focus="isDropdownOpen = true"
-                                @blur="closeDropdown"
-                                placeholder="Ketik 'Kementerian', 'Pemkab', atau nama daerah..."
-                                class="w-full bg-gray-50 border-gray-100 rounded-2xl py-4 pl-14 pr-6 text-sm font-bold placeholder:text-gray-300 focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 transition-all outline-none"
-                                autocomplete="off"
-                            />
-                            <span class="absolute right-5 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none">🔍</span>
+                    <div class="space-y-2 relative group">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 group-focus-within:text-indigo-600 transition-colors">Instansi Tujuan</label>
+                        <div class="relative">
+                            <input v-model="searchAgency" type="text" required @input="onSearchInput" @focus="isDropdownOpen = true" @blur="closeDropdown"
+                                placeholder="Cari Instansi (Kementerian/Pemkab...)"
+                                class="w-full bg-slate-50 border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-800 placeholder:text-slate-300 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 transition-all outline-none border" autocomplete="off" />
+                            <span class="absolute right-6 top-1/2 -translate-y-1/2 opacity-30">🔍</span>
                         </div>
 
-                        <div v-if="isDropdownOpen" class="absolute z-50 mt-2 w-full bg-white shadow-2xl shadow-indigo-100/50 max-h-60 rounded-2xl py-2 text-sm border border-gray-100 overflow-auto custom-scrollbar">
+                        <div v-if="isDropdownOpen" class="absolute z-50 mt-2 w-full bg-white shadow-2xl rounded-2xl py-2 text-sm border border-slate-100 max-h-56 overflow-y-auto custom-scrollbar">
                             <ul v-if="filteredAgencies.length > 0">
-                                <li 
-                                    v-for="(agency, index) in filteredAgencies" 
-                                    :key="index"
-                                    @mousedown.prevent="selectAgency(agency)"
-                                    class="cursor-pointer select-none relative py-3 px-6 hover:bg-indigo-50 hover:text-indigo-700 text-gray-600 font-bold border-b border-gray-50 last:border-0 transition-colors"
-                                >
+                                <li v-for="(agency, index) in filteredAgencies" :key="index" @mousedown.prevent="selectAgency(agency)"
+                                    class="cursor-pointer py-3 px-6 hover:bg-indigo-50 hover:text-indigo-700 text-slate-600 font-bold transition-colors">
                                     {{ agency }}
                                 </li>
                             </ul>
-                            <div v-else class="py-4 px-6 text-gray-400 font-bold text-center text-xs uppercase tracking-wider">
+                            <div v-else class="py-4 px-6 text-slate-400 font-bold text-center text-xs italic">
                                 Instansi tidak ditemukan
                             </div>
                         </div>
-                        <p v-if="form.errors.agency_name" class="text-[9px] text-red-500 font-black uppercase ml-2 mt-1 tracking-wider">{{ form.errors.agency_name }}</p>
+                        <p v-if="form.errors.agency_name" class="text-[10px] text-red-500 font-bold mt-1 ml-1">{{ form.errors.agency_name }}</p>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div class="space-y-2">
-                            <label class="text-[10px] font-black text-gray-400 uppercase ml-2 tracking-widest">Kata Sandi</label>
-                            <div class="relative group">
-                                <span class="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-indigo-600 transition-colors">🔒</span>
-                                <input 
-                                    v-model="form.password" 
-                                    :type="isPasswordVisible ? 'text' : 'password'" 
-                                    required 
-                                    placeholder="••••••••"
-                                    class="w-full bg-gray-50 border-gray-100 rounded-2xl py-4 pl-14 pr-6 text-sm font-bold placeholder:text-gray-300 focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 transition-all outline-none"
-                                />
-                            </div>
-                            <p v-if="form.errors.password" class="text-[9px] text-red-500 font-black uppercase ml-2 mt-1 tracking-wider">{{ form.errors.password }}</p>
+                        <div class="space-y-2 group">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 group-focus-within:text-indigo-600 transition-colors">Kata Sandi</label>
+                            <input v-model="form.password" :type="isPasswordVisible ? 'text' : 'password'" required placeholder="••••••••"
+                                class="w-full bg-slate-50 border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-800 placeholder:text-slate-300 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 transition-all outline-none border" />
                         </div>
-
-                        <div class="space-y-2">
-                            <label class="text-[10px] font-black text-gray-400 uppercase ml-2 tracking-widest">Konfirmasi</label>
-                            <div class="relative group">
-                                <span class="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-indigo-600 transition-colors">🔒</span>
-                                <input 
-                                    v-model="form.password_confirmation" 
-                                    :type="isPasswordVisible ? 'text' : 'password'" 
-                                    required 
-                                    placeholder="••••••••"
-                                    class="w-full bg-gray-50 border-gray-100 rounded-2xl py-4 pl-14 pr-6 text-sm font-bold placeholder:text-gray-300 focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 transition-all outline-none"
-                                />
-                            </div>
+                        <div class="space-y-2 group">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 group-focus-within:text-indigo-600 transition-colors">Konfirmasi</label>
+                            <input v-model="form.password_confirmation" :type="isPasswordVisible ? 'text' : 'password'" required placeholder="••••••••"
+                                class="w-full bg-slate-50 border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-800 placeholder:text-slate-300 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 transition-all outline-none border" />
                         </div>
                     </div>
 
-                    <div class="flex justify-end pr-2">
-                        <button 
-                            type="button" 
-                            @click="isPasswordVisible = !isPasswordVisible" 
-                            class="text-[9px] font-black text-indigo-500 uppercase tracking-widest hover:text-indigo-700 transition flex items-center gap-1"
-                        >
-                            {{ isPasswordVisible ? 'Sembunyikan' : 'Lihat Sandi' }}
-                            <span>{{ isPasswordVisible ? '🙈' : '👁️' }}</span>
+                    <div class="flex justify-end px-1">
+                        <button type="button" @click="isPasswordVisible = !isPasswordVisible" class="text-[9px] font-black text-indigo-500 uppercase tracking-widest hover:text-indigo-700 transition flex items-center gap-1.5">
+                            {{ isPasswordVisible ? 'Sembunyikan' : 'Lihat Kata Sandi' }}
+                            <span class="text-xs">{{ isPasswordVisible ? '🙈' : '👁️' }}</span>
                         </button>
                     </div>
 
-                    <div class="pt-6">
-                        <button 
-                            type="submit" 
-                            :disabled="form.processing"
-                            class="w-full bg-gray-900 text-white rounded-[1.5rem] py-5 font-black text-[11px] uppercase tracking-[0.2em] shadow-2xl shadow-gray-200 hover:bg-indigo-600 hover:shadow-indigo-100 disabled:opacity-50 active:scale-95 transition-all duration-300"
-                        >
-                            {{ form.processing ? 'Memproses Pendaftaran...' : 'Daftar Sekarang' }}
+                    <div class="pt-2">
+                        <button type="submit" :disabled="form.processing"
+                            class="w-full bg-slate-900 text-white rounded-2xl py-5 font-bold text-xs uppercase tracking-[0.3em] shadow-2xl shadow-slate-200 hover:bg-indigo-600 hover:shadow-indigo-100 active:scale-[0.98] transition-all duration-500 disabled:opacity-50">
+                            {{ form.processing ? 'Memproses Akun...' : 'Daftar Sekarang' }}
                         </button>
                     </div>
                 </form>
 
-                <div class="mt-6 text-center pb-4">
-                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                        Sudah memiliki akun? 
-                        <Link :href="route('login')" class="text-indigo-600 hover:text-gray-900 underline underline-offset-4 decoration-2 ml-1 transition">
-                            Masuk di sini
+                <div class="mt-8 text-center pb-8 md:pb-0">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        Sudah punya akun? 
+                        <Link :href="route('login')" class="text-indigo-600 font-black hover:underline underline-offset-4 decoration-2 ml-1">
+                            Masuk Disini
                         </Link>
                     </p>
                 </div>
             </div>
         </div>
+
+        <div class="absolute bottom-6 text-[9px] text-slate-400 font-bold uppercase tracking-[0.6em] hidden md:block">
+            Premium Registration &copy; 2026
+        </div>
     </div>
 </template>
 
 <style scoped>
-/* Animasi Slide Up untuk Form */
-form {
-    animation: slideUp 0.6s ease-out;
-}
-
-@keyframes slideUp {
-    from { opacity: 0; transform: translateY(20px); }
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(15px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* Custom Scrollbar untuk Panel Kanan */
+.w-full {
+    animation: fadeIn 1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.font-serif {
+    font-family: Georgia, 'Times New Roman', Times, serif;
+}
+
+/* Custom Scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
+    width: 5px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
     background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-    background-color: #e2e8f0;
-    border-radius: 20px;
+    background: #e2e8f0;
+    border-radius: 10px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background-color: #cbd5e1;
+    background: #cbd5e1;
 }
 </style>

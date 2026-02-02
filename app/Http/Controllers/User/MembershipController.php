@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class MembershipController extends Controller
 {
@@ -25,7 +26,8 @@ class MembershipController extends Controller
         return Inertia::render('User/Membership/Index', [
             'plans' => $this->plans,
             'current_membership' => auth()->user()->membership_expires_at,
-            'is_member' => auth()->user()->isMember()
+            'is_member' => auth()->user()->isMember(),
+            'user_balance' => auth()->user()->balance
         ]);
     }
 
@@ -36,9 +38,10 @@ class MembershipController extends Controller
 
         $user = auth()->user();
 
+        // LOGIKA PEMBAYARAN VIA WALLET
         if ($request->payment_method === 'wallet') {
             if ($user->balance < $plan['price']) {
-                return back()->with('error', 'Saldo tidak cukup');
+                return back()->with('error', 'Saldo wallet tidak cukup');
             }
 
             DB::transaction(function () use ($user, $plan) {
@@ -55,24 +58,32 @@ class MembershipController extends Controller
                 ]);
 
                 // Update Masa Aktif User
-                $currentExpiry = $user->isMember() ? $user->membership_expires_at : now();
+                $currentExpiry = $user->isMember() ? Carbon::parse($user->membership_expires_at) : now();
                 $user->update([
                     'membership_expires_at' => $currentExpiry->addDays($plan['days'])
                 ]);
             });
 
-            return redirect()->route('dashboard')->with('success', 'Membership berhasil diaktifkan!');
+            return redirect()->route('dashboard')->with('success', 'Membership ' . $plan['name'] . ' berhasil diaktifkan!');
         }
 
-        // Logic Midtrans (Jika menggunakan QRIS/Bank Transfer)
+        // LOGIKA PEMBAYARAN VIA MIDTRANS/BANK TRANSFER
         $invoice = 'MEMB-' . strtoupper(Str::random(10));
+        
         $transaction = Transaction::create([
             'user_id' => $user->id,
+            'tryout_id' => null, // Wajib null untuk membership
             'invoice_code' => $invoice,
             'amount' => $plan['price'],
+            'unit_price' => $plan['price'], // Mengisi kolom wajib agar tidak 0
+            'qty' => 1,
             'description' => 'Pembelian ' . $plan['name'],
             'status' => 'pending',
-            'metadata' => ['days' => $plan['days']] // Simpan durasi di metadata
+            'metadata' => [
+                'type' => 'membership',
+                'days' => $plan['days'],
+                'plan_name' => $plan['name']
+            ]
         ]);
 
         return redirect()->route('checkout.show', $transaction->id);

@@ -20,6 +20,8 @@ class Transaction extends Model
         'rejection_note', // <--- TAMBAHKAN INI
         'total_amount',     // <--- WAJIB ADA (Untuk harga kolektif)
         'details',          // <--- WAJIB ADA (Untuk simpan email teman)
+        'description', // Tambahkan ini
+    'metadata',    // Tambahkan ini
     ];
 
     protected $casts = [
@@ -27,6 +29,7 @@ class Transaction extends Model
         'proof_payment' => 'array', 
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'metadata' => 'array', // Agar metadata otomatis jadi array/object
     ];
 
     public function user() { return $this->belongsTo(User::class); }

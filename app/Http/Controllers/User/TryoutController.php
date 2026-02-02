@@ -48,6 +48,18 @@ class TryoutController extends Controller
         ]);
     }
 
+    /**
+     * Tampilkan halaman SKD Quantum (Premium Membership)
+     */
+    public function quantum()
+    {
+        // Untuk sementara kita kirim data kosong, nanti bisa ambil dari Database
+        return Inertia::render('Tryout/QuantumIndex', [
+            'exclusiveTryouts' => [], 
+            'generalTryouts' => []
+        ]);
+    }
+
     public function myTryouts(Request $request)
     {
         $userEmail = auth()->user()->email;

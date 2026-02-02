@@ -12,6 +12,7 @@ use App\Http\Controllers\User\CheckoutController;
 use App\Http\Controllers\User\WalletController;
 use App\Http\Controllers\User\TryoutAkbarController as UserTryoutAkbarController;
 use App\Http\Controllers\User\TryoutController; // Pastikan di-use
+use App\Http\Controllers\User\MembershipController;
 
 // Import Controller Admin
 use App\Http\Controllers\Admin\AdminDashboardController;
@@ -56,6 +57,9 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     // --- WALLET ---
     Route::get('/wallet', [WalletController::class, 'index'])->name('wallet.index');
     Route::post('/wallet/topup', [WalletController::class, 'topup'])->name('wallet.topup');
+
+    // Tambahkan baris ini:
+    Route::get('/tryout/quantum', [TryoutController::class, 'quantum'])->name('tryout.quantum');
 
     // --- TRYOUT KATALOG & DETAIL ---
     Route::get('/tryouts', [UserTryoutController::class, 'index'])->name('tryout.index');

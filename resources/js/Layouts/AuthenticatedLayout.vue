@@ -1,8 +1,9 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
 
 const page = usePage();
+const sidebarNav = ref(null); // Ref untuk navigasi sidebar
 
 // --- 1. DATA AUTH & ROLE ---
 const user = computed(() => page.props.auth?.user ?? null);
@@ -33,180 +34,134 @@ const isUserMember = computed(() => {
 const formatDate = (dateString) => {
     if (!dateString) return '';
     return new Date(dateString).toLocaleDateString('id-ID', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric'
+        day: 'numeric', month: 'short', year: 'numeric'
     });
 };
 
-// --- 5. LOGIKA ACTIVE SIDEBAR ---
-const isAkbarActive = computed(() => {
-    if (route().current('admin.tryout-akbar.*')) return true;
-    if (route().current('admin.tryouts.questions.*') && page.props.tryout?.type === 'akbar') {
-        return true;
-    }
-    return false;
-});
+// --- 5. LOGIKA SCROLL PERSISTENCE ---
+const scrollToActive = () => {
+    nextTick(() => {
+        const activeElement = sidebarNav.value?.querySelector('.active-link');
+        if (activeElement) {
+            activeElement.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+        }
+    });
+};
 
-const isTryoutActive = computed(() => {
-    if (isAkbarActive.value) return false;
-    return route().current('admin.tryouts.*') || route().current('admin.questions.*');
-});
+onMounted(scrollToActive);
+watch(() => page.url, scrollToActive); // Pantau perubahan URL untuk menjaga posisi scroll
 
-// --- DYNAMIC LOGO ROUTE ---
-const logoRoute = computed(() => {
-    try {
-        return isAdmin.value ? route('admin.dashboard') : route('dashboard');
-    } catch (e) {
-        return '/dashboard'; 
-    }
-});
+// LOGIKA ACTIVE ADMIN
+const isAkbarActiveAdmin = computed(() => 
+    route().current('admin.tryout-akbar.*') || (route().current('admin.tryouts.questions.*') && page.props.tryout?.type === 'akbar')
+);
 
-const isSidebarOpen = ref(true);
+const isTryoutActiveAdmin = computed(() => 
+    !isAkbarActiveAdmin.value && (route().current('admin.tryouts.*') || route().current('admin.questions.*'))
+);
 
-onMounted(() => {
-    console.log("Layout Loaded");
-});
+const logoRoute = computed(() => isAdmin.value ? route('admin.dashboard') : route('dashboard'));
 </script>
 
 <template>
-    <div class="flex h-screen bg-gray-50 overflow-hidden font-sans text-gray-900">
+    <div class="flex h-screen bg-[#F8FAFC] overflow-hidden font-sans text-slate-900">
         
-        <aside 
-            :class="[
-                'bg-white border-r border-gray-200 transition-all duration-300 flex flex-col z-50 shadow-xl shrink-0', 
-                isSidebarOpen ? 'w-64' : 'w-20'
-            ]"
-        >
-            <div class="h-20 flex items-center px-6 border-b border-gray-100 shrink-0 bg-white">
-                <Link :href="logoRoute" class="flex items-center gap-3 group">
-                    <div class="w-10 h-10 shrink-0 group-hover:scale-110 transition-transform flex items-center justify-center">
-                        <img src="/images/logo.png" alt="Logo" class="w-full h-full object-contain">
+        <aside class="w-72 bg-white border-r border-slate-200/60 flex flex-col z-50 shadow-2xl shadow-slate-200/50 shrink-0">
+            
+            <div class="h-24 flex items-center px-6 border-b border-slate-100 shrink-0 bg-white">
+                <Link :href="logoRoute" class="flex items-center gap-4 group overflow-hidden">
+                    <div class="w-12 h-12 shrink-0 group-hover:rotate-12 transition-transform duration-500 flex items-center justify-center bg-slate-900 rounded-2xl shadow-lg">
+                        <img src="/images/logo.png" alt="Logo" class="w-8 h-8 object-contain brightness-0 invert">
                     </div>
-                    <span v-if="isSidebarOpen" class="font-black text-sm tracking-tight text-gray-800 uppercase truncate">
-                        CPNS NUSANTARA
-                    </span>
+                    <div class="flex flex-col">
+                        <span class="font-black text-xs tracking-[0.3em] text-slate-900 uppercase">NUSANTARA</span>
+                        <span class="text-[8px] font-bold text-indigo-600 uppercase tracking-widest">CPNS Academy</span>
+                    </div>
                 </Link>
             </div>
 
-            <div v-if="isSidebarOpen && user && user.membership_expires_at" class="px-4 mt-6 mb-2">
-                <div :class="isUserMember ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'" class="border rounded-2xl p-3 shadow-sm">
-                    <p :class="isUserMember ? 'text-amber-800' : 'text-gray-500'" class="text-[10px] font-bold uppercase tracking-wider">Status Member</p>
-                    <p v-if="isUserMember" class="text-[11px] font-black text-amber-600">
-                        Aktif s/d {{ formatDate(user.membership_expires_at) }}
+            <div v-if="isUser && !isAdmin && user" class="px-6 mt-4 shrink-0">
+                <div :class="isUserMember ? 'bg-indigo-600 shadow-lg shadow-indigo-100' : 'bg-slate-100'" class="rounded-[1.5rem] p-4 transition-all duration-500 relative overflow-hidden">
+                    <div v-if="isUserMember" class="absolute top-0 right-0 w-16 h-16 bg-white/10 -mr-8 -mt-8 rounded-full blur-xl"></div>
+                    <p :class="isUserMember ? 'text-white/60' : 'text-slate-400'" class="text-[8px] font-black uppercase tracking-widest mb-0.5">Status Saya</p>
+                    <p :class="isUserMember ? 'text-white' : 'text-slate-600'" class="text-[10px] font-black uppercase tracking-tight leading-none">
+                        {{ isUserMember ? 'Akses Adidaya' : 'Anggota Gratis' }}
                     </p>
-                    <p v-else class="text-[11px] font-bold text-gray-400 italic">Masa Aktif Habis</p>
+                    <p v-if="isUserMember" class="text-[8px] font-bold text-indigo-200 mt-1 leading-none">Sampai: {{ formatDate(user.membership_expires_at) }}</p>
                 </div>
             </div>
 
-            <nav class="flex-1 overflow-y-auto py-4 px-4 space-y-1 custom-scrollbar">
+            <nav ref="sidebarNav" class="flex-1 overflow-y-auto py-4 px-4 space-y-1 custom-scrollbar">
                 
                 <div v-if="isAdmin" class="space-y-1">
-                    <p v-if="isSidebarOpen" class="text-[10px] uppercase font-black text-red-500 px-3 mb-2 tracking-widest">Admin Control</p>
-                    
-                    <Link :href="route('admin.dashboard')" :class="[route().current('admin.dashboard') ? 'bg-red-50 text-red-600' : 'text-gray-500 hover:bg-red-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
-                        <span class="text-xl">🛡️</span> 
-                        <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Dashboard</span>
-                    </Link>
-
-                    <Link :href="route('admin.tryouts.index')" :class="[isTryoutActive ? 'bg-red-50 text-red-600' : 'text-gray-500 hover:bg-red-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
-                        <span class="text-xl">📑</span> 
-                        <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Kelola Tryout</span>
-                    </Link>
-
-                    <Link :href="route('admin.tryout-akbar.index')" :class="[isAkbarActive ? 'bg-red-50 text-red-600' : 'text-gray-500 hover:bg-red-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
-                        <span class="text-xl">🏆</span> 
-                        <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Tryout Akbar</span>
-                    </Link>
-
-                    <Link :href="route('admin.transactions.index')" :class="[route().current('admin.transactions.*') ? 'bg-red-50 text-red-600' : 'text-gray-500 hover:bg-red-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
-                        <span class="text-xl">💰</span> 
-                        <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Transaksi</span>
-                    </Link>
-
-                    <Link :href="route('admin.users.index')" :class="[route().current('admin.users.*') ? 'bg-red-50 text-red-600' : 'text-gray-500 hover:bg-red-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
-                        <span class="text-xl">👥</span> 
-                        <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Kelola User</span>
+                    <p class="text-[9px] uppercase font-black text-rose-500 px-4 mb-3 mt-4 tracking-[0.3em]">Admin Control</p>
+                    <Link :href="route('admin.dashboard')" :class="[route().current('admin.dashboard') ? 'bg-rose-50 text-rose-600 active-link' : 'text-slate-500 hover:bg-rose-50', 'flex items-center gap-4 p-3.5 rounded-2xl font-black transition-all group']">
+                        <span class="text-lg">🛡️</span> <span class="text-[10px] uppercase tracking-widest">Dashboard Admin</span>
                     </Link>
                 </div>
 
                 <div v-if="isUser && !isAdmin" class="space-y-1">
-                    <p v-if="isSidebarOpen" class="text-[10px] uppercase font-black text-gray-400 px-3 mb-2 tracking-widest">Main Menu</p>
+                    <p class="text-[9px] uppercase font-black text-slate-400 px-4 mb-3 mt-4 tracking-[0.3em]">Menu Navigasi</p>
                     
-                    <Link :href="route('dashboard')" :class="[route().current('dashboard') ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
-                        <span class="text-xl">🏠</span> 
-                        <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Dashboard</span>
+                    <Link :href="route('dashboard')" :class="[route().current('dashboard') ? 'bg-slate-900 text-white shadow-xl active-link' : 'text-slate-500 hover:bg-slate-100', 'flex items-center gap-4 p-3.5 rounded-2xl font-black transition-all group']">
+                        <span class="text-xl">🏠</span> <span class="text-[10px] uppercase tracking-widest">Dashboard</span>
                     </Link>
 
-                    <Link :href="route('membership.index')" :class="[route().current('membership.*') ? 'bg-amber-50 text-amber-600' : 'text-gray-500 hover:bg-amber-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
-                        <span class="text-xl">💎</span> 
-                        <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Membership</span>
+                    <Link :href="route('tryout.index')" :class="[(route().current('tryout.index') || route().current('tryout.show')) ? 'bg-slate-900 text-white shadow-xl active-link' : 'text-slate-500 hover:bg-slate-100', 'flex items-center gap-4 p-3.5 rounded-2xl font-black transition-all group']">
+                        <span class="text-xl">📝</span> <span class="text-[10px] uppercase tracking-widest">Katalog Tryout</span>
                     </Link>
 
-                    <Link :href="route('tryout-akbar.index')" :class="[route().current('tryout-akbar.*') ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
-                        <span class="text-xl">🔥</span> 
-                        <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Event Akbar</span>
+                    <Link :href="route('tryout-akbar.index')" :class="[route().current('tryout-akbar.*') ? 'bg-slate-900 text-white shadow-xl active-link' : 'text-slate-500 hover:bg-slate-100', 'flex items-center gap-4 p-3.5 rounded-2xl font-black transition-all group']">
+                        <span class="text-xl">🔥</span> <span class="text-[10px] uppercase tracking-widest">Event Akbar</span>
                     </Link>
 
-                    <Link :href="route('tryout.index')" 
-                        :class="[(route().current('tryout.index') || route().current('tryout.show') || route().current('tryout.register')) ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
-                        <span class="text-xl">📝</span> 
-                        <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Katalog Tryout</span>
+                    <Link :href="route('tryout.quantum')" :class="[route().current('tryout.quantum') ? 'bg-slate-900 text-white shadow-xl active-link' : 'text-slate-500 hover:bg-slate-100', 'flex items-center justify-between p-3.5 rounded-2xl font-black transition-all group']">
+                        <div class="flex items-center gap-4">
+                            <span class="text-xl">⚡</span> <span class="text-[10px] uppercase tracking-widest">Nusantara Adidaya</span>
+                        </div>
+                        <span class="text-[7px] bg-indigo-600 text-white px-1.5 py-0.5 rounded-md font-black">VIP</span>
                     </Link>
 
-                    <Link :href="route('tryout.history')" :class="[route().current('tryout.history') ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
-                        <span class="text-xl">📜</span> 
-                        <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Riwayat Tryout</span>
+                    <Link :href="route('membership.index')" :class="[route().current('membership.*') ? 'bg-slate-900 text-white shadow-xl active-link' : 'text-slate-500 hover:bg-slate-100', 'flex items-center gap-4 p-3.5 rounded-2xl font-black transition-all group']">
+                        <span class="text-xl">💎</span> <span class="text-[10px] uppercase tracking-widest">Membership</span>
                     </Link>
 
-                    <Link :href="route('wallet.index')" :class="[route().current('wallet.*') ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
-                        <span class="text-xl">💳</span> 
-                        <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Dompet Saya</span>
+                    <Link :href="route('tryout.history')" :class="[route().current('tryout.history') ? 'bg-slate-900 text-white shadow-xl active-link' : 'text-slate-500 hover:bg-slate-100', 'flex items-center gap-4 p-3.5 rounded-2xl font-black transition-all group']">
+                        <span class="text-xl">📜</span> <span class="text-[10px] uppercase tracking-widest">Riwayat Tryout</span>
                     </Link>
 
-                    <Link :href="route('profile.edit')" :class="[route().current('profile.*') ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50', 'flex items-center gap-3 p-3.5 rounded-2xl font-bold transition-all group']">
-                        <span class="text-xl">👤</span> 
-                        <span v-if="isSidebarOpen" class="text-xs uppercase tracking-tight">Profil Saya</span>
+                    <Link :href="route('wallet.index')" :class="[route().current('wallet.*') ? 'bg-slate-900 text-white shadow-xl active-link' : 'text-slate-500 hover:bg-slate-100', 'flex items-center gap-4 p-3.5 rounded-2xl font-black transition-all group']">
+                        <span class="text-xl">💳</span> <span class="text-[10px] uppercase tracking-widest">Dompet Saya</span>
+                    </Link>
+
+                    <Link :href="route('profile.edit')" :class="[route().current('profile.edit') ? 'bg-slate-900 text-white shadow-xl active-link' : 'text-slate-500 hover:bg-slate-100', 'flex items-center gap-4 p-3.5 rounded-2xl font-black transition-all group']">
+                        <span class="text-xl">👤</span> <span class="text-[10px] uppercase tracking-widest">Profil Saya</span>
                     </Link>
                 </div>
             </nav>
 
-            <div class="p-4 border-t border-gray-100 bg-gray-50/50">
-                <Link :href="route('logout')" method="post" as="button" class="w-full flex items-center justify-center gap-3 p-3.5 text-red-500 hover:bg-red-100 rounded-2xl transition font-black text-[10px] uppercase tracking-widest active:scale-95">
-                    <span>Logout Account</span>
+            <div class="p-6 border-t border-slate-100">
+                <Link :href="route('logout')" method="post" as="button" class="w-full flex items-center justify-center gap-3 p-4 text-rose-500 hover:bg-rose-50 rounded-2xl transition font-black text-[10px] uppercase tracking-[0.2em]">
+                    <span>Keluar Akun</span>
                 </Link>
             </div>
         </aside>
 
         <div class="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-            
-            <header class="h-20 bg-white border-b border-gray-200 flex items-center justify-between px-8 shrink-0 z-30">
+            <header class="h-24 bg-white border-b border-slate-100 flex items-center justify-between px-10 shrink-0 shadow-sm">
+                <h2 class="font-black text-slate-900 uppercase text-[11px] tracking-[0.3em]">
+                    {{ isAdmin ? 'Panel Admin' : 'Halaman Belajar' }}
+                </h2>
                 <div class="flex items-center gap-4">
-                    <button 
-                        @click="isSidebarOpen = !isSidebarOpen" 
-                        class="p-2.5 hover:bg-gray-100 rounded-xl text-gray-400 transition active:scale-90"
-                    >
-                        <span class="text-xl font-bold">☰</span>
-                    </button>
-                    <h2 class="font-bold text-gray-400 uppercase text-[10px] tracking-[0.2em]">
-                        {{ isAdmin ? 'Admin Control Center' : 'User Workspace' }}
-                    </h2>
-                </div>
-
-                <div class="hidden sm:flex items-center gap-3">
-                    <div class="text-[9px] font-black text-green-500 uppercase bg-green-50 px-4 py-2 rounded-full border border-green-100 flex items-center gap-2">
-                        <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
-                        System Active
+                    <div class="hidden sm:flex items-center gap-3 bg-emerald-50 px-4 py-2 rounded-2xl border border-emerald-100 text-[9px] font-black text-emerald-600 uppercase tracking-widest">
+                        <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Sistem Aktif
                     </div>
+                    <img :src="user?.profile_photo_url || `https://ui-avatars.com/api/?name=${user?.name}`" class="h-10 w-10 rounded-xl border-2 border-white shadow-sm" />
                 </div>
             </header>
 
-            <main class="flex-1 overflow-x-hidden overflow-y-auto p-6 md:p-10 bg-gray-50/20">
-                <div v-if="$slots.header" class="mb-10 animate-in fade-in duration-700">
-                    <slot name="header" />
-                </div>
-                
-                <div class="animate-in fade-in slide-in-from-bottom-2 duration-700">
+            <main class="flex-1 overflow-y-auto p-6 md:p-12 bg-[#F8FAFC]">
+                <div class="max-w-[1400px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
                     <slot />
                 </div>
             </main>
@@ -216,15 +171,6 @@ onMounted(() => {
 
 <style scoped>
 .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-
-.transition-all {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.animate-in {
-    animation-duration: 0.5s;
-    animation-fill-mode: both;
-}
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
+.animate-in { animation-duration: 0.6s; animation-fill-mode: both; }
 </style>

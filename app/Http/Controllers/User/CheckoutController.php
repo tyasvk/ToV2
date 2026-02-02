@@ -4,43 +4,44 @@ namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
 use App\Models\Transaction;
+use App\Models\Tryout;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-// Jika Anda mengurus logic Snap Token di sini, uncomment baris bawah:
-// use Midtrans\Snap;
-// use Midtrans\Config;
+use Midtrans\Snap;
+use Midtrans\Config;
 
 class CheckoutController extends Controller
 {
     /**
      * Menampilkan halaman checkout berdasarkan ID Transaksi.
-     * * @param Transaction $transaction
-     * @return \Inertia\Response
+     * Mendukung transaksi Tryout dan Membership.
      */
     public function show(Transaction $transaction)
     {
-        // 1. Validasi Keamanan:
-        // Pastikan user yang sedang login adalah pemilik transaksi ini.
+        // 1. Validasi Keamanan: Pastikan pemilik transaksi adalah user yang login
         if ($transaction->user_id !== auth()->id()) {
             abort(403, 'Anda tidak memiliki akses ke transaksi ini.');
         }
 
-        // 2. Cek Status Pembayaran (Opsional):
-        // Jika transaksi sudah dibayar, lempar kembali ke halaman dashboard/history
+        // 2. Jika transaksi sudah berhasil, arahkan ke halaman yang sesuai
         if (in_array($transaction->status, ['paid', 'success'])) {
-            return redirect()->route('tryout.index')
-                ->with('message', 'Transaksi ini sudah berhasil dibayar.');
+            $route = $transaction->tryout_id ? 'tryout.my' : 'dashboard';
+            return redirect()->route($route)->with('success', 'Transaksi ini sudah berhasil dibayar.');
         }
 
-        // 3. Load Relasi:
-        // Kita perlu data 'tryout' (judul, dll) untuk ditampilkan di struk belanja.
-        $transaction->load('tryout');
+        // 3. Tentukan Nama Item (Tryout atau Membership)
+        $itemName = '';
+        if ($transaction->tryout_id) {
+            // Jika transaksi Tryout
+            $transaction->load('tryout');
+            $itemName = $transaction->tryout->title;
+        } else {
+            // Jika transaksi Membership (tryout_id adalah null)
+            $itemName = $transaction->description ?? 'Membership Premium';
+        }
 
-        // 4. (Opsional) Generate Midtrans Snap Token
-        // Jika Anda belum men-generate snap_token saat 'create' di TryoutController,
-        // Anda bisa melakukannya di sini agar token selalu tersedia saat halaman dibuka.
-        /*
-        if ($transaction->status === 'pending' && empty($transaction->snap_token)) {
+        // 4. Generate Midtrans Snap Token jika belum ada
+        if (empty($transaction->snap_token)) {
             // Konfigurasi Midtrans
             Config::$serverKey = config('services.midtrans.server_key');
             Config::$isProduction = config('services.midtrans.is_production');
@@ -56,23 +57,44 @@ class CheckoutController extends Controller
                     'first_name' => auth()->user()->name,
                     'email' => auth()->user()->email,
                 ],
+                'item_details' => [
+                    [
+                        'id' => $transaction->id,
+                        'price' => (int) $transaction->amount,
+                        'quantity' => 1,
+                        'name' => $itemName,
+                    ]
+                ]
             ];
 
             try {
                 $snapToken = Snap::getSnapToken($params);
-                $transaction->snap_token = $snapToken;
-                $transaction->save();
+                $transaction->update(['snap_token' => $snapToken]);
             } catch (\Exception $e) {
-                // Handle error jika koneksi ke Midtrans gagal
+                // Biarkan snap_token kosong jika gagal, frontend akan menangani error
             }
         }
-        */
 
-        // 5. Render ke Inertia
-        // Frontend 'User/Checkout/Show' sekarang akan menerima prop 'transaction'
-        // yang berisi 'amount' yang benar (bukan 0).
+        // 5. Render ke Inertia dengan prop yang dibutuhkan
         return Inertia::render('User/Checkout/Show', [
             'transaction' => $transaction,
+            'item_name'   => $itemName, // Dikirim secara eksplisit agar Vue tidak bingung
+            'snap_token'  => $transaction->snap_token
         ]);
+    }
+
+    /**
+     * Callback internal jika Anda menggunakan update status manual dari frontend
+     */
+    public function callbackInternal(Request $request)
+    {
+        $transaction = Transaction::where('invoice_code', $request->order_id)->firstOrFail();
+        
+        if ($request->status === 'success') {
+            $transaction->update(['status' => 'paid']);
+            // Logic tambahan (seperti aktivasi membership) sebaiknya dilakukan di Midtrans Webhook
+        }
+
+        return response()->json(['message' => 'Status updated']);
     }
 }

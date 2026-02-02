@@ -35,6 +35,7 @@ class HandleInertiaRequests extends Middleware
                     'province_code' => $request->user()->province_code, // <--- TAMBAHKAN
                     'gender' => $request->user()->gender,               // <--- TAMBAHKAN
                     'instance_type' => $request->user()->instance_type, // <--- TAMBAHKAN
+                    'created_at' => $request->user()->created_at,
                     // ----------------------------------------------
                     
                     'roles' => $request->user()->getRoleNames(),
