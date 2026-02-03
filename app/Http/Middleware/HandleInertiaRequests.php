@@ -30,6 +30,9 @@ class HandleInertiaRequests extends Middleware
                     // --- TAMBAHKAN INI AGAR MUNCUL DI DASHBOARD ---
                     'participant_number' => $request->user()->participant_number,
                     'agency_name' => $request->user()->agency_name,// PERBAIKAN DI SINI (Ganti 'image' jadi 'avatar')
+                    // --- TAMBAHKAN BARIS INI ---
+                'membership_expires_at' => $request->user()->membership_expires_at, 
+                // ---------------------------
                     'avatar' => $request->user()->avatar, 
                     // ------------------------------------------------
                     'province_code' => $request->user()->province_code, // <--- TAMBAHKAN

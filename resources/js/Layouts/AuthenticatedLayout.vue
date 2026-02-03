@@ -6,7 +6,6 @@ const page = usePage();
 const sidebarNav = ref(null); 
 
 // --- 1. DATA AUTH & REAKTIVITAS ---
-// Mengambil data user dari props global Inertia
 const user = computed(() => page.props.auth?.user ?? null);
 
 // --- 2. NORMALISASI ROLE ---
@@ -25,18 +24,13 @@ const isUser = computed(() =>
     roles.value.some(r => String(r).toLowerCase() === 'user') || roles.value.length === 0
 );
 
-// --- 3. LOGIKA MEMBERSHIP (DIOPTIMASI) ---
+// --- 3. LOGIKA MEMBERSHIP ---
 const isUserMember = computed(() => {
-    // Cek apakah field ada
     if (!user.value || !user.value.membership_expires_at) {
         return false;
     }
-    
-    // Konversi string DB ke Objek Date JS
     const expiryDate = new Date(user.value.membership_expires_at);
     const today = new Date();
-    
-    // Bandingkan
     return expiryDate > today;
 });
 
@@ -70,6 +64,9 @@ const logoRoute = computed(() => {
         return '/dashboard'; 
     }
 });
+
+// Helper untuk mengecek tipe tryout yang sedang aktif di props (untuk halaman Kelola Soal)
+const activeTryoutType = computed(() => page.props.tryout?.type || 'general');
 </script>
 
 <template>
@@ -92,15 +89,11 @@ const logoRoute = computed(() => {
             <div v-if="isUser && !isAdmin && user" class="px-6 mt-4 shrink-0">
                 <div :class="isUserMember ? 'bg-indigo-600 shadow-indigo-100 shadow-lg' : 'bg-slate-100'" 
                      class="rounded-[1.5rem] p-5 transition-all duration-500 relative overflow-hidden">
-                    
                     <div v-if="isUserMember" class="absolute top-0 right-0 w-16 h-16 bg-white/10 -mr-8 -mt-8 rounded-full blur-xl"></div>
-                    
                     <p :class="isUserMember ? 'text-white/60' : 'text-slate-400'" class="text-[10px] font-black uppercase tracking-widest mb-1">Status Saya</p>
-                    
                     <p :class="isUserMember ? 'text-white' : 'text-slate-600'" class="text-xs font-black uppercase tracking-tight leading-none">
                         {{ isUserMember ? 'Akses Adidaya' : 'Anggota Gratis' }}
                     </p>
-                    
                     <p v-if="isUserMember" class="text-[10px] font-bold text-indigo-200 mt-1.5 leading-none">
                         Sampai: {{ formatDate(user.membership_expires_at) }}
                     </p>
@@ -111,10 +104,53 @@ const logoRoute = computed(() => {
                 
                 <div v-if="isAdmin" class="space-y-1">
                     <p class="text-[11px] uppercase font-black text-rose-500 px-4 mb-3 mt-4 tracking-[0.3em]">Admin Control</p>
+                    
                     <Link :href="route('admin.dashboard')" 
                         :class="[route().current('admin.dashboard') ? 'bg-rose-50 text-rose-600 active-link shadow-sm' : 'text-slate-500 hover:bg-rose-50', 'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group']"
                     >
                         <span class="text-xl">🛡️</span> <span class="text-xs uppercase tracking-widest">Dashboard Admin</span>
+                    </Link>
+
+                    <Link :href="route('admin.users.index')" 
+                        :class="[route().current('admin.users.*') ? 'bg-rose-50 text-rose-600 active-link shadow-sm' : 'text-slate-500 hover:bg-rose-50', 'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group']"
+                    >
+                        <span class="text-xl">👥</span> <span class="text-xs uppercase tracking-widest">Kelola User</span>
+                    </Link>
+
+                    <Link :href="route('admin.tryouts.index')" 
+                        :class="[
+                            (route().current('admin.tryouts.*') && !route().current('admin.tryouts.questions.*')) || 
+                            (route().current('admin.tryouts.questions.*') && activeTryoutType !== 'adidaya')
+                            ? 'bg-rose-50 text-rose-600 active-link shadow-sm' 
+                            : 'text-slate-500 hover:bg-rose-50', 
+                            'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group'
+                        ]"
+                    >
+                        <span class="text-xl">📚</span> <span class="text-xs uppercase tracking-widest">Kelola Tryout</span>
+                    </Link>
+
+                    <Link :href="route('admin.adidaya-manage.index')" 
+                        :class="[
+                            route().current('admin.adidaya-manage.*') || 
+                            (route().current('admin.tryouts.questions.*') && activeTryoutType === 'adidaya')
+                            ? 'bg-rose-50 text-rose-600 active-link shadow-sm' 
+                            : 'text-slate-500 hover:bg-rose-50', 
+                            'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group'
+                        ]"
+                    >
+                        <span class="text-xl">⚡</span> <span class="text-xs uppercase tracking-widest">Adidaya Manager</span>
+                    </Link>
+
+                    <Link :href="route('admin.tryout-akbar.index')" 
+                        :class="[route().current('admin.tryout-akbar.*') ? 'bg-rose-50 text-rose-600 active-link shadow-sm' : 'text-slate-500 hover:bg-rose-50', 'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group']"
+                    >
+                        <span class="text-xl">🏆</span> <span class="text-xs uppercase tracking-widest">Event Akbar</span>
+                    </Link>
+
+                    <Link :href="route('admin.transactions.index')" 
+                        :class="[route().current('admin.transactions.*') ? 'bg-rose-50 text-rose-600 active-link shadow-sm' : 'text-slate-500 hover:bg-rose-50', 'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group']"
+                    >
+                        <span class="text-xl">💸</span> <span class="text-xs uppercase tracking-widest">Data Transaksi</span>
                     </Link>
                 </div>
 
@@ -218,5 +254,21 @@ const logoRoute = computed(() => {
 .animate-in {
     animation-duration: 0.8s;
     animation-fill-mode: both;
+}
+
+.active-link {
+    position: relative;
+}
+
+/* Garis indikator aktif untuk style admin */
+.active-link::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 25%;
+    bottom: 25%;
+    width: 4px;
+    background: currentColor;
+    border-radius: 0 4px 4px 0;
 }
 </style>

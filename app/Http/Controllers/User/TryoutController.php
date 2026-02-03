@@ -53,12 +53,35 @@ class TryoutController extends Controller
 /**
  * Tampilkan halaman Nusantara Adidaya (Premium Membership)
  */
+// app/Http/Controllers/User/TryoutController.php
+
+// File: app/Http/Controllers/User/TryoutController.php
+
+/**
+ * Tampilkan halaman Nusantara Adidaya (Premium Membership)
+ */
 public function adidaya()
 {
-    // Arahkan ke file 'resources/js/Pages/User/Tryout/AdidayaIndex.vue'
-    return Inertia::render('User/Tryout/AdidayaIndex', [
-        'exclusiveTryouts' => [], // Nanti isi dari DB
-        'generalTryouts' => []
+    // Mengambil data tryout tipe 'adidaya' yang sudah di-publish
+    $exclusiveTryouts = \App\Models\Tryout::where('type', 'adidaya')
+        ->where('is_published', true)
+        ->withCount('questions')
+        ->latest()
+        ->get();
+
+    $generalTryouts = \App\Models\Tryout::where(function($q) {
+            $q->where('type', 'general')
+              ->orWhereNull('type');
+        })
+        ->where('is_published', true)
+        ->withCount('questions')
+        ->latest()
+        ->take(6)
+        ->get();
+
+    return \Inertia\Inertia::render('User/Tryout/AdidayaIndex', [
+        'exclusiveTryouts' => $exclusiveTryouts,
+        'generalTryouts' => $generalTryouts
     ]);
 }
 

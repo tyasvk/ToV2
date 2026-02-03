@@ -26,7 +26,7 @@ const handleSearch = debounce(() => {
 // --- FORM DATA ---
 const form = useForm({
     title: '',
-    duration: 110, // <--- UBAH DARI duration_minutes KE duration
+    duration: 110, // Menggunakan 'duration' sesuai pembaruan model
     description: '',
     is_published: false,
     published_at: '',
@@ -49,7 +49,7 @@ const openEditModal = (tryout) => {
     editingId.value = tryout.id;
     
     form.title = tryout.title;
-    form.duration = tryout.duration; // <--- UBAH DARI duration_minutes KE duration
+    form.duration = tryout.duration; 
     form.description = tryout.description;
     form.is_published = !!tryout.is_published;
     form.published_at = tryout.published_at ? tryout.published_at.substring(0, 16) : '';
@@ -99,19 +99,17 @@ const formatPrice = (price) => {
     <Head title="Manajemen Tryout" />
 
     <AuthenticatedLayout>
-        <template #header>
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="max-w-6xl mx-auto mt-8 px-4 sm:px-0">
+            
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
                 <div>
-                    <h2 class="font-black text-3xl text-gray-900 tracking-tighter uppercase">Katalog Tryout</h2>
+                    <h2 class="font-black text-3xl text-gray-900 tracking-tighter uppercase italic">Katalog Tryout</h2>
                     <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Penjadwalan & Manajemen Konten</p>
                 </div>
                 <button @click="openCreateModal" class="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-2xl font-black text-xs transition shadow-xl shadow-indigo-100 uppercase tracking-widest active:scale-95">
                     + Buat Paket Baru
                 </button>
             </div>
-        </template>
-
-        <div class="max-w-6xl mx-auto mt-8 px-4 sm:px-0">
             
             <div class="mb-6 relative">
                 <input 
@@ -212,7 +210,7 @@ const formatPrice = (price) => {
                 
                 <div class="relative bg-white w-full max-w-xl rounded-[3rem] p-10 shadow-2xl animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh] no-scrollbar">
                     <div class="mb-8">
-                        <h3 class="font-black text-2xl text-gray-900 uppercase tracking-tighter">
+                        <h3 class="font-black text-2xl text-gray-900 uppercase tracking-tighter italic">
                             {{ isEdit ? 'Perbarui Paket' : 'Konfigurasi Paket' }}
                         </h3>
                         <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Detail, Harga & Jadwal</p>
@@ -269,7 +267,7 @@ const formatPrice = (price) => {
                         <div class="flex gap-4 pt-6">
                             <button type="button" @click="showModal = false" class="flex-1 py-4 text-gray-400 font-black text-[10px] uppercase hover:text-gray-600">Batal</button>
                             <button type="submit" :disabled="form.processing" class="flex-[2] py-4 bg-gray-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-indigo-600 transition active:scale-95">
-                                {{ isEdit ? 'Simpan Perubahan' : 'Buat Paket' }}
+                                {{ isEdit ? 'Simpan Perbarui' : 'Buat Paket' }}
                             </button>
                         </div>
                     </form>

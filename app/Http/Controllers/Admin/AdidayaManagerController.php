@@ -7,21 +7,11 @@ use App\Models\Tryout;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
-class TryoutManagerController extends Controller
+class AdidayaManagerController extends Controller
 {
-    /**
-     * Menampilkan daftar tryout umum (bukan adidaya atau akbar).
-     */
     public function index(Request $request)
     {
-        $query = Tryout::query()->withCount('questions');
-
-        // --- FILTER: Sembunyikan tipe adidaya dan akbar ---
-        $query->where(function ($q) {
-            $q->whereNotIn('type', ['adidaya', 'akbar'])
-              ->orWhereNull('type');
-        });
-        // ------------------------------------------------
+        $query = Tryout::query()->withCount('questions')->where('type', 'adidaya');
 
         if ($request->search) {
             $query->where('title', 'like', '%' . $request->search . '%');
@@ -29,15 +19,12 @@ class TryoutManagerController extends Controller
 
         $tryouts = $query->latest()->paginate(10)->withQueryString();
 
-        return Inertia::render('Admin/Tryout/Index', [
+        return Inertia::render('Admin/Adidaya/Index', [
             'tryouts' => $tryouts,
             'filters' => $request->only(['search']),
         ]);
     }
 
-    /**
-     * Menyimpan paket tryout baru dengan tipe default 'general'.
-     */
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -51,19 +38,21 @@ class TryoutManagerController extends Controller
             'started_at' => 'nullable|date',
         ]);
 
-        // Secara otomatis set tipe ke general agar tidak masuk ke list adidaya
-        $validated['type'] = 'general';
+        $validated['type'] = 'adidaya';
 
         Tryout::create($validated);
 
-        return back()->with('message', 'Paket Tryout berhasil ditambahkan!');
+        return back()->with('message', 'Paket Adidaya berhasil ditambahkan!');
     }
 
     /**
-     * Memperbarui data tryout.
+     * PERBAIKAN: Nama variabel harus sesuai dengan parameter rute {adidaya_manage}
+     * Atau Anda bisa menggunakan Type Hinting (Tryout $adidayaManage)
      */
-    public function update(Request $request, Tryout $tryout)
+    public function update(Request $request, $id)
     {
+        $tryout = Tryout::findOrFail($id); // Mencari data berdasarkan ID secara manual agar pasti ketemu
+
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'duration' => 'required|integer|min:1',
@@ -77,15 +66,17 @@ class TryoutManagerController extends Controller
 
         $tryout->update($validated);
 
-        return back()->with('message', 'Paket Tryout berhasil diperbarui!');
+        return back()->with('message', 'Paket Adidaya berhasil diperbarui!');
     }
 
     /**
-     * Menghapus tryout.
+     * PERBAIKAN: Samakan juga untuk method destroy
      */
-    public function destroy(Tryout $tryout)
+    public function destroy($id)
     {
+        $tryout = Tryout::findOrFail($id);
         $tryout->delete();
-        return back()->with('message', 'Paket Tryout berhasil dihapus.');
+        
+        return back()->with('message', 'Paket Adidaya berhasil dihapus.');
     }
 }

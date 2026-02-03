@@ -11,15 +11,43 @@ use App\Models\WalletTransaction;
 
 class UserManagerController extends Controller
 {
-    public function index()
-    {
-        // Mengambil semua user beserta role-nya
-        $users = User::with('roles')->latest()->get();
+// app/Http/Controllers/Admin/UserManagerController.php
 
-        return Inertia::render('Admin/Users/Index', [
-            'users' => $users
-        ]);
-    }
+public function index(Request $request)
+{
+    $users = User::query()
+        ->with('roles')
+        ->when($request->search, function ($query, $search) {
+            $query->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+        })
+        ->latest()
+        ->get(); // Gunakan ->paginate(10) jika data user sangat banyak
+
+    return Inertia::render('Admin/Users/Index', [
+        'users' => $users,
+        'filters' => $request->only(['search'])
+    ]);
+}
+
+public function addMembership(Request $request, User $user)
+{
+    $request->validate([
+        'days' => 'required|integer|min:1'
+    ]);
+
+    // Ambil tanggal mulai: Jika sudah ada member aktif, mulai dari tanggal expired. 
+    // Jika belum ada/sudah expired, mulai dari sekarang.
+    $startDate = ($user->membership_expires_at && $user->membership_expires_at->isFuture()) 
+        ? $user->membership_expires_at 
+        : now();
+
+    $user->update([
+        'membership_expires_at' => $startDate->addDays($request->days)
+    ]);
+
+    return back()->with('success', "Berhasil menambahkan {$request->days} hari membership untuk {$user->name}");
+}
 
     public function destroy(User $user)
     {

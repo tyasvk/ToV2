@@ -1,56 +1,56 @@
 <script setup>
-import { useForm } from '@inertiajs/vue3';
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import { Head, useForm, Link, router } from '@inertiajs/vue3';
+import { ref, watch } from 'vue';
+import draggable from 'vuedraggable';
 
-const props = defineProps({ tryout: Object, questions: Array });
-
-const form = useForm({
-    type: 'TWK',
-    content: '',
-    options: { a: '', b: '', c: '', d: '', e: '' },
-    correct_answer: '', // Untuk TWK/TIU
-    tkp_scores: { a: 1, b: 2, c: 3, d: 4, e: 5 } // Untuk TKP
+const props = defineProps({
+    tryout: { type: Object, default: () => ({}) }, // Tambahkan default
+    questions: { type: Array, default: () => [] }   // Tambahkan default
 });
 
+// Gunakan fallback array kosong agar spread operator tidak error
+const localQuestions = ref([...(props.questions || [])]);
+const expandedId = ref(null);
+const isModalOpen = ref(false);
+const fileInput = ref(null);
+
+watch(() => props.questions, (newVal) => {
+    localQuestions.value = [...(newVal || [])];
+}, { deep: true });
+
+// ... (logika lainnya tetap sama) ...
+
 const submit = () => {
-    form.post(route('admin.questions.store', props.tryout.id), {
-        onSuccess: () => form.reset()
+    // Pastikan parameter ID ada sebelum memanggil route
+    if (!props.tryout?.id) return alert('Data Tryout tidak ditemukan.');
+
+    const url = form.id 
+        ? route('admin.tryouts.questions.update', [props.tryout.id, form.id]) 
+        : route('admin.tryouts.questions.store', props.tryout.id);
+
+    form.post(url, {
+        onSuccess: () => { isModalOpen.value = false; form.reset(); },
+        forceFormData: true,
+        preserveScroll: true
     });
 };
 </script>
 
 <template>
-    <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-        <h3 class="font-black text-gray-800 mb-6 uppercase tracking-tighter">Tambah Soal Baru</h3>
-        
-        <form @submit.prevent="submit" class="space-y-6">
-            <div>
-                <label class="block text-xs font-bold text-gray-400 uppercase mb-2">Materi Soal</label>
-                <select v-model="form.type" class="w-full border-gray-100 rounded-xl bg-gray-50 font-bold text-sm focus:ring-indigo-500">
-                    <option value="TWK">TWK (Wawasan Kebangsaan)</option>
-                    <option value="TIU">TIU (Intelegensia Umum)</option>
-                    <option value="TKP">TKP (Karakteristik Pribadi)</option>
-                </select>
-            </div>
+    <Head :title="'Bank Soal - ' + (tryout?.title || 'Loading...')" />
 
-            <div>
-                <label class="block text-xs font-bold text-gray-400 uppercase mb-2">Pertanyaan</label>
-                <textarea v-model="form.content" rows="4" class="w-full border-gray-100 rounded-xl bg-gray-50 text-sm focus:ring-indigo-500" placeholder="Tulis soal di sini..."></textarea>
-            </div>
-
-            <div class="grid grid-cols-1 gap-4">
-                <div v-for="opt in ['a', 'b', 'c', 'd', 'e']" :key="opt" class="flex gap-4 items-center">
-                    <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center font-black uppercase text-xs">{{ opt }}</div>
-                    <input v-model="form.options[opt]" type="text" class="flex-1 border-gray-100 rounded-xl bg-gray-50 text-sm" :placeholder="`Teks pilihan ${opt.toUpperCase()}`">
-                    
-                    <input v-if="form.type === 'TKP'" v-model="form.tkp_scores[opt]" type="number" min="1" max="5" class="w-20 border-gray-100 rounded-xl bg-indigo-50 text-center font-bold text-indigo-600">
-                    
-                    <input v-if="form.type !== 'TKP'" type="radio" :value="opt" v-model="form.correct_answer" class="w-5 h-5 text-indigo-600 border-gray-300">
+    <AuthenticatedLayout>
+        <div class="max-w-4xl mx-auto pb-24 mt-4">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+                <div class="flex items-center gap-4 min-w-0">
+                    <Link :href="route('admin.tryouts.index')" class="bg-gray-50 p-2.5 rounded-2xl hover:bg-gray-100 transition shrink-0">⬅️</Link>
+                    <div class="truncate">
+                        <h2 class="font-black text-xl text-gray-900 uppercase tracking-tighter truncate">{{ tryout?.title }}</h2>
+                        <p class="text-[9px] text-indigo-600 font-bold uppercase tracking-widest">Manajemen {{ questions?.length || 0 }} Butir Soal</p>
+                    </div>
+                </div>
                 </div>
             </div>
-
-            <button type="submit" :disabled="form.processing" class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition uppercase tracking-widest text-xs">
-                Simpan Soal Ke Database
-            </button>
-        </form>
-    </div>
+    </AuthenticatedLayout>
 </template>

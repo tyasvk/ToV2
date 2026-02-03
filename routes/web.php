@@ -139,6 +139,11 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     
     // Tryout Management
     Route::resource('tryouts', TryoutManagerController::class);
+
+    Route::post('/users/{user}/add-membership', [UserManagerController::class, 'addMembership'])->name('users.add-membership');
+
+    // Rute khusus Kelola Tryout Adidaya
+    Route::resource('adidaya-manage', \App\Http\Controllers\Admin\AdidayaManagerController::class);
     
     // Question Management
     Route::resource('tryouts.questions', QuestionManagerController::class);
@@ -155,6 +160,9 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
 
     Route::post('/tryouts/{tryout}/questions/import', [QuestionManagerController::class, 'import'])->name('tryouts.questions.import');
 
+    // Tambahkan rute reorder sebelum resource
+    Route::patch('/questions/reorder', [QuestionManagerController::class, 'reorder'])->name('questions.reorder');
+    Route::resource('tryouts.questions', QuestionManagerController::class);
     // Tambahkan baris ini secara eksplisit jika belum ada, atau sesuaikan nama di Vue
     Route::delete('/questions/{question}', [QuestionManagerController::class, 'destroy'])->name('questions.destroy');
 });

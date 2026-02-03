@@ -43,6 +43,17 @@ const highestScore = computed(() => {
         <div class="py-8 md:py-12 bg-slate-50 min-h-screen">
             <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
                 
+                <div class="mb-6">
+                    <Link :href="tryout.type === 'akbar' ? route('tryout-akbar.index') : route('tryout.index')" 
+                        class="inline-flex items-center gap-2 text-slate-500 hover:text-[#004a87] transition-colors font-bold text-sm group"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transition-transform group-hover:-translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                        </svg>
+                        Kembali ke Daftar {{ tryout.type === 'akbar' ? 'Event Akbar' : 'Tryout' }}
+                    </Link>
+                </div>
+
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                     <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
                         <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Paket Tryout</span>

@@ -14,9 +14,10 @@ class QuestionManagerController extends Controller
 {
     public function index(Tryout $tryout)
     {
+        $questions = $tryout->questions()->orderBy('order', 'asc')->get();
         return Inertia::render('Admin/Question/Index', [
             'tryout' => $tryout,
-            'questions' => $tryout->questions()->orderBy('order', 'asc')->get()
+            'questions' => $questions
         ]);
     }
 
@@ -24,7 +25,7 @@ class QuestionManagerController extends Controller
     {
         $request->validate([
             'type' => 'required|in:TWK,TIU,TKP',
-            'content' => 'required',
+            'content' => 'required', // Kembali menggunakan 'content'
             'image' => 'nullable|image|max:2048', 
             'options' => 'required|array',
             'explanation' => 'nullable|string',
@@ -41,100 +42,11 @@ class QuestionManagerController extends Controller
         return back()->with('message', 'Soal berhasil disimpan!');
     }
 
-    // --- FITUR IMPORT CSV ---
-    public function import(Request $request, Tryout $tryout)
-    {
-        $request->validate([
-            'file' => 'required|file|mimes:csv,txt,xlsx|max:2048',
-        ]);
-
-        $file = $request->file('file');
-        
-        // Membuka file CSV
-        if (($handle = fopen($file->getRealPath(), "r")) !== FALSE) {
-            $header = fgetcsv($handle, 1000, ","); // Lewati baris header
-            
-            DB::beginTransaction();
-            try {
-                while (($row = fgetcsv($handle, 1000, ",")) !== FALSE) {
-                    // Pastikan urutan kolom di CSV:
-                    // 0: type (TWK/TIU/TKP)
-                    // 1: content (Soal)
-                    // 2: option_a
-                    // 3: option_b
-                    // 4: option_c
-                    // 5: option_d
-                    // 6: option_e
-                    // 7: correct_answer (kunci a/b/c/d/e) atau score JSON untuk TKP
-                    // 8: explanation (pembahasan)
-
-                    if (count($row) < 8) continue; // Skip jika data tidak lengkap
-
-                    $type = strtoupper($row[0]);
-                    
-                    // Format Options
-                    $options = [
-                        'a' => $row[2],
-                        'b' => $row[3],
-                        'c' => $row[4],
-                        'd' => $row[5],
-                        'e' => $row[6],
-                    ];
-
-                    // Handle TKP Scores atau Kunci Jawaban Biasa
-                    $correctAnswer = $row[7];
-                    $tkpScores = null;
-
-                    if ($type === 'TKP') {
-                        // Jika TKP, kolom correct_answer diisi JSON string misal: {"a":5,"b":4...}
-                        // Atau format manual "54321" (a=5, b=4 dst) - disini asumsi manual input score json valid
-                        // Untuk simplicity import CSV, kita asumsikan user mengisi format: 54321
-                        // Dimana urutan digit mewakili skor a,b,c,d,e
-                        if (is_numeric($correctAnswer) && strlen($correctAnswer) == 5) {
-                            $tkpScores = [
-                                'a' => $correctAnswer[0],
-                                'b' => $correctAnswer[1],
-                                'c' => $correctAnswer[2],
-                                'd' => $correctAnswer[3],
-                                'e' => $correctAnswer[4],
-                            ];
-                            $correctAnswer = null; // TKP tidak punya satu kunci
-                        }
-                    }
-
-                    $tryout->questions()->create([
-                        'type' => $type,
-                        'content' => $row[1],
-                        'options' => $options,
-                        'correct_answer' => $correctAnswer,
-                        'tkp_scores' => $tkpScores,
-                        'explanation' => isset($row[8]) ? $row[8] : '',
-                        'order' => 999 // Taruh di paling bawah
-                    ]);
-                }
-                DB::commit();
-                return back()->with('message', 'Import soal berhasil!');
-            } catch (\Exception $e) {
-                DB::rollBack();
-                return back()->withErrors(['file' => 'Gagal import: ' . $e->getMessage()]);
-            }
-            fclose($handle);
-        }
-
-        return back()->withErrors(['file' => 'Gagal membaca file CSV.']);
-    }
-
-    public function destroy(Question $question)
-    {
-        $question->delete();
-        return back()->with('message', 'Soal berhasil dihapus.');
-    }
-
-    public function update(Request $request, Question $question)
+    public function update(Request $request, Tryout $tryout, Question $question)
     {
         $request->validate([
             'type' => 'required|in:TWK,TIU,TKP',
-            'content' => 'required',
+            'content' => 'required', // Kembali menggunakan 'content'
             'image' => 'nullable|image|max:2048',
             'options' => 'required|array',
             'explanation' => 'nullable|string',
@@ -154,12 +66,95 @@ class QuestionManagerController extends Controller
         return back()->with('message', 'Soal berhasil diperbarui!');
     }
 
+    public function destroy(Tryout $tryout, Question $question)
+    {
+        if ($question->image) {
+            Storage::disk('public')->delete($question->image);
+        }
+        $question->delete();
+        return back()->with('message', 'Soal berhasil dihapus.');
+    }
+
     public function reorder(Request $request)
     {
-        $ids = $request->ids; 
+        $ids = $request->ids;
         foreach ($ids as $index => $id) {
-            DB::table('questions')->where('id', $id)->update(['order' => $index]);
+            Question::where('id', $id)->update(['order' => $index + 1]);
         }
-        return back()->with('message', 'Urutan soal berhasil diperbarui!');
+        return back()->with('message', 'Urutan soal diperbarui');
     }
+
+public function import(Request $request, Tryout $tryout)
+{
+    $request->validate([
+        'file' => 'required|file|mimes:csv,txt|max:2048', // Gunakan CSV
+    ]);
+
+    $file = $request->file('file');
+    $path = $file->getRealPath();
+
+    // Buka file untuk mendeteksi delimiter (koma atau titik koma)
+    $handle = fopen($path, "r");
+    $firstLine = fgets($handle);
+    $delimiter = (strpos($firstLine, ';') !== false) ? ';' : ',';
+    rewind($handle); // Kembalikan pointer ke awal file
+
+    fgetcsv($handle, 1000, $delimiter); // Lewati header baris pertama
+
+    DB::beginTransaction();
+    try {
+        $count = 0;
+        while (($row = fgetcsv($handle, 1000, $delimiter)) !== FALSE) {
+            // Lewati jika kolom inti (tipe dan soal) kosong
+            if (empty($row[0]) || empty($row[1])) continue;
+
+            $type = strtoupper(trim($row[0]));
+            
+            // Format Pilihan A-E
+            $options = [
+                'a' => $row[2] ?? '',
+                'b' => $row[3] ?? '',
+                'c' => $row[4] ?? '',
+                'd' => $row[5] ?? '',
+                'e' => $row[6] ?? '',
+            ];
+
+            $correctAnswer = trim($row[7] ?? '');
+            $tkpScores = null;
+
+            // Logika khusus Skor TKP (format 54321)
+            if ($type === 'TKP' && strlen($correctAnswer) === 5) {
+                $tkpScores = [
+                    'a' => (int)$correctAnswer[0],
+                    'b' => (int)$correctAnswer[1],
+                    'c' => (int)$correctAnswer[2],
+                    'd' => (int)$correctAnswer[3],
+                    'e' => (int)$correctAnswer[4],
+                ];
+                $correctAnswer = null;
+            }
+
+            // Simpan ke database dengan kolom 'content'
+            $tryout->questions()->create([
+                'type'           => $type,
+                'content'        => $row[1],
+                'options'        => $options,
+                'correct_answer' => $correctAnswer,
+                'tkp_scores'     => $tkpScores,
+                'explanation'    => $row[8] ?? '',
+                'order'          => 999
+            ]);
+            $count++;
+        }
+
+        DB::commit();
+        fclose($handle);
+        return back()->with('message', "Berhasil mengimpor $count soal!");
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        fclose($handle);
+        return back()->withErrors(['file' => 'Gagal membaca isi file: ' . $e->getMessage()]);
+    }
+}
 }
