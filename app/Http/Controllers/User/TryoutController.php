@@ -62,26 +62,14 @@ class TryoutController extends Controller
  */
 public function adidaya()
 {
-    // Mengambil data tryout tipe 'adidaya' yang sudah di-publish
     $exclusiveTryouts = \App\Models\Tryout::where('type', 'adidaya')
         ->where('is_published', true)
         ->withCount('questions')
         ->latest()
         ->get();
 
-    $generalTryouts = \App\Models\Tryout::where(function($q) {
-            $q->where('type', 'general')
-              ->orWhereNull('type');
-        })
-        ->where('is_published', true)
-        ->withCount('questions')
-        ->latest()
-        ->take(6)
-        ->get();
-
     return \Inertia\Inertia::render('User/Tryout/AdidayaIndex', [
         'exclusiveTryouts' => $exclusiveTryouts,
-        'generalTryouts' => $generalTryouts
     ]);
 }
 
