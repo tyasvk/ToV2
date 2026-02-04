@@ -34,10 +34,19 @@ class TransactionController extends Controller
             'filters' => $request->only(['search']),
         ]);
     }
+public function approve(Transaction $transaction)
+{
+    if ($transaction->status === 'paid') return back();
 
-    public function approve(Transaction $transaction)
-    {
-        $transaction->update(['status' => 'paid']); 
-        return back()->with('success', 'Transaksi berhasil disetujui.');
-    }
+    DB::transaction(function () use ($transaction) {
+        $transaction->update(['status' => 'paid']);
+
+        // Tambahkan komisi ke pemilik kode voucher
+        if ($transaction->referrer_id && $transaction->affiliate_commission > 0) {
+            User::find($transaction->referrer_id)->increment('affiliate_balance', $transaction->affiliate_commission);
+        }
+    });
+
+    return back()->with('success', 'Transaksi disetujui dan komisi afiliasi telah dikirim.');
+}
 }

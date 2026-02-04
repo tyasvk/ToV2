@@ -14,7 +14,8 @@ class User extends Authenticatable
     protected $fillable = [
         'name', 'email', 'password', 'balance', 'avatar', 
         'membership_expires_at', 'participant_number', 'instance_type', 
-        'agency_name', 'province_code', 'gender',
+        'agency_name', 'province_code', 'gender','affiliate_code',
+    'affiliate_balance','bank_info',
     ];
 
     protected $hidden = [
@@ -30,9 +31,18 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'bank_info' => 'array',
             'membership_expires_at' => 'datetime', // <--- WAJIB DI SINI AGAR REAKTIF
         ];
     }
+
+    /**
+ * Relasi ke Riwayat Transaksi Dompet
+ */
+public function walletTransactions()
+{
+    return $this->hasMany(WalletTransaction::class);
+}
 
     public function isMember()
     {

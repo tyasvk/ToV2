@@ -13,7 +13,8 @@ const currentUser = computed(() => page.props.auth.user);
 
 const form = useForm({
     payment_method: 'wallet',
-    emails: [], // Awal kosong
+    emails: [], 
+    voucher_code: '', // Tambahan kolom voucher
 });
 
 // State Visual
@@ -93,8 +94,6 @@ const checkEmail = async (index, emailValue) => {
 };
 
 const submit = () => {
-    // INI YANG BENAR:
-    // Mengirim data ke method 'store' di controller
     form.post(route('tryout.processRegistration', props.tryout.id), {
         onError: (errors) => {
             console.error(errors);
@@ -102,8 +101,14 @@ const submit = () => {
     });
 };
 
+// Logika Total Bayar (Dinamis dengan Diskon Voucher)
 const totalAmount = computed(() => {
-    return props.tryout.price * (form.emails.length + 1);
+    const baseAmount = props.tryout.price * (form.emails.length + 1);
+    // Jika voucher diisi (minimal 3 karakter), beri potongan simulasi Rp 3.000
+    if (form.voucher_code && form.voucher_code.length >= 3) {
+        return Math.max(0, baseAmount - 3000);
+    }
+    return baseAmount;
 });
 </script>
 
@@ -267,7 +272,27 @@ const totalAmount = computed(() => {
                                             <span class="font-medium">Peserta</span>
                                             <span class="font-bold text-gray-900">{{ form.emails.length + 1 }} Orang</span>
                                         </div>
+                                        <div v-if="form.voucher_code && form.voucher_code.length >= 3" class="flex justify-between text-xs text-indigo-600 font-bold border-t border-indigo-100 pt-2">
+                                            <span>Diskon Voucher</span>
+                                            <span>- {{ formatRupiah(3000) }}</span>
+                                        </div>
                                     </div>
+                                </div>
+
+                                <div class="mb-6">
+                                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">Kode Voucher (Opsional)</label>
+                                    <div class="relative">
+                                        <input 
+                                            v-model="form.voucher_code"
+                                            type="text" 
+                                            placeholder="Masukkan kode voucher..."
+                                            class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500 uppercase tracking-widest shadow-inner transition-all"
+                                        />
+                                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🎟️</span>
+                                    </div>
+                                    <p v-if="form.voucher_code" class="text-[9px] text-indigo-600 font-bold mt-2 uppercase tracking-wide animate-pulse">
+                                        *Potongan Rp 3.000 akan divalidasi sistem.
+                                    </p>
                                 </div>
 
                                 <div class="flex justify-between items-end pb-6 border-b border-dashed border-gray-200 mb-6">
@@ -353,3 +378,16 @@ const totalAmount = computed(() => {
         </div>
     </AuthenticatedLayout>
 </template>
+
+<style scoped>
+/* Transisi untuk slot anggota */
+.v-enter-active,
+.v-leave-active {
+  transition: all 0.3s ease;
+}
+.v-enter-from,
+.v-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+</style>

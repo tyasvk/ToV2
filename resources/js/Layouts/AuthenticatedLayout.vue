@@ -65,7 +65,7 @@ const logoRoute = computed(() => {
     }
 });
 
-// Helper untuk mengecek tipe tryout yang sedang aktif di props (untuk halaman Kelola Soal)
+// Helper untuk mengecek tipe tryout yang sedang aktif di props
 const activeTryoutType = computed(() => page.props.tryout?.type || 'general');
 </script>
 
@@ -80,8 +80,8 @@ const activeTryoutType = computed(() => page.props.tryout?.type || 'general');
                         <img src="/images/logo.png" alt="Logo" class="w-8 h-8 object-contain brightness-0 invert">
                     </div>
                     <div class="flex flex-col">
-                        <span class="font-black text-sm tracking-[0.3em] text-slate-900 uppercase">NUSANTARA</span>
-                        <span class="text-[10px] font-bold text-indigo-600 uppercase tracking-widest leading-none">CPNS Academy</span>
+                        <span class="font-black text-[11px] tracking-[0.3em] text-slate-900 uppercase leading-tight">NUSANTARA</span>
+                        <span class="text-[9px] font-bold text-indigo-600 uppercase tracking-widest leading-none">CPNS Academy</span>
                     </div>
                 </Link>
             </div>
@@ -90,11 +90,11 @@ const activeTryoutType = computed(() => page.props.tryout?.type || 'general');
                 <div :class="isUserMember ? 'bg-indigo-600 shadow-indigo-100 shadow-lg' : 'bg-slate-100'" 
                      class="rounded-[1.5rem] p-5 transition-all duration-500 relative overflow-hidden">
                     <div v-if="isUserMember" class="absolute top-0 right-0 w-16 h-16 bg-white/10 -mr-8 -mt-8 rounded-full blur-xl"></div>
-                    <p :class="isUserMember ? 'text-white/60' : 'text-slate-400'" class="text-[10px] font-black uppercase tracking-widest mb-1">Status Saya</p>
-                    <p :class="isUserMember ? 'text-white' : 'text-slate-600'" class="text-xs font-black uppercase tracking-tight leading-none">
+                    <p :class="isUserMember ? 'text-white/60' : 'text-slate-400'" class="text-[9px] font-black uppercase tracking-widest mb-1">Status Saya</p>
+                    <p :class="isUserMember ? 'text-white' : 'text-slate-600'" class="text-[11px] font-black uppercase tracking-tight leading-none">
                         {{ isUserMember ? 'Akses Adidaya' : 'Anggota Gratis' }}
                     </p>
-                    <p v-if="isUserMember" class="text-[10px] font-bold text-indigo-200 mt-1.5 leading-none">
+                    <p v-if="isUserMember" class="text-[9px] font-bold text-indigo-200 mt-1.5 leading-none">
                         Sampai: {{ formatDate(user.membership_expires_at) }}
                     </p>
                 </div>
@@ -103,18 +103,18 @@ const activeTryoutType = computed(() => page.props.tryout?.type || 'general');
             <nav ref="sidebarNav" class="flex-1 overflow-y-auto py-4 px-4 space-y-1.5 custom-scrollbar">
                 
                 <div v-if="isAdmin" class="space-y-1">
-                    <p class="text-[11px] uppercase font-black text-rose-500 px-4 mb-3 mt-4 tracking-[0.3em]">Admin Control</p>
+                    <p class="text-[10px] uppercase font-black text-rose-500 px-4 mb-3 mt-4 tracking-[0.3em]">Admin Control</p>
                     
                     <Link :href="route('admin.dashboard')" 
                         :class="[route().current('admin.dashboard') ? 'bg-rose-50 text-rose-600 active-link shadow-sm' : 'text-slate-500 hover:bg-rose-50', 'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group']"
                     >
-                        <span class="text-xl">🛡️</span> <span class="text-xs uppercase tracking-widest">Dashboard Admin</span>
+                        <span class="text-xl">🛡️</span> <span class="text-[11px] uppercase tracking-widest">Dashboard Admin</span>
                     </Link>
 
                     <Link :href="route('admin.users.index')" 
                         :class="[route().current('admin.users.*') ? 'bg-rose-50 text-rose-600 active-link shadow-sm' : 'text-slate-500 hover:bg-rose-50', 'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group']"
                     >
-                        <span class="text-xl">👥</span> <span class="text-xs uppercase tracking-widest">Kelola User</span>
+                        <span class="text-xl">👥</span> <span class="text-[11px] uppercase tracking-widest">Kelola User</span>
                     </Link>
 
                     <Link :href="route('admin.tryouts.index')" 
@@ -126,8 +126,14 @@ const activeTryoutType = computed(() => page.props.tryout?.type || 'general');
                             'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group'
                         ]"
                     >
-                        <span class="text-xl">📚</span> <span class="text-xs uppercase tracking-widest">Kelola Tryout</span>
+                        <span class="text-xl">📚</span> <span class="text-[11px] uppercase tracking-widest">Kelola Tryout</span>
                     </Link>
+
+                    <Link :href="route('admin.affiliate.leaderboard')" 
+    :class="[route().current('admin.affiliate.leaderboard') ? 'bg-amber-50 text-amber-600 active-link shadow-sm' : 'text-slate-500 hover:bg-amber-50', 'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group']"
+>
+    <span class="text-xl">🏆</span> <span class="text-[11px] uppercase tracking-widest">Ranking Affiliate</span>
+</Link>
 
                     <Link :href="route('admin.adidaya-manage.index')" 
                         :class="[
@@ -138,48 +144,70 @@ const activeTryoutType = computed(() => page.props.tryout?.type || 'general');
                             'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group'
                         ]"
                     >
-                        <span class="text-xl">⚡</span> <span class="text-xs uppercase tracking-widest">Adidaya Manager</span>
+                        <span class="text-xl">⚡</span> <span class="text-[11px] uppercase tracking-widest">Adidaya Manager</span>
                     </Link>
 
                     <Link :href="route('admin.tryout-akbar.index')" 
                         :class="[route().current('admin.tryout-akbar.*') ? 'bg-rose-50 text-rose-600 active-link shadow-sm' : 'text-slate-500 hover:bg-rose-50', 'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group']"
                     >
-                        <span class="text-xl">🏆</span> <span class="text-xs uppercase tracking-widest">Event Akbar</span>
+                        <span class="text-xl">🏆</span> <span class="text-[11px] uppercase tracking-widest">Event Akbar</span>
                     </Link>
 
                     <Link :href="route('admin.transactions.index')" 
                         :class="[route().current('admin.transactions.*') ? 'bg-rose-50 text-rose-600 active-link shadow-sm' : 'text-slate-500 hover:bg-rose-50', 'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group']"
                     >
-                        <span class="text-xl">💸</span> <span class="text-xs uppercase tracking-widest">Data Transaksi</span>
+                        <span class="text-xl">💸</span> <span class="text-[11px] uppercase tracking-widest">Data Transaksi</span>
+                    </Link>
+
+                    <p class="text-[10px] uppercase font-black text-amber-500 px-4 mb-3 mt-6 tracking-[0.3em]">Afiliasi System</p>
+                    <Link :href="route('admin.affiliate.withdrawals')" 
+                        :class="[route().current('admin.affiliate.withdrawals') ? 'bg-amber-50 text-amber-600 active-link shadow-sm' : 'text-slate-500 hover:bg-amber-50', 'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group']"
+                    >
+                        <span class="text-xl">💰</span> <span class="text-[11px] uppercase tracking-widest">Permintaan WD</span>
+                    </Link>
+                    <Link :href="route('admin.affiliate.transactions')" 
+                        :class="[route().current('admin.affiliate.transactions') ? 'bg-amber-50 text-amber-600 active-link shadow-sm' : 'text-slate-500 hover:bg-amber-50', 'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group']"
+                    >
+                        <span class="text-xl">📊</span> <span class="text-[11px] uppercase tracking-widest">Data Afiliasi</span>
                     </Link>
                 </div>
 
                 <div v-if="isUser && !isAdmin" class="space-y-1.5">
-                    <p class="text-[11px] uppercase font-black text-slate-400 px-4 mb-3 mt-4 tracking-[0.3em]">Menu Navigasi</p>
+                    <p class="text-[10px] uppercase font-black text-slate-400 px-4 mb-3 mt-4 tracking-[0.3em]">Menu Navigasi</p>
                     
                     <Link :href="route('dashboard')" 
                         :class="[route().current('dashboard') ? 'bg-slate-900 text-white shadow-xl active-link' : 'text-slate-500 hover:bg-slate-50', 'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group']"
                     >
-                        <span class="text-2xl">🏠</span> <span class="text-xs uppercase tracking-widest">Dashboard</span>
+                        <span class="text-xl">🏠</span> <span class="text-[11px] uppercase tracking-widest">Dashboard</span>
                     </Link>
 
                     <Link :href="route('tryout.index')" 
-                        :class="[(route().current('tryout.index') || route().current('tryout.show') || route().current('tryout.register') || route().current('tryout.my')) ? 'bg-slate-900 text-white shadow-xl active-link' : 'text-slate-500 hover:bg-slate-50', 'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group']"
+                        :class="[
+                            (route().current('tryout.index') || route().current('tryout.show') || route().current('tryout.register') || route().current('tryout.my') || (route().current('tryout.wait') && activeTryoutType !== 'adidaya')) 
+                            ? 'bg-slate-900 text-white shadow-xl active-link' 
+                            : 'text-slate-500 hover:bg-slate-50', 
+                            'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group'
+                        ]"
                     >
-                        <span class="text-2xl">📝</span> <span class="text-xs uppercase tracking-widest">Katalog Tryout</span>
+                        <span class="text-xl">📝</span> <span class="text-[11px] uppercase tracking-widest">Katalog Tryout</span>
                     </Link>
 
                     <Link :href="route('tryout-akbar.index')" 
                         :class="[route().current('tryout-akbar.*') ? 'bg-slate-900 text-white shadow-xl active-link' : 'text-slate-500 hover:bg-slate-50', 'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group']"
                     >
-                        <span class="text-2xl">🔥</span> <span class="text-xs uppercase tracking-widest">Event Akbar</span>
+                        <span class="text-xl">🔥</span> <span class="text-[11px] uppercase tracking-widest">Event Akbar</span>
                     </Link>
 
                     <Link :href="route('tryout.adidaya')" 
-                        :class="[route().current('tryout.adidaya') ? 'bg-slate-900 text-white shadow-xl active-link' : 'text-slate-500 hover:bg-slate-100', 'flex items-center justify-between p-4 rounded-2xl font-black transition-all group']"
+                        :class="[
+                            (route().current('tryout.adidaya') || (route().current('tryout.wait') && activeTryoutType === 'adidaya')) 
+                            ? 'bg-slate-900 text-white shadow-xl active-link' 
+                            : 'text-slate-500 hover:bg-slate-100', 
+                            'flex items-center justify-between p-4 rounded-2xl font-black transition-all group'
+                        ]"
                     >
                         <div class="flex items-center gap-4">
-                            <span class="text-2xl">⚡</span> <span class="text-xs uppercase tracking-widest">Nusantara Adidaya</span>
+                            <span class="text-xl">⚡</span> <span class="text-[11px] uppercase tracking-widest">Nusantara Adidaya</span>
                         </div>
                         <span v-if="isUserMember" class="text-[8px] bg-indigo-600 text-white px-2 py-0.5 rounded-md font-black shadow-sm shadow-indigo-200">ACTIVE</span>
                         <span v-else class="text-[8px] bg-slate-200 text-slate-500 px-2 py-0.5 rounded-md font-black italic">LOCKED</span>
@@ -188,32 +216,38 @@ const activeTryoutType = computed(() => page.props.tryout?.type || 'general');
                     <Link :href="route('membership.index')" 
                         :class="[route().current('membership.*') ? 'bg-slate-900 text-white shadow-xl active-link' : 'text-slate-500 hover:bg-slate-50', 'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group']"
                     >
-                        <span class="text-2xl">💎</span> <span class="text-xs uppercase tracking-widest">Membership</span>
+                        <span class="text-xl">💎</span> <span class="text-[11px] uppercase tracking-widest">Membership</span>
+                    </Link>
+
+                    <Link :href="route('affiliate.index')" 
+                        :class="[route().current('affiliate.*') ? 'bg-slate-900 text-white shadow-xl active-link' : 'text-slate-500 hover:bg-slate-50', 'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group']"
+                    >
+                        <span class="text-xl">🤝</span> <span class="text-[11px] uppercase tracking-widest">Afiliasi</span>
                     </Link>
 
                     <Link :href="route('tryout.history')" 
                         :class="[route().current('tryout.history') ? 'bg-slate-900 text-white shadow-xl active-link' : 'text-slate-500 hover:bg-slate-50', 'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group']"
                     >
-                        <span class="text-2xl">📜</span> <span class="text-xs uppercase tracking-widest">Riwayat Tryout</span>
+                        <span class="text-xl">📜</span> <span class="text-[11px] uppercase tracking-widest">Riwayat Tryout</span>
                     </Link>
 
                     <Link :href="route('wallet.index')" 
                         :class="[route().current('wallet.index') ? 'bg-slate-900 text-white shadow-xl active-link' : 'text-slate-500 hover:bg-slate-50', 'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group']"
                     >
-                        <span class="text-2xl">💳</span> <span class="text-xs uppercase tracking-widest">Dompet Saya</span>
+                        <span class="text-xl">💳</span> <span class="text-[11px] uppercase tracking-widest">Dompet Saya</span>
                     </Link>
 
                     <Link :href="route('profile.edit')" 
                         :class="[route().current('profile.*') ? 'bg-slate-900 text-white shadow-xl active-link' : 'text-slate-500 hover:bg-slate-50', 'flex items-center gap-4 p-4 rounded-2xl font-black transition-all group']"
                     >
-                        <span class="text-2xl">👤</span> <span class="text-xs uppercase tracking-widest">Profil Saya</span>
+                        <span class="text-xl">👤</span> <span class="text-[11px] uppercase tracking-widest">Profil Saya</span>
                     </Link>
                 </div>
             </nav>
 
             <div class="p-6 border-t border-slate-100 bg-slate-50/50">
                 <Link :href="route('logout')" method="post" as="button" 
-                    class="w-full flex items-center justify-center gap-3 p-4 text-rose-500 hover:bg-rose-50 rounded-2xl transition font-black text-xs uppercase tracking-[0.2em] active:scale-95"
+                    class="w-full flex items-center justify-center gap-3 p-4 text-rose-500 hover:bg-rose-50 rounded-2xl transition font-black text-[11px] uppercase tracking-[0.2em] active:scale-95"
                 >
                     <span>Keluar Akun</span>
                 </Link>
@@ -221,15 +255,16 @@ const activeTryoutType = computed(() => page.props.tryout?.type || 'general');
         </aside>
 
         <div class="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+            
             <header class="h-24 bg-white border-b border-slate-100 flex items-center justify-between px-10 shrink-0 z-30 shadow-sm">
                 <div class="flex items-center gap-6">
-                    <h2 class="font-black text-slate-900 uppercase text-xs tracking-[0.3em]">
+                    <h2 class="font-black text-slate-900 uppercase text-[11px] tracking-[0.3em]">
                         {{ isAdmin ? 'Admin Command Center' : 'Halaman Belajar Nusantara' }}
                     </h2>
                 </div>
 
                 <div class="flex items-center gap-4">
-                    <div class="hidden sm:flex items-center gap-3 bg-emerald-50 px-4 py-2 rounded-2xl border border-emerald-100 text-[10px] font-black text-emerald-600 uppercase tracking-widest">
+                    <div class="hidden sm:flex items-center gap-3 bg-emerald-50 px-4 py-2 rounded-2xl border border-emerald-100 text-[9px] font-black text-emerald-600 uppercase tracking-widest">
                         <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Sistem Aktif
                     </div>
                     <img :src="user?.profile_photo_url || `https://ui-avatars.com/api/?name=${user?.name}`" 
@@ -260,7 +295,7 @@ const activeTryoutType = computed(() => page.props.tryout?.type || 'general');
     position: relative;
 }
 
-/* Garis indikator aktif untuk style admin */
+/* Garis indikator aktif */
 .active-link::before {
     content: '';
     position: absolute;

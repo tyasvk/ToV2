@@ -1,9 +1,12 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, usePage } from '@inertiajs/vue3';
-import { ref, computed } from 'vue';
+import { computed } from 'vue';
 
-const props = defineProps({ exclusiveTryouts: Array, generalTryouts: Array });
+const props = defineProps({ 
+    exclusiveTryouts: Array 
+});
+
 const page = usePage();
 
 // --- LOGIKA MEMBERSHIP ---
@@ -18,7 +21,6 @@ const isPremium = computed(() => {
     <Head title="Nusantara Adidaya - Akses Premium" />
 
     <AuthenticatedLayout>
-        
         <div class="relative bg-slate-900 overflow-hidden shadow-md z-0 -mx-6 -mt-6 md:-mx-12 md:-mt-12 mb-10 pb-10 pt-10 md:pt-16">
             <div class="absolute inset-0">
                 <div class="absolute inset-0 bg-gradient-to-r from-indigo-950 to-slate-900 opacity-95"></div>
@@ -52,13 +54,18 @@ const isPremium = computed(() => {
         </div>
 
         <div class="max-w-7xl mx-auto px-2 pb-20">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <div v-for="i in 10" :key="i" class="group bg-white rounded-[2.5rem] shadow-sm hover:shadow-2xl border border-slate-200 overflow-hidden transition-all duration-500 hover:-translate-y-2 flex flex-col h-full relative">
+            <div v-if="exclusiveTryouts.length === 0" class="py-20 text-center bg-white rounded-[2.5rem] border-2 border-dashed border-slate-100 shadow-sm">
+                <div class="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">📭</div>
+                <h3 class="font-black text-slate-800 uppercase tracking-tighter">Belum Ada Paket</h3>
+                <p class="text-slate-400 text-sm font-medium">Paket simulasi Adidaya belum tersedia saat ini.</p>
+            </div>
+
+            <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div v-for="(tryout, index) in exclusiveTryouts" :key="tryout.id" 
+                    class="group bg-white rounded-[2.5rem] shadow-sm hover:shadow-2xl border border-slate-200 overflow-hidden transition-all duration-500 hover:-translate-y-2 flex flex-col h-full relative">
                     
                     <div v-if="!isPremium" class="absolute inset-0 bg-white/40 backdrop-blur-[2px] z-30 flex flex-col items-center justify-center p-6 text-center transition-all group-hover:backdrop-blur-[4px]">
-                        <div class="w-14 h-14 bg-white rounded-2xl shadow-xl flex items-center justify-center text-2xl mb-4 border border-slate-100">
-                            🔒
-                        </div>
+                        <div class="w-14 h-14 bg-white rounded-2xl shadow-xl flex items-center justify-center text-2xl mb-4 border border-slate-100">🔒</div>
                         <p class="text-[10px] font-black uppercase tracking-widest text-slate-900 mb-1">Konten Terkunci</p>
                         <p class="text-[9px] font-bold text-slate-500 leading-tight">Khusus Member Premium Adidaya</p>
                     </div>
@@ -70,17 +77,14 @@ const isPremium = computed(() => {
                     </div>
 
                     <div class="h-20 bg-gradient-to-br from-indigo-50 via-white to-slate-50 relative overflow-hidden border-b border-slate-100">
-                        <div class="absolute -left-4 -top-4 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition duration-700"></div>
-                        <div class="absolute right-2 top-2 text-6xl opacity-[0.04] font-black text-slate-900 select-none italic tracking-tighter">#{{ i }}</div>
+                        <div class="absolute right-2 top-2 text-6xl opacity-[0.04] font-black text-slate-900 select-none italic tracking-tighter">#{{ index + 1 }}</div>
                     </div>
 
                     <div class="px-8 pb-8 pt-0 flex-1 flex flex-col -mt-10 relative z-10">
-                        <div class="w-14 h-14 bg-white rounded-2xl shadow-lg border border-slate-100 flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition duration-500 text-indigo-600">
-                            ⚡
-                        </div>
+                        <div class="w-14 h-14 bg-white rounded-2xl shadow-lg border border-slate-100 flex items-center justify-center text-2xl mb-5 text-indigo-600 group-hover:scale-110 transition duration-500">⚡</div>
 
                         <h3 class="text-xl font-black text-slate-800 leading-tight mb-1 group-hover:text-indigo-600 transition truncate">
-                            Simulasi Adidaya #{{ i }}
+                            {{ tryout.title }}
                         </h3>
                         <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6">Premium Intelligence</p>
 
@@ -88,11 +92,11 @@ const isPremium = computed(() => {
                             <div class="grid grid-cols-2 gap-px bg-slate-200/50 rounded-xl overflow-hidden">
                                 <div class="bg-white p-3 text-center">
                                     <p class="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Soal</p>
-                                    <p class="text-sm font-black text-slate-800">110</p>
+                                    <p class="text-sm font-black text-slate-800">{{ tryout.questions_count || 0 }}</p>
                                 </div>
                                 <div class="bg-white p-3 text-center">
                                     <p class="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Waktu</p>
-                                    <p class="text-sm font-black text-slate-800">100m</p>
+                                    <p class="text-sm font-black text-slate-800">{{ tryout.duration }}m</p>
                                 </div>
                             </div>
                             <div class="mt-1.5 px-3 py-2 bg-white rounded-xl flex items-center justify-between border border-slate-100">
@@ -101,9 +105,9 @@ const isPremium = computed(() => {
                             </div>
                         </div>
 
-                        <div class="mt-auto">
+                        <div class="mt-auto space-y-3">
                             <Link 
-                                :href="isPremium ? '#' : route('membership.index')" 
+                                :href="isPremium ? route('tryout.wait', tryout.id) : route('membership.index')" 
                                 class="block w-full py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] text-center transition-all active:scale-95 flex items-center justify-center gap-2 relative z-40"
                                 :class="isPremium 
                                     ? 'bg-slate-900 text-white shadow-xl shadow-slate-200 hover:bg-indigo-600 hover:shadow-indigo-200' 
@@ -111,15 +115,22 @@ const isPremium = computed(() => {
                             >
                                 <span v-if="isPremium">Mulai Ujian</span>
                                 <span v-else>Upgrade Ke Adidaya</span>
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg v-if="isPremium" xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                                 </svg>
+                            </Link>
+
+                            <Link 
+                                v-if="isPremium"
+                                :href="route('tryout.history.detail', tryout.id)"
+                                class="block w-full py-3 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] text-center border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all active:scale-95 relative z-40"
+                            >
+                                Riwayat Ujian
                             </Link>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-
     </AuthenticatedLayout>
 </template>

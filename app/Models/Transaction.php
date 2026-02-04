@@ -25,6 +25,9 @@ class Transaction extends Model
         'description', // Tambahkan ini
         'metadata',    // Tambahkan ini
         'payment_method', // <--- TAMBAHKAN INI WAJIB!
+        'referrer_id',
+    'discount_amount',
+    'affiliate_commission',
     ];
 
     protected $casts = [
@@ -42,6 +45,11 @@ public function package()
 {
     // Sesuaikan foreign_key-nya, misalnya 'package_id'
     return $this->belongsTo(Package::class, 'package_id');
+}
+
+public function referrer()
+{
+    return $this->belongsTo(User::class, 'referrer_id');
 }
 
 public function tryout()

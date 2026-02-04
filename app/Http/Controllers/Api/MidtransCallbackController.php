@@ -44,6 +44,39 @@ class MidtransCallbackController extends Controller
         return response()->json(['message' => 'Transaction not found'], 404);
     }
 
+    // Cari method handleGeneralPurchase dan tambahkan logika referrer
+private function handleGeneralPurchase($transaction, $status)
+{
+    if ($transaction->status == 'paid') return response()->json(['message' => 'Already processed']);
+
+    if ($status == 'capture' || $status == 'settlement') {
+        DB::transaction(function () use ($transaction) {
+            $transaction->update(['status' => 'paid']);
+
+            // TAMBAHKAN INI: Komisi Afiliasi
+            if ($transaction->referrer_id && $transaction->affiliate_commission > 0) {
+                User::find($transaction->referrer_id)->increment('affiliate_balance', $transaction->affiliate_commission);
+            }
+
+            // Logika Membership (Tetap ada)
+            if (str_starts_with($transaction->invoice_code, 'MEMB-')) {
+                $user = User::find($transaction->user_id);
+                $daysToAdd = $transaction->details['membership_days'] ?? 0;
+                if ($daysToAdd > 0) {
+                    $currentExpiry = ($user->membership_expires_at && Carbon::parse($user->membership_expires_at)->isFuture()) 
+                        ? $user->membership_expires_at 
+                        : now();
+                    $user->membership_expires_at = Carbon::parse($currentExpiry)->addDays($daysToAdd);
+                    $user->save();
+                }
+            }
+        });
+    } else if (in_array($status, ['cancel', 'deny', 'expire'])) {
+        $transaction->update(['status' => 'failed']);
+    }
+    return response()->json(['message' => 'Purchase processed']);
+}
+
     private function handleWalletTopUp($transaction, $status)
     {
         if ($transaction->status == 'success') return response()->json(['message' => 'Already processed']);
@@ -59,29 +92,4 @@ class MidtransCallbackController extends Controller
         return response()->json(['message' => 'Wallet Top Up processed']);
     }
 
-    private function handleGeneralPurchase($transaction, $status)
-    {
-        if ($transaction->status == 'paid') return response()->json(['message' => 'Already processed']);
-
-        if ($status == 'capture' || $status == 'settlement') {
-            $transaction->update(['status' => 'paid']);
-
-            // JIKA INI MEMBERSHIP (Ditandai dengan kode invoice MEMB-)
-            if (str_starts_with($transaction->invoice_code, 'MEMB-')) {
-                $user = User::find($transaction->user_id);
-                
-                // Ambil jumlah hari dari kolom 'details' (kita simpan di controller pembelian)
-                $daysToAdd = $transaction->details['membership_days'] ?? 0;
-
-                if ($daysToAdd > 0) {
-                    $currentExpiry = $user->isMember() ? $user->membership_expires_at : now();
-                    $user->membership_expires_at = Carbon::parse($currentExpiry)->addDays($daysToAdd);
-                    $user->save();
-                }
-            }
-        } else if (in_array($status, ['cancel', 'deny', 'expire'])) {
-            $transaction->update(['status' => 'failed']);
-        }
-        return response()->json(['message' => 'Purchase processed']);
-    }
 }
