@@ -11,7 +11,6 @@ use Inertia\Inertia;
 use Midtrans\Snap;
 use Midtrans\Config;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class CheckoutController extends Controller
@@ -29,21 +28,6 @@ class CheckoutController extends Controller
         return $transaction->tryout?->title ?? $nusantaraName ?? $transaction->description ?? 'Paket Belajar';
     }
 
-    /**
-     * Hitung biaya tambahan agar Merchant "Terima Bersih"
-     * Estimasi QRIS: 0.7% MDR + PPN 11% dari biaya tersebut.
-     */
-    private function calculateTotalWithFee($baseAmount)
-    {
-        $feePercentage = 0.007; // MDR QRIS 0.7%
-        $taxPercentage = 0.11;  // PPN 11% dari MDR
-
-        $adminFee = $baseAmount * $feePercentage;
-        $vat = $adminFee * $taxPercentage;
-        
-        return (int) ceil($baseAmount + $adminFee + $vat);
-    }
-
     public function show(Transaction $transaction)
     {
         if ($transaction->user_id !== auth()->id()) abort(403);
@@ -51,63 +35,50 @@ class CheckoutController extends Controller
         $user = User::find(auth()->id());
         $itemName = $this->resolveItemName($transaction);
 
-        // Jika sudah lunas, arahkan ke dashboard
         if (in_array($transaction->status, ['paid', 'success'])) {
-            return redirect()->route('dashboard')->with('success', "Akses $itemName Telah Aktif!");
+            if (!$transaction->tryout_id) {
+                if (!$user->membership_expires_at || $user->membership_expires_at->isPast()) {
+                    $days = $transaction->metadata['days'] ?? 30;
+                    $user->update(['membership_expires_at' => now()->addDays($days)]);
+                }
+                return redirect()->route('dashboard')->with('success', "Akses $itemName Telah Aktif!");
+            }
+            return redirect()->route('tryout.adidaya');
         }
 
         $transaction->load(['tryout']); 
 
-        // Generasi Snap Token
+        // Hitung Total Bayar agar Merchant "Terima Bersih" (Asumsi Fee QRIS 0.7% + PPN 11%)
+        $fee = ceil($transaction->amount * 0.007 * 1.11);
+        $totalToPay = (int) ($transaction->amount + $fee);
+        
+        // Simpan total_amount ke database agar sinkron
+        $transaction->update(['total_amount' => $totalToPay]);
+
         if (empty($transaction->snap_token)) {
+            $this->initMidtrans();
+            $params = [
+                'transaction_details' => [
+                    'order_id' => $transaction->invoice_code . '-' . time(), 
+                    'gross_amount' => $totalToPay
+                ],
+                'item_details' => [
+                    ['id' => $transaction->id, 'price' => (int) $transaction->amount, 'quantity' => 1, 'name' => "Nusantara: " . substr($itemName, 0, 20)],
+                    ['id' => 'FEE', 'price' => (int) $fee, 'quantity' => 1, 'name' => 'Biaya Layanan']
+                ],
+                'customer_details' => ['first_name' => auth()->user()->name, 'email' => auth()->user()->email],
+            ];
             try {
-                $this->initMidtrans();
-
-                // Hitung total bayar agar merchant terima bersih
-                $totalToPay = $this->calculateTotalWithFee($transaction->amount);
-                
-                // Update total_amount di database
-                $transaction->update(['total_amount' => $totalToPay]);
-
-                $params = [
-                    'transaction_details' => [
-                        'order_id' => $transaction->invoice_code . '-' . time(), // Unique ID untuk Sandbox
-                        'gross_amount' => $totalToPay
-                    ],
-                    'item_details' => [
-                        [
-                            'id' => 'P-' . $transaction->id, 
-                            'price' => (int) $transaction->amount, 
-                            'quantity' => 1, 
-                            'name' => "Nusantara: " . substr($itemName, 0, 30)
-                        ],
-                        [
-                            'id' => 'FEE-QRIS',
-                            'price' => (int) ($totalToPay - $transaction->amount),
-                            'quantity' => 1,
-                            'name' => 'Biaya Layanan & PPN'
-                        ]
-                    ],
-                    'customer_details' => [
-                        'first_name' => auth()->user()->name, 
-                        'email' => auth()->user()->email
-                    ],
-                    // HANYA QRIS
-                    'enabled_payments' => ['qris'],
-                ];
-
                 $snapToken = Snap::getSnapToken($params);
                 $transaction->update(['snap_token' => $snapToken]);
-            } catch (\Exception $e) {
-                Log::error('Midtrans Error: ' . $e->getMessage());
-            }
+            } catch (\Exception $e) {}
         }
 
         return Inertia::render('User/Checkout/Show', [
             'transaction' => [
                 'id' => $transaction->id, 
                 'amount' => $transaction->amount, 
-                'total_amount' => $transaction->total_amount ?? $transaction->amount,
+                'total_amount' => $transaction->total_amount, // PERBAIKAN: Masukkan data ini
                 'invoice_code' => $transaction->invoice_code,
                 'snap_token' => $transaction->snap_token, 
                 'description' => $itemName, 
@@ -155,9 +126,8 @@ class CheckoutController extends Controller
     }
 
     private function initMidtrans() {
-        Config::$serverKey = config('services.midtrans.server_key'); //
+        Config::$serverKey = config('services.midtrans.server_key');
         Config::$isProduction = config('services.midtrans.is_production');
-        Config::$isSanitized = true; 
-        Config::$is3ds = true;
+        Config::$isSanitized = true; Config::$is3ds = true;
     }
 }

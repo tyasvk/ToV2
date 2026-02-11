@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\WalletTransaction;
-use App\Models\Transaction; // Tambahkan model Transaction
+use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Midtrans\Config;
 use Midtrans\Notification;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB; // PERBAIKAN 1: Wajib di-import
+use Illuminate\Support\Facades\Log;
 
 class MidtransCallbackController extends Controller
 {
@@ -27,16 +29,22 @@ class MidtransCallbackController extends Controller
         }
 
         $transactionStatus = $notif->transaction_status;
-        $orderId = $notif->order_id;
+        $orderIdMidtrans = $notif->order_id;
 
-        // 1. CEK APAKAH INI TRANSAKSI TOP UP WALLET
-        $walletTx = WalletTransaction::where('proof_payment', $orderId)->first();
+        /**
+         * PERBAIKAN 2: Jika Anda menggunakan timestamp di order_id (misal: INV-123-171234),
+         * kita ambil bagian depannya saja untuk mencari di database.
+         */
+        $invoiceCode = explode('-', $orderIdMidtrans)[0];
+
+        // 1. Cek Transaksi Top Up Wallet
+        $walletTx = WalletTransaction::where('proof_payment', $orderIdMidtrans)->first();
         if ($walletTx) {
             return $this->handleWalletTopUp($walletTx, $transactionStatus);
         }
 
-        // 2. CEK APAKAH INI TRANSAKSI PEMBELIAN (TRYOUT ATAU MEMBERSHIP)
-        $tx = Transaction::where('invoice_code', $orderId)->first();
+        // 2. Cek Transaksi Pembelian (Tryout atau Membership)
+        $tx = Transaction::where('invoice_code', $invoiceCode)->first();
         if ($tx) {
             return $this->handleGeneralPurchase($tx, $transactionStatus);
         }
@@ -44,38 +52,45 @@ class MidtransCallbackController extends Controller
         return response()->json(['message' => 'Transaction not found'], 404);
     }
 
-    // Cari method handleGeneralPurchase dan tambahkan logika referrer
-private function handleGeneralPurchase($transaction, $status)
-{
-    if ($transaction->status == 'paid') return response()->json(['message' => 'Already processed']);
+    private function handleGeneralPurchase($transaction, $status)
+    {
+        if ($transaction->status == 'paid') return response()->json(['message' => 'Already processed']);
 
-    if ($status == 'capture' || $status == 'settlement') {
-        DB::transaction(function () use ($transaction) {
-            $transaction->update(['status' => 'paid']);
+        if ($status == 'capture' || $status == 'settlement') {
+            DB::transaction(function () use ($transaction) {
+                $transaction->update(['status' => 'paid']);
 
-            // TAMBAHKAN INI: Komisi Afiliasi
-            if ($transaction->referrer_id && $transaction->affiliate_commission > 0) {
-                User::find($transaction->referrer_id)->increment('affiliate_balance', $transaction->affiliate_commission);
-            }
-
-            // Logika Membership (Tetap ada)
-            if (str_starts_with($transaction->invoice_code, 'MEMB-')) {
-                $user = User::find($transaction->user_id);
-                $daysToAdd = $transaction->details['membership_days'] ?? 0;
-                if ($daysToAdd > 0) {
-                    $currentExpiry = ($user->membership_expires_at && Carbon::parse($user->membership_expires_at)->isFuture()) 
-                        ? $user->membership_expires_at 
-                        : now();
-                    $user->membership_expires_at = Carbon::parse($currentExpiry)->addDays($daysToAdd);
-                    $user->save();
+                // Komisi Afiliasi
+                if ($transaction->referrer_id && $transaction->affiliate_commission > 0) {
+                    User::find($transaction->referrer_id)->increment('affiliate_balance', $transaction->affiliate_commission);
                 }
-            }
-        });
-    } else if (in_array($status, ['cancel', 'deny', 'expire'])) {
-        $transaction->update(['status' => 'failed']);
+
+                /**
+                 * PERBAIKAN 3: Logika Aktivasi Membership
+                 * Kita cek apakah tryout_id kosong (ciri khas transaksi membership di sistem Anda)
+                 */
+                if (!$transaction->tryout_id) {
+                    $user = User::find($transaction->user_id);
+                    
+                    // Gunakan metadata['days'] agar sesuai dengan CheckoutController
+                    $daysToAdd = $transaction->metadata['days'] ?? 30;
+
+                    $currentExpiry = ($user->membership_expires_at && Carbon::parse($user->membership_expires_at)->isFuture()) 
+                        ? Carbon::parse($user->membership_expires_at) 
+                        : now();
+
+                    $user->membership_expires_at = $currentExpiry->addDays($daysToAdd);
+                    $user->save();
+                    
+                    Log::info("Membership Aktif untuk User: {$user->id} selama {$daysToAdd} hari.");
+                }
+            });
+        } else if (in_array($status, ['cancel', 'deny', 'expire'])) {
+            $transaction->update(['status' => 'failed']);
+        }
+
+        return response()->json(['message' => 'Purchase processed']);
     }
-    return response()->json(['message' => 'Purchase processed']);
-}
 
     private function handleWalletTopUp($transaction, $status)
     {
@@ -89,7 +104,7 @@ private function handleGeneralPurchase($transaction, $status)
         } else if (in_array($status, ['cancel', 'deny', 'expire'])) {
             $transaction->update(['status' => 'failed']);
         }
+        
         return response()->json(['message' => 'Wallet Top Up processed']);
     }
-
 }
