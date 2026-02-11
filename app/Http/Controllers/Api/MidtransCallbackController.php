@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 use Midtrans\Config;
 use Midtrans\Notification;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB; // PERBAIKAN 1: Wajib di-import
+use Illuminate\Support\Facades\DB; // Perbaikan: Tambahkan Import DB
 use Illuminate\Support\Facades\Log;
 
 class MidtransCallbackController extends Controller
@@ -31,19 +31,16 @@ class MidtransCallbackController extends Controller
         $transactionStatus = $notif->transaction_status;
         $orderIdMidtrans = $notif->order_id;
 
-        /**
-         * PERBAIKAN 2: Jika Anda menggunakan timestamp di order_id (misal: INV-123-171234),
-         * kita ambil bagian depannya saja untuk mencari di database.
-         */
+        // Perbaikan 1: Ambil Invoice Code asli (buang suffix timestamp jika ada)
         $invoiceCode = explode('-', $orderIdMidtrans)[0];
 
-        // 1. Cek Transaksi Top Up Wallet
+        // 1. CEK TOP UP WALLET
         $walletTx = WalletTransaction::where('proof_payment', $orderIdMidtrans)->first();
         if ($walletTx) {
             return $this->handleWalletTopUp($walletTx, $transactionStatus);
         }
 
-        // 2. Cek Transaksi Pembelian (Tryout atau Membership)
+        // 2. CEK PEMBELIAN (TRYOUT ATAU MEMBERSHIP)
         $tx = Transaction::where('invoice_code', $invoiceCode)->first();
         if ($tx) {
             return $this->handleGeneralPurchase($tx, $transactionStatus);
@@ -65,15 +62,13 @@ class MidtransCallbackController extends Controller
                     User::find($transaction->referrer_id)->increment('affiliate_balance', $transaction->affiliate_commission);
                 }
 
-                /**
-                 * PERBAIKAN 3: Logika Aktivasi Membership
-                 * Kita cek apakah tryout_id kosong (ciri khas transaksi membership di sistem Anda)
-                 */
+                // Perbaikan 2 & 3: Logika Aktivasi Membership (Konsisten dengan CheckoutController)
+                // Jika tryout_id kosong, berarti ini transaksi Membership
                 if (!$transaction->tryout_id) {
                     $user = User::find($transaction->user_id);
                     
-                    // Gunakan metadata['days'] agar sesuai dengan CheckoutController
-                    $daysToAdd = $transaction->metadata['days'] ?? 30;
+                    // Gunakan metadata['days'] sesuai yang disimpan di CheckoutController
+                    $daysToAdd = $transaction->metadata['days'] ?? 30; 
 
                     $currentExpiry = ($user->membership_expires_at && Carbon::parse($user->membership_expires_at)->isFuture()) 
                         ? Carbon::parse($user->membership_expires_at) 
@@ -82,13 +77,12 @@ class MidtransCallbackController extends Controller
                     $user->membership_expires_at = $currentExpiry->addDays($daysToAdd);
                     $user->save();
                     
-                    Log::info("Membership Aktif untuk User: {$user->id} selama {$daysToAdd} hari.");
+                    Log::info("Membership user {$user->id} aktif via Midtrans selama {$daysToAdd} hari.");
                 }
             });
         } else if (in_array($status, ['cancel', 'deny', 'expire'])) {
             $transaction->update(['status' => 'failed']);
         }
-
         return response()->json(['message' => 'Purchase processed']);
     }
 
@@ -99,12 +93,10 @@ class MidtransCallbackController extends Controller
         if ($status == 'capture' || $status == 'settlement') {
             $transaction->update(['status' => 'success']);
             $user = User::find($transaction->user_id);
-            $user->balance += $transaction->amount;
-            $user->save();
+            $user->increment('balance', $transaction->amount);
         } else if (in_array($status, ['cancel', 'deny', 'expire'])) {
             $transaction->update(['status' => 'failed']);
         }
-        
         return response()->json(['message' => 'Wallet Top Up processed']);
     }
 }

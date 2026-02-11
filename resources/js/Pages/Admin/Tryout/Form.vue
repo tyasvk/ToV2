@@ -5,13 +5,15 @@ const props = defineProps({
     tryout: Object, 
 });
 
-// Inisialisasi form dengan data default atau data dari props (untuk edit)
+// Inisialisasi form
 const form = useForm({
     title: props.tryout?.title ?? '',
     description: props.tryout?.description ?? '',
-    duration: props.tryout?.duration ?? 110, // <--- UBAH DARI duration_minutes
+    duration: props.tryout?.duration ?? 110,
     is_paid: props.tryout?.is_paid ?? false,
     price: props.tryout?.price ?? 0,
+    // Pastikan ini ada:
+    end_date: props.tryout?.end_date ?? '', 
 });
 
 const submit = () => {
@@ -79,6 +81,16 @@ const submit = () => {
                 </div>
             </Transition>
 
+            <div>
+                <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Batas Akhir Pendaftaran</label>
+                <input 
+                    v-model="form.end_date" 
+                    type="datetime-local" 
+                    class="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-600 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                >
+                <p class="text-[10px] text-slate-400 mt-2 font-bold italic">*Kosongkan jika pendaftaran dibuka selamanya.</p>
+                <div v-if="form.errors.end_date" class="text-rose-500 text-[10px] mt-1 font-bold uppercase">{{ form.errors.end_date }}</div>
+            </div>
             <div>
                 <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Keterangan Paket</label>
                 <textarea 

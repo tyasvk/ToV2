@@ -9,19 +9,15 @@ use Inertia\Inertia;
 
 class TryoutManagerController extends Controller
 {
-    /**
-     * Menampilkan daftar tryout umum (bukan adidaya atau akbar).
-     */
     public function index(Request $request)
     {
         $query = Tryout::query()->withCount('questions');
 
-        // --- FILTER: Sembunyikan tipe adidaya dan akbar ---
+        // Filter tipe (bukan adidaya/akbar)
         $query->where(function ($q) {
             $q->whereNotIn('type', ['adidaya', 'akbar'])
               ->orWhereNull('type');
         });
-        // ------------------------------------------------
 
         if ($request->search) {
             $query->where('title', 'like', '%' . $request->search . '%');
@@ -35,54 +31,42 @@ class TryoutManagerController extends Controller
         ]);
     }
 
-    /**
-     * Menyimpan paket tryout baru dengan tipe default 'general'.
-     */
     public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'duration' => 'required|integer|min:1',
-            'description' => 'nullable|string',
-            'is_paid' => 'required|boolean',
-            'price' => 'required_if:is_paid,true|numeric|min:0',
-            'is_published' => 'boolean',
-            'published_at' => 'nullable|date',
-            'started_at' => 'nullable|date',
-        ]);
+{
+    $validated = $request->validate([
+        'title' => 'required|string|max:255',
+        'duration' => 'required|integer|min:1',
+        'description' => 'nullable|string',
+        'is_paid' => 'required|boolean',
+        'price' => 'required_if:is_paid,true|numeric|min:0',
+        'is_published' => 'boolean',
+        'end_date' => 'nullable|date', // <--- Validasi Tanggal
+    ]);
 
-        // Secara otomatis set tipe ke general agar tidak masuk ke list adidaya
-        $validated['type'] = 'general';
+    $validated['type'] = 'general'; // Default tipe
 
-        Tryout::create($validated);
+    Tryout::create($validated);
 
-        return back()->with('message', 'Paket Tryout berhasil ditambahkan!');
-    }
+    return back()->with('message', 'Paket Tryout berhasil ditambahkan!');
+}
 
-    /**
-     * Memperbarui data tryout.
-     */
-    public function update(Request $request, Tryout $tryout)
-    {
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'duration' => 'required|integer|min:1',
-            'description' => 'nullable|string',
-            'is_paid' => 'required|boolean',
-            'price' => 'required_if:is_paid,true|numeric|min:0',
-            'is_published' => 'boolean',
-            'published_at' => 'nullable|date',
-            'started_at' => 'nullable|date',
-        ]);
+public function update(Request $request, Tryout $tryout)
+{
+    $validated = $request->validate([
+        'title' => 'required|string|max:255',
+        'duration' => 'required|integer|min:1',
+        'description' => 'nullable|string',
+        'is_paid' => 'required|boolean',
+        'price' => 'required_if:is_paid,true|numeric|min:0',
+        'is_published' => 'boolean',
+        'end_date' => 'nullable|date', // <--- Validasi Tanggal
+    ]);
 
-        $tryout->update($validated);
+    $tryout->update($validated);
 
-        return back()->with('message', 'Paket Tryout berhasil diperbarui!');
-    }
+    return back()->with('message', 'Paket Tryout berhasil diperbarui!');
+}
 
-    /**
-     * Menghapus tryout.
-     */
     public function destroy(Tryout $tryout)
     {
         $tryout->delete();

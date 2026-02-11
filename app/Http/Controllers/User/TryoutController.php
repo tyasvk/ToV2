@@ -58,88 +58,106 @@ class TryoutController extends Controller
         ]);
     }
 
-    // Cari method processRegistration dan ganti isinya dengan ini
-public function processRegistration(Request $request, Tryout $tryout)
+    public function show(Tryout $tryout)
 {
-    $request->validate([
-        'payment_method' => 'required|in:wallet,midtrans',
-        'emails' => 'array|max:5',
-        'emails.*' => 'required|email|exists:users,email|distinct',
-        'voucher_code' => 'nullable|string|exists:users,affiliate_code', // Tambahkan validasi
+    // Cek apakah pendaftaran ditutup
+    $isClosed = $tryout->end_date && now()->greaterThan($tryout->end_date);
+
+    return Inertia::render('User/Tryout/Show', [
+        'tryout' => $tryout,
+        'is_registration_closed' => $isClosed, // Kirim status ke frontend
     ]);
-
-    $participants = collect([auth()->user()->email])->merge($request->emails ?? [])->unique()->values();
-    $qty = $participants->count();
-    $discount = match($qty) { 2 => 0.05, 3 => 0.10, 4 => 0.15, default => $qty >= 5 ? 0.20 : 0 };
-
-    // --- LOGIKA AFILIASI ---
-    $referrerId = null;
-    $discountVoucher = 0;
-    $commission = 0;
-
-    if ($request->voucher_code) {
-        $referrer = User::where('affiliate_code', $request->voucher_code)->first();
-        // Cek agar tidak pakai kode sendiri
-        if ($referrer && $referrer->id !== auth()->id()) {
-            $referrerId = $referrer->id;
-            $discountVoucher = 3000;
-            $commission = 3000;
-        }
-    }
-
-    $finalAmount = ($tryout->price * $qty) * (1 - $discount) - $discountVoucher;
-    $finalAmount = max(0, $finalAmount); // Pastikan tidak negatif
-    $invoice = 'INV-' . strtoupper(Str::random(10));
-
-    if ($request->payment_method === 'wallet') {
-        $user = auth()->user();
-        if ($user->balance < $finalAmount) return back()->withErrors(['payment' => 'Saldo dompet tidak mencukupi.']);
-
-        DB::transaction(function () use ($user, $tryout, $finalAmount, $participants, $qty, $invoice, $referrerId, $commission, $discountVoucher) {
-            $user->decrement('balance', $finalAmount);
-            
-            WalletTransaction::create(['user_id' => $user->id, 'type' => 'debit', 'amount' => $finalAmount, 'description' => 'Bayar Tryout: ' . $tryout->title, 'status' => 'success', 'proof_payment' => 'WALLET-SYSTEM']);
-            
-            $transaction = Transaction::create([
-                'user_id' => $user->id, 
-                'tryout_id' => $tryout->id, 
-                'referrer_id' => $referrerId, // Simpan Referrer
-                'invoice_code' => $invoice, 
-                'unit_price' => $tryout->price, 
-                'qty' => $qty, 
-                'amount' => $finalAmount, 
-                'discount_amount' => $discountVoucher, // Simpan Diskon
-                'affiliate_commission' => $commission, // Simpan Komisi
-                'participants_data' => $participants->all(), 
-                'status' => 'paid'
-            ]);
-
-            // INPUT KOMISI KE REFERRER (Jika bayar pakai wallet)
-            if ($referrerId) {
-                User::find($referrerId)->increment('affiliate_balance', $commission);
-            }
-        });
-
-        return redirect()->route('tryout.index')->with('success', 'Pembelian berhasil!');
-    }
-
-    // Untuk Midtrans: Simpan data referal, komisi akan cair saat status jadi 'paid' di callback
-    $transaction = Transaction::create([
-        'user_id' => auth()->id(), 
-        'tryout_id' => $tryout->id, 
-        'referrer_id' => $referrerId,
-        'invoice_code' => $invoice, 
-        'unit_price' => $tryout->price, 
-        'qty' => $qty, 
-        'amount' => $finalAmount, 
-        'discount_amount' => $discountVoucher,
-        'affiliate_commission' => $commission,
-        'participants_data' => $participants->all(), 
-        'status' => 'pending'
-    ]);
-    
-    return redirect()->route('checkout.show', $transaction->id);
 }
+
+    /**
+     * Proses Pendaftaran Tryout
+     */
+    public function processRegistration(Request $request, Tryout $tryout)
+    {
+        // --- 1. Validasi Batas Waktu Pendaftaran ---
+        if ($tryout->end_date && now()->greaterThan($tryout->end_date)) {
+            return back()->withErrors(['message' => 'Pendaftaran untuk tryout ini sudah ditutup karena melewati batas waktu.']);
+        }
+
+        $request->validate([
+            'payment_method' => 'required|in:wallet,midtrans',
+            'emails' => 'array|max:5',
+            'emails.*' => 'required|email|exists:users,email|distinct',
+            'voucher_code' => 'nullable|string|exists:users,affiliate_code',
+        ]);
+
+        $participants = collect([auth()->user()->email])->merge($request->emails ?? [])->unique()->values();
+        $qty = $participants->count();
+        $discount = match($qty) { 2 => 0.05, 3 => 0.10, 4 => 0.15, default => $qty >= 5 ? 0.20 : 0 };
+
+        // --- LOGIKA AFILIASI ---
+        $referrerId = null;
+        $discountVoucher = 0;
+        $commission = 0;
+
+        if ($request->voucher_code) {
+            $referrer = User::where('affiliate_code', $request->voucher_code)->first();
+            // Cek agar tidak pakai kode sendiri
+            if ($referrer && $referrer->id !== auth()->id()) {
+                $referrerId = $referrer->id;
+                $discountVoucher = 3000;
+                $commission = 3000;
+            }
+        }
+
+        $finalAmount = ($tryout->price * $qty) * (1 - $discount) - $discountVoucher;
+        $finalAmount = max(0, $finalAmount); // Pastikan tidak negatif
+        $invoice = 'INV-' . strtoupper(Str::random(10));
+
+        if ($request->payment_method === 'wallet') {
+            $user = auth()->user();
+            if ($user->balance < $finalAmount) return back()->withErrors(['payment' => 'Saldo dompet tidak mencukupi.']);
+
+            DB::transaction(function () use ($user, $tryout, $finalAmount, $participants, $qty, $invoice, $referrerId, $commission, $discountVoucher) {
+                $user->decrement('balance', $finalAmount);
+                
+                WalletTransaction::create(['user_id' => $user->id, 'type' => 'debit', 'amount' => $finalAmount, 'description' => 'Bayar Tryout: ' . $tryout->title, 'status' => 'success', 'proof_payment' => 'WALLET-SYSTEM']);
+                
+                $transaction = Transaction::create([
+                    'user_id' => $user->id, 
+                    'tryout_id' => $tryout->id, 
+                    'referrer_id' => $referrerId, // Simpan Referrer
+                    'invoice_code' => $invoice, 
+                    'unit_price' => $tryout->price, 
+                    'qty' => $qty, 
+                    'amount' => $finalAmount, 
+                    'discount_amount' => $discountVoucher, // Simpan Diskon
+                    'affiliate_commission' => $commission, // Simpan Komisi
+                    'participants_data' => $participants->all(), 
+                    'status' => 'paid'
+                ]);
+
+                // INPUT KOMISI KE REFERRER (Jika bayar pakai wallet)
+                if ($referrerId) {
+                    User::find($referrerId)->increment('affiliate_balance', $commission);
+                }
+            });
+
+            return redirect()->route('tryout.index')->with('success', 'Pembelian berhasil!');
+        }
+
+        // Untuk Midtrans: Simpan data referal, komisi akan cair saat status jadi 'paid' di callback
+        $transaction = Transaction::create([
+            'user_id' => auth()->id(), 
+            'tryout_id' => $tryout->id, 
+            'referrer_id' => $referrerId,
+            'invoice_code' => $invoice, 
+            'unit_price' => $tryout->price, 
+            'qty' => $qty, 
+            'amount' => $finalAmount, 
+            'discount_amount' => $discountVoucher,
+            'affiliate_commission' => $commission,
+            'participants_data' => $participants->all(), 
+            'status' => 'pending'
+        ]);
+        
+        return redirect()->route('checkout.show', $transaction->id);
+    }
 
     /**
      * Tampilkan halaman Nusantara Adidaya (Premium Membership)
@@ -322,6 +340,12 @@ public function processRegistration(Request $request, Tryout $tryout)
 
     public function registerForm(Tryout $tryout)
     {
+        // --- Validasi Tambahan: Cek Tanggal ---
+        if ($tryout->end_date && now()->greaterThan($tryout->end_date)) {
+            return redirect()->route('tryout.show', $tryout->id)
+                ->with('error', 'Pendaftaran untuk tryout ini telah ditutup.');
+        }
+
         return Inertia::render('User/Tryout/Register', ['tryout' => $tryout]);
     }
 
@@ -369,11 +393,6 @@ public function processRegistration(Request $request, Tryout $tryout)
 
         $attempt = ExamAttempt::create(['user_id' => auth()->id(), 'tryout_id' => $tryout->id, 'answers' => $answers, 'twk_score' => $twk, 'tiu_score' => $tiu, 'tkp_score' => $tkp, 'total_score' => $twk + $tiu + $tkp, 'completed_at' => now()]);
         return redirect()->route('tryout.result', $attempt->id);
-    }
-
-    public function show(Tryout $tryout)
-    {
-        return Inertia::render('User/Tryout/Show', ['tryout' => $tryout->loadCount('questions')]);
     }
 
     public function history()
