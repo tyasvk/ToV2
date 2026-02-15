@@ -1,6 +1,6 @@
 {
-    "masterProcessId": 3747,
-    "managerProcessId": 3756,
+    "masterProcessId": 5533,
+    "managerProcessId": 5542,
     "state": {
         "appName": "Laravel",
         "host": "127.0.0.1",
@@ -8,12 +8,12 @@
         "workers": 2,
         "taskWorkers": 2,
         "maxRequests": 500,
-        "publicPath": "\/home\/tyasvara\/Laravel\/ToV2\/public",
-        "storagePath": "\/home\/tyasvara\/Laravel\/ToV2\/storage",
+        "publicPath": "\/home\/tyasvara\/Documents\/Laravel\/ToV2\/public",
+        "storagePath": "\/home\/tyasvara\/Documents\/Laravel\/ToV2\/storage",
         "defaultServerOptions": {
             "enable_coroutine": false,
             "daemonize": false,
-            "log_file": "\/home\/tyasvara\/Laravel\/ToV2\/storage\/logs\/swoole_http.log",
+            "log_file": "\/home\/tyasvara\/Documents\/Laravel\/ToV2\/storage\/logs\/swoole_http.log",
             "log_level": 2,
             "max_request": 500,
             "package_max_length": 10485760,
