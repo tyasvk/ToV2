@@ -19,42 +19,67 @@ use Barryvdh\DomPDF\Facade\Pdf;
 class TryoutController extends Controller
 {
     /**
-     * Katalog Tryout Umum
+     * Gabungan Katalog & Tryout Saya
      */
     public function index(Request $request)
     {
         $user = auth()->user();
         $isPremiumMember = $user->membership_expires_at && now()->lt($user->membership_expires_at);
 
-        $tryouts = Tryout::query()
-            ->where('is_published', true)
-            // Filter agar tipe 'akbar' dan 'adidaya' tidak muncul di list umum
-            ->where(function ($query) {
-                $query->whereNotIn('type', ['akbar', 'adidaya'])
-                      ->orWhereNull('type');
-            })
-            // Jika Member Premium, pindahkan semua ke 'Tryout Saya' (katalog umum menjadi kosong)
-            ->when($isPremiumMember, function ($query) {
-                $query->whereRaw('1 = 0');
-            })
-            // Jika bukan member, sembunyikan yang sudah dibeli manual
-            ->when(!$isPremiumMember, function ($query) use ($user) {
-                $query->whereDoesntHave('transactions', function($q) use ($user) {
+        // --- 1. DATA KATALOG (Belum Dimiliki) ---
+        // Jika Premium, katalog kosong karena semua otomatis jadi "Milik Saya"
+        $catalogTryouts = collect();
+        if (!$isPremiumMember) {
+            $catalogTryouts = Tryout::query()
+                ->where('is_published', true)
+                ->where(function ($query) {
+                    $query->whereNotIn('type', ['akbar', 'adidaya'])->orWhereNull('type');
+                })
+                ->whereDoesntHave('transactions', function($q) use ($user) {
                     $q->whereIn('status', ['paid', 'success'])
                       ->where(function($subQuery) use ($user) {
                           $subQuery->where('user_id', $user->id)
                                    ->orWhereJsonContains('participants_data', $user->email);
                       });
-                });
+                })
+                ->when($request->search, fn($q, $s) => $q->where('title', 'like', "%{$s}%"))
+                ->latest()
+                ->get();
+        }
+
+        // --- 2. DATA TRYOUT SAYA (Sudah Dibeli / Akses Premium) ---
+        $myTryouts = Tryout::query()
+            ->where('is_published', true)
+            ->where(function ($query) {
+                $query->whereNotIn('type', ['akbar', 'adidaya'])->orWhereNull('type');
             })
+            ->where(function($query) use ($user, $isPremiumMember) {
+                $query->whereHas('transactions', function($q) use ($user) {
+                    $q->whereIn('status', ['paid', 'success'])
+                      ->where(function($sq) use ($user) {
+                          $sq->where('user_id', $user->id)
+                            ->orWhereJsonContains('participants_data', $user->email);
+                      });
+                });
+
+                if ($isPremiumMember) {
+                    $query->orWhere(function($q) {
+                        $q->whereNotIn('type', ['akbar', 'adidaya'])->orWhereNull('type');
+                    });
+                }
+            })
+            ->withCount(['examAttempts' => function($q) use ($user) {
+                $q->where('user_id', $user->id);
+            }])
             ->when($request->search, fn($q, $s) => $q->where('title', 'like', "%{$s}%"))
             ->latest()
-            ->paginate(9)
-            ->withQueryString();
+            ->get();
 
         return Inertia::render('User/Tryout/Index', [
-            'tryouts' => $tryouts,
+            'catalogTryouts' => $catalogTryouts,
+            'myTryouts' => $myTryouts,
             'filters' => $request->only(['search']),
+            'isPremiumMember' => $isPremiumMember
         ]);
     }
 

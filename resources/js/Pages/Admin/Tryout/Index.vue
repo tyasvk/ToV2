@@ -31,6 +31,7 @@ const form = useForm({
     is_published: false,
     published_at: '',
     started_at: '',
+    end_date: '', // <--- Tambahan kolom tanggal pendaftaran
     is_paid: false,
     price: 0,
     type: 'general'
@@ -54,6 +55,7 @@ const openEditModal = (tryout) => {
     form.is_published = !!tryout.is_published;
     form.published_at = tryout.published_at ? tryout.published_at.substring(0, 16) : '';
     form.started_at = tryout.started_at ? tryout.started_at.substring(0, 16) : '';
+    form.end_date = tryout.end_date ? tryout.end_date.substring(0, 16) : ''; // <--- Tambahan mapping data
     form.is_paid = !!tryout.is_paid;
     form.price = tryout.price;
     
@@ -254,6 +256,12 @@ const formatPrice = (price) => {
                                 <label class="text-[9px] font-black text-gray-400 uppercase ml-2">Tanggal Mulai Ujian</label>
                                 <input v-model="form.started_at" type="datetime-local" class="w-full border-gray-100 bg-gray-50 rounded-2xl p-3 focus:ring-indigo-500 font-bold text-xs" />
                             </div>
+                        </div>
+
+                        <div class="space-y-1 pt-2">
+                            <label class="text-[9px] font-black text-gray-400 uppercase ml-2">Batas Akhir Pendaftaran</label>
+                            <input v-model="form.end_date" type="datetime-local" class="w-full border-gray-100 bg-gray-50 rounded-2xl p-3 focus:ring-indigo-500 font-bold text-xs" />
+                            <p class="text-[8px] text-gray-400 ml-2 italic">*Kosongkan jika pendaftaran dibuka selamanya.</p>
                         </div>
 
                         <div class="space-y-1 pt-2">

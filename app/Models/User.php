@@ -2,56 +2,72 @@
 
 namespace App\Models;
 
-use Spatie\Permission\Traits\HasRoles; 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, HasRoles; 
+    use HasFactory, Notifiable, HasRoles;
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
     protected $fillable = [
-        'name', 'email', 'password', 'balance', 'avatar', 
-        'membership_expires_at', 'participant_number', 'instance_type', 
-        'agency_name', 'province_code', 'gender','affiliate_code',
-    'affiliate_balance','bank_info',
-    ];
-
-    protected $hidden = [
-        'password', 'remember_token',
+        'name',
+        'email',
+        'password',
+        'balance',
+        'affiliate_code',
+        'affiliate_balance',
+        'membership_expires_at', // Tambahkan ini agar membership bisa diupdate
+        'province',
+        'city',
+        'district',
+        'agency_name',
+        'participant_number',
+        'avatar',
     ];
 
     /**
-     * PERBAIKAN: Satukan semua casting di sini.
-     * HAPUS properti $casts yang ada di luar fungsi ini.
+     * The attributes that should be hidden for serialization.
+     *
+     * @var array<int, string>
+     */
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
      */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
-            'bank_info' => 'array',
-            'membership_expires_at' => 'datetime', // <--- WAJIB DI SINI AGAR REAKTIF
+            'membership_expires_at' => 'datetime', // Tambahkan ini untuk pengolahan tanggal otomatis
         ];
     }
 
     /**
- * Relasi ke Riwayat Transaksi Dompet
- */
-public function walletTransactions()
-{
-    return $this->hasMany(WalletTransaction::class);
-}
-
+     * Cek apakah user adalah member premium yang aktif
+     */
     public function isMember()
     {
         return $this->membership_expires_at && $this->membership_expires_at->isFuture();
     }
 
-    public function getMembershipDaysLeftAttribute(): int
+    // Relasi
+    public function transactions()
     {
-        return $this->membership_expires_at ? now()->diffInDays($this->membership_expires_at, false) : 0;
+        return $this->hasMany(Transaction::class);
     }
 
     public function examAttempts()
@@ -59,10 +75,8 @@ public function walletTransactions()
         return $this->hasMany(ExamAttempt::class);
     }
 
-    public function purchasedTryouts()
+    public function walletTransactions()
     {
-        return $this->belongsToMany(Tryout::class, 'purchases')
-                    ->withPivot('status')
-                    ->wherePivot('status', 'success');
+        return $this->hasMany(WalletTransaction::class);
     }
 }

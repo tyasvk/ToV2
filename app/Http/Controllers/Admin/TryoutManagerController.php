@@ -32,40 +32,44 @@ class TryoutManagerController extends Controller
     }
 
     public function store(Request $request)
-{
-    $validated = $request->validate([
-        'title' => 'required|string|max:255',
-        'duration' => 'required|integer|min:1',
-        'description' => 'nullable|string',
-        'is_paid' => 'required|boolean',
-        'price' => 'required_if:is_paid,true|numeric|min:0',
-        'is_published' => 'boolean',
-        'end_date' => 'nullable|date', // <--- Validasi Tanggal
-    ]);
+    {
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'duration' => 'required|integer|min:1',
+            'description' => 'nullable|string',
+            'is_paid' => 'required|boolean',
+            'price' => 'required_if:is_paid,true|numeric|min:0',
+            'is_published' => 'boolean',
+            'published_at' => 'nullable|date', // <--- TAMBAHKAN INI
+            'started_at' => 'nullable|date',   // <--- TAMBAHKAN INI
+            'end_date' => 'nullable|date',     // <--- PASTIKAN INI ADA
+        ]);
 
-    $validated['type'] = 'general'; // Default tipe
+        $validated['type'] = 'general'; // Default tipe
 
-    Tryout::create($validated);
+        Tryout::create($validated);
 
-    return back()->with('message', 'Paket Tryout berhasil ditambahkan!');
-}
+        return back()->with('message', 'Paket Tryout berhasil ditambahkan!');
+    }
 
-public function update(Request $request, Tryout $tryout)
-{
-    $validated = $request->validate([
-        'title' => 'required|string|max:255',
-        'duration' => 'required|integer|min:1',
-        'description' => 'nullable|string',
-        'is_paid' => 'required|boolean',
-        'price' => 'required_if:is_paid,true|numeric|min:0',
-        'is_published' => 'boolean',
-        'end_date' => 'nullable|date', // <--- Validasi Tanggal
-    ]);
+    public function update(Request $request, Tryout $tryout)
+    {
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'duration' => 'required|integer|min:1',
+            'description' => 'nullable|string',
+            'is_paid' => 'required|boolean',
+            'price' => 'required_if:is_paid,true|numeric|min:0',
+            'is_published' => 'boolean',
+            'published_at' => 'nullable|date', // <--- TAMBAHKAN INI
+            'started_at' => 'nullable|date',   // <--- TAMBAHKAN INI
+            'end_date' => 'nullable|date',     // <--- PASTIKAN INI ADA
+        ]);
 
-    $tryout->update($validated);
+        $tryout->update($validated);
 
-    return back()->with('message', 'Paket Tryout berhasil diperbarui!');
-}
+        return back()->with('message', 'Paket Tryout berhasil diperbarui!');
+    }
 
     public function destroy(Tryout $tryout)
     {
