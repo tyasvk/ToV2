@@ -7,226 +7,180 @@ import Swal from 'sweetalert2';
 const page = usePage();
 const user = computed(() => page.props.auth.user);
 
-const commonFeatures = [
-    '10 Paket Eksklusif (HOTS)',
-    'Tryout Umum Unlimited',
-    'Ranking Nasional & Regional'
-];
+// Logika status membership
+const isAdidayaActive = computed(() => {
+    if (!user.value?.membership_expires_at) return false;
+    return new Date(user.value.membership_expires_at) > new Date();
+});
 
-/**
- * Daftar paket dengan nama Nusantara & Harga Premium
- */
-const plans = [
-    {
-        id: '7_days',
-        name: 'Prawira',
-        duration: '7 Hari Akses Full',
-        price: '49.000',
-        description: 'Langkah awal pejuang tangguh.',
-        features: [...commonFeatures],
-        buttonText: 'Pilih Paket',
-        highlight: false,
-    },
-    {
-        id: '30_days',
-        name: 'Satria',
-        duration: '30 Hari Akses Full',
-        price: '99.000',
-        description: 'Dedikasi penuh untuk hasil maksimal.',
-        features: [...commonFeatures],
-        buttonText: 'Pilih Paket',
-        highlight: false,
-    },
-    {
-        id: '90_days',
-        name: 'Wiranata',
-        duration: '90 Hari Akses Full',
-        price: '199.000',
-        description: 'Strategi matang menuju kemenangan.',
-        features: [...commonFeatures],
-        buttonText: 'Investasi Terbaik',
-        highlight: true,
-    },
-    {
-        id: '1_year',
-        name: 'Mahapatih',
-        duration: '1 Tahun Akses Full',
-        price: '299.000',
-        description: 'Puncak persiapan ASN sejati.',
-        features: [...commonFeatures, 'Update FR 2024 Prioritas'],
-        buttonText: 'Ambil Akses Penuh',
-        highlight: false,
-    }
-];
+const formatDate = (dateString) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+    });
+};
 
-/**
- * Fungsi untuk memproses pembelian dengan Pop-up Konfirmasi
- */
-const buyPlan = (planId, planName) => {
+const buyMembership = () => {
     Swal.fire({
-        title: 'Konfirmasi Pembelian', // Judul sudah diganti sesuai request
-        text: `Apakah Anda yakin ingin membeli paket ${planName}? Anda akan diarahkan ke halaman pembayaran aman.`,
+        title: 'Konfirmasi Langganan',
+        text: "Apakah Anda ingin melanjutkan ke halaman pembayaran Nusantara Adidaya?",
         icon: 'question',
         showCancelButton: true,
-        confirmButtonColor: '#4f46e5', 
-        cancelButtonColor: '#64748b', 
+        confirmButtonColor: '#4f46e5',
+        cancelButtonColor: '#94a3b8',
         confirmButtonText: 'Ya, Lanjutkan',
         cancelButtonText: 'Batal',
         reverseButtons: true,
-        background: '#ffffff',
         customClass: {
-            popup: 'rounded-[2rem] border-none shadow-2xl',
-            title: 'font-black text-slate-900 uppercase tracking-tight',
-            htmlContainer: 'text-slate-500 font-medium',
-            confirmButton: 'rounded-xl font-black uppercase tracking-widest text-[10px] py-4 px-8',
-            cancelButton: 'rounded-xl font-black uppercase tracking-widest text-[10px] py-4 px-8'
+            popup: 'rounded-[2rem] border-none shadow-2xl p-6 md:p-10',
+            title: 'font-medium text-slate-900 uppercase tracking-tight text-lg',
+            htmlContainer: 'text-slate-500 font-medium text-xs mt-2',
+            confirmButton: 'rounded-xl font-medium uppercase tracking-[0.2em] text-[9px] py-4 px-8',
+            cancelButton: 'rounded-xl font-medium uppercase tracking-[0.2em] text-[9px] py-4 px-8'
         }
     }).then((result) => {
         if (result.isConfirmed) {
-            router.post(route('membership.buy'), {
-                plan_id: planId,
-                payment_method: 'midtrans'
-            });
+            router.get(route('checkout.show', { type: 'membership', id: 'premium' }));
         }
     });
 };
+
+const features = [
+    'Akses Seluruh Katalog Tryout Premium',
+    'Simulasi Ranking Nasional & Real-time',
+    'Analisis Quantum (Kelemahan & Kekuatan)',
+    'Sertifikat Digital Setiap Simulasi',
+    'Update Soal Prediksi Terbaru Mingguan',
+    'Bebas Iklan & Prioritas Layanan'
+];
 </script>
 
 <template>
-    <Head title="Keanggotaan Nusantara Adidaya" />
+    <Head title="Membership Nusantara" />
 
     <AuthenticatedLayout>
-        
-        <div class="relative bg-slate-900 overflow-hidden shadow-md z-0 -mx-6 -mt-6 md:-mx-12 md:-mt-12 mb-10 pb-10 pt-10 md:pt-16">
-            <div class="absolute inset-0">
-                <div class="absolute inset-0 bg-gradient-to-r from-indigo-950 to-slate-900 opacity-95"></div>
-                <div class="absolute top-0 right-0 w-96 h-96 bg-indigo-500/20 rounded-full blur-[100px]"></div>
-                <div class="absolute bottom-0 left-0 w-64 h-64 bg-violet-500/10 rounded-full blur-[80px]"></div>
-                <div class="absolute inset-0 opacity-[0.03]" style="background-image: radial-gradient(#ffffff 1px, transparent 1px); background-size: 24px 24px;"></div>
+        <div class="max-w-5xl mx-auto px-2 md:px-4 space-y-8 animate-in fade-in duration-700">
+            
+            <div class="bg-white border border-slate-100 rounded-[2rem] p-6 md:p-10 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
+                <div class="flex items-center gap-6 text-center md:text-left flex-col md:flex-row">
+                    <div :class="isAdidayaActive ? 'bg-indigo-600 shadow-indigo-100' : 'bg-slate-100'" 
+                         class="w-20 h-20 rounded-[1.5rem] flex items-center justify-center shadow-lg transition-all duration-500 shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" 
+                             :class="isAdidayaActive ? 'text-white' : 'text-slate-400'" class="w-10 h-10">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-[9px] text-slate-400 uppercase tracking-[0.2em] font-medium mb-1.5">Status Keanggotaan</p>
+                        <h2 class="text-2xl font-medium text-slate-900 tracking-tight uppercase leading-none">
+                            {{ isAdidayaActive ? 'Nusantara Adidaya' : 'Basic Member' }}
+                        </h2>
+                        <p v-if="isAdidayaActive" class="text-[11px] text-indigo-600 font-medium mt-2 uppercase tracking-widest italic opacity-80">
+                            Akses aktif hingga: {{ formatDate(user.membership_expires_at) }}
+                        </p>
+                    </div>
+                </div>
+                
+                <div v-if="isAdidayaActive" class="px-5 py-2.5 bg-emerald-50 border border-emerald-100 rounded-2xl shrink-0">
+                    <span class="text-[10px] font-medium text-emerald-600 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Langganan Aktif
+                    </span>
+                </div>
             </div>
 
-            <div class="relative max-w-7xl mx-auto px-6 lg:px-8 text-center">
-                <span class="inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-indigo-500/20 border border-indigo-400/20 text-indigo-200 text-[10px] font-black tracking-[0.2em] uppercase mb-6 backdrop-blur-sm shadow-lg">
-                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span> Kualitas Di Atas Harga
-                </span>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                 
-                <h1 class="text-4xl md:text-6xl font-black text-white tracking-tighter mb-4 leading-tight uppercase">
-                    SATU HARGA UNTUK <br> <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-400 italic">RIBUAN POTENSI.</span>
-                </h1>
-                
-                <p class="mt-4 max-w-2xl mx-auto text-sm md:text-base text-slate-400 font-medium leading-relaxed">
-                    Nusantara Adidaya tidak bersaing dengan harga murah. Kami fokus pada akurasi simulasi, standar HOTS tertinggi, dan keberhasilan Anda menjadi ASN.
+                <div class="bg-white border border-slate-100 rounded-[2.5rem] p-8 md:p-12 flex flex-col transition-all duration-500 opacity-70 group hover:opacity-100">
+                    <div class="mb-10">
+                        <h3 class="text-[10px] font-medium text-slate-400 uppercase tracking-[0.3em] mb-3">Paket Dasar</h3>
+                        <div class="flex items-baseline gap-1">
+                            <span class="text-4xl font-medium text-slate-900 tracking-tighter">Rp 0</span>
+                            <span class="text-[10px] text-slate-400 font-medium uppercase tracking-widest">/ Selamanya</span>
+                        </div>
+                    </div>
+                    
+                    <ul class="space-y-5 mb-12 flex-1">
+                        <li class="flex items-center gap-4 text-slate-500">
+                            <div class="shrink-0 w-5 h-5 rounded-lg bg-slate-50 flex items-center justify-center">
+                                <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+                            </div>
+                            <span class="text-[11px] font-medium uppercase tracking-wider">Akses Tryout Gratis</span>
+                        </li>
+                        <li class="flex items-center gap-4 text-slate-300 italic line-through">
+                            <div class="shrink-0 w-5 h-5 rounded-lg bg-slate-50/50 flex items-center justify-center">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </div>
+                            <span class="text-[11px] font-medium uppercase tracking-wider">Materi Premium Adidaya</span>
+                        </li>
+                    </ul>
+
+                    <button disabled class="w-full py-5 rounded-2xl border border-slate-50 text-[9px] font-medium text-slate-300 uppercase tracking-[0.3em] cursor-not-allowed">
+                        Paket Dasar Aktif
+                    </button>
+                </div>
+
+                <div class="relative group h-full">
+                    <div class="absolute -inset-1 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-[2.6rem] blur-xl opacity-50 group-hover:opacity-100 transition duration-1000"></div>
+                    <div class="relative bg-white border border-indigo-50 rounded-[2.5rem] p-8 md:p-12 flex flex-col h-full shadow-2xl shadow-indigo-900/5 overflow-hidden">
+                        
+                        <div class="absolute top-8 right-8">
+                            <span class="text-[8px] font-medium text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full uppercase tracking-[0.2em] border border-indigo-100 shadow-sm">
+                                Best Choice
+                            </span>
+                        </div>
+
+                        <div class="mb-10">
+                            <h3 class="text-[10px] font-medium text-indigo-600 uppercase tracking-[0.3em] mb-3">Nusantara Adidaya</h3>
+                            <div class="flex items-baseline gap-1">
+                                <span class="text-4xl font-medium text-slate-900 tracking-tighter">Rp 149.000</span>
+                                <span class="text-[10px] text-slate-400 font-medium uppercase tracking-widest">/ 12 Bulan</span>
+                            </div>
+                        </div>
+
+                        <ul class="space-y-5 mb-12 flex-1">
+                            <li v-for="feature in features" :key="feature" class="flex items-center gap-4 text-slate-600">
+                                <div class="shrink-0 w-5 h-5 bg-indigo-50 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110">
+                                    <svg class="w-3 h-3 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                </div>
+                                <span class="text-[11px] font-medium uppercase tracking-wider">{{ feature }}</span>
+                            </li>
+                        </ul>
+
+                        <button 
+                            @click="buyMembership"
+                            :disabled="isAdidayaActive"
+                            :class="isAdidayaActive ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-slate-950 text-white hover:bg-indigo-600 shadow-xl shadow-slate-200'"
+                            class="w-full py-5 rounded-2xl text-[10px] font-medium uppercase tracking-[0.3em] transition-all active:scale-95 border border-transparent"
+                        >
+                            {{ isAdidayaActive ? 'Langganan Aktif' : 'Pilih Adidaya' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-center pt-8 pb-12 max-w-2xl mx-auto px-6">
+                <p class="text-[9px] text-slate-400 font-medium uppercase tracking-[0.25em] leading-relaxed">
+                    Sistem pembayaran terenkripsi oleh Midtrans. <br class="md:hidden"> Lisensi akses akan terbit secara otomatis setelah transaksi diverifikasi.
                 </p>
             </div>
         </div>
-
-        <div class="flex justify-center -mt-16 relative z-10 mb-10">
-            <div class="bg-white px-10 py-3 rounded-full shadow-2xl shadow-indigo-900/10 border border-white flex items-center gap-3">
-                <span class="text-indigo-600 animate-bounce">💎</span>
-                <span class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-900">Pilih Jenjang Belajar</span>
-            </div>
-        </div>
-
-        <div class="max-w-[1400px] mx-auto px-2 pb-20">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div v-for="plan in plans" :key="plan.name" 
-                    :class="[
-                        'group relative rounded-[3rem] p-8 md:p-10 flex flex-col transition-all duration-500 border',
-                        plan.highlight 
-                            ? 'bg-slate-900 text-white shadow-2xl shadow-indigo-500/20 border-slate-800 lg:scale-105 z-20' 
-                            : 'bg-white text-slate-900 shadow-sm border-slate-200 hover:shadow-xl hover:-translate-y-2'
-                    ]"
-                >
-                    <div v-if="plan.highlight" class="absolute -top-4 left-1/2 -translate-x-1/2 z-40">
-                        <span class="bg-indigo-600 text-white text-[9px] font-black uppercase tracking-[0.2em] py-2 px-5 rounded-full shadow-xl whitespace-nowrap inline-block">
-                            Pilihan Utama
-                        </span>
-                    </div>
-
-                    <div class="mb-8 relative z-10">
-                        <h3 :class="['text-[11px] font-black uppercase tracking-[0.2em] mb-4', plan.highlight ? 'text-indigo-400' : 'text-indigo-600']">
-                            {{ plan.name }}
-                        </h3>
-                        <div class="flex items-baseline gap-1">
-                            <span class="text-lg font-bold">Rp</span>
-                            <span class="text-4xl font-black tracking-tighter">{{ plan.price }}</span>
-                        </div>
-                        <p :class="['text-[10px] font-bold uppercase tracking-widest mt-2', plan.highlight ? 'text-slate-500' : 'text-slate-400']">
-                            {{ plan.duration }}
-                        </p>
-                    </div>
-
-                    <div :class="['w-full h-[1px] mb-8', plan.highlight ? 'bg-white/10' : 'bg-slate-100']"></div>
-
-                    <p :class="['text-[11px] font-medium leading-relaxed mb-6', plan.highlight ? 'text-slate-400' : 'text-slate-500']">
-                        {{ plan.description }}
-                    </p>
-
-                    <div class="flex-1 space-y-4 mb-10">
-                        <div v-for="feature in plan.features" :key="feature" class="flex items-start gap-3">
-                            <div :class="['shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5', plan.highlight ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-50 text-indigo-600']">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="4"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
-                            </div>
-                            <span :class="['text-[11px] font-bold leading-tight', plan.highlight ? 'text-slate-300' : 'text-slate-600']">
-                                {{ feature }}
-                            </span>
-                        </div>
-                    </div>
-
-                    <button 
-                        @click="buyPlan(plan.id, plan.name)"
-                        :class="[
-                            'w-full py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all duration-300 active:scale-95 shadow-xl',
-                            plan.highlight 
-                                ? 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-indigo-600/30' 
-                                : 'bg-slate-900 text-white hover:bg-indigo-600 shadow-slate-900/10'
-                        ]"
-                    >
-                        {{ plan.buttonText }}
-                    </button>
-                </div>
-            </div>
-
-            <div class="mt-20 pt-10 border-t border-slate-200/60">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
-                    <div class="flex gap-5">
-                        <div class="shrink-0 w-12 h-12 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-xl">🎯</div>
-                        <div>
-                            <h4 class="text-sm font-black text-slate-900 uppercase tracking-tight mb-1 italic">Standar HOTS</h4>
-                            <p class="text-[11px] text-slate-500 font-medium leading-relaxed">Materi disusun menggunakan standar kesulitan terbaru sesuai kisi-kisi BKN.</p>
-                        </div>
-                    </div>
-                    <div class="flex gap-5">
-                        <div class="shrink-0 w-12 h-12 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-xl">📂</div>
-                        <div>
-                            <h4 class="text-sm font-black text-slate-900 uppercase tracking-tight mb-1 italic">Update Berkala</h4>
-                            <p class="text-[11px] text-slate-500 font-medium leading-relaxed">Penambahan bank soal secara rutin mengikuti Field Report (FR) peserta.</p>
-                        </div>
-                    </div>
-                    <div class="flex gap-5">
-                        <div class="shrink-0 w-12 h-12 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-xl">📊</div>
-                        <div>
-                            <h4 class="text-sm font-black text-slate-900 uppercase tracking-tight mb-1 italic">Analisis Pintar</h4>
-                            <p class="text-[11px] text-slate-500 font-medium leading-relaxed">Lihat grafik perkembangan skor dan perbandingan ranking nasional.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
     </AuthenticatedLayout>
 </template>
 
 <style scoped>
-.grid > div {
-    animation: fadeInSlideUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+.animate-in {
+    animation-duration: 1s;
+    animation-fill-mode: both;
 }
-@keyframes fadeInSlideUp {
-    from { opacity: 0; transform: translateY(20px); }
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(15px); }
     to { opacity: 1; transform: translateY(0); }
 }
-.grid > div:nth-child(1) { animation-delay: 0.1s; }
-.grid > div:nth-child(2) { animation-delay: 0.2s; }
-.grid > div:nth-child(3) { animation-delay: 0.3s; }
-.grid > div:nth-child(4) { animation-delay: 0.4s; }
+
+.grid > div {
+    animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
 </style>
