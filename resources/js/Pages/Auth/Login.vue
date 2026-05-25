@@ -32,17 +32,17 @@ const submit = () => {
 
         <div class="w-full max-w-[900px] flex flex-col md:flex-row bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative z-10 fade-in">
             
-            <div class="hidden md:flex md:w-5/12 bg-slate-50 p-10 flex-col justify-between relative overflow-hidden border-r border-slate-100">
+            <div class="hidden md:flex md:w-5/12 bg-slate-50 p-10 flex-col justify-center items-center relative overflow-hidden border-r border-slate-100">
                 <div class="absolute inset-0 opacity-[0.03] bg-[url('https://www.transparenttextures.com/patterns/gplay.png')]"></div>
                 
-                <div class="relative z-10 flex justify-start">
+                <div class="relative z-10 flex justify-center mb-10">
                     <Link href="/" class="transition-transform duration-300 hover:scale-105">
-                        <img src="/images/logo.png" alt="Logo" class="h-10 w-auto drop-shadow-sm">
+                        <img src="/images/logo.png" alt="Logo" class="h-32 w-auto drop-shadow-sm object-contain">
                     </Link>
                 </div>
 
-                <div class="relative z-10 mb-8 mt-12">
-                    <div class="w-8 h-1 bg-blue-600 rounded-full mb-6"></div>
+                <div class="relative z-10 text-center">
+                    <div class="w-8 h-1 bg-blue-600 rounded-full mb-6 mx-auto"></div>
                     <h2 class="text-xl lg:text-2xl font-light text-slate-600 leading-relaxed font-serif italic">
                         "Langkah kecil hari ini adalah jembatan menuju <span class="text-blue-600 font-bold not-italic">kesuksesan besar</span>."
                     </h2>
@@ -55,7 +55,7 @@ const submit = () => {
             <div class="w-full md:w-7/12 p-8 md:p-14 flex flex-col justify-center bg-white relative">
                 
                 <div class="md:hidden flex flex-col items-center justify-center gap-2 mb-8">
-                    <img src="/images/logo.png" alt="Logo" class="h-10 w-auto">
+                    <img src="/images/logo.png" alt="Logo" class="h-32 w-auto object-contain">
                     <span class="text-sm font-bold text-slate-900 tracking-tight">CPNS <span class="text-blue-600">NUSANTARA</span></span>
                 </div>
 
