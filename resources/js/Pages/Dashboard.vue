@@ -26,7 +26,7 @@ const userAvatar = computed(() => {
         const cleanPath = rawPath.replace(/^\//, '');
         return `/storage/${cleanPath}`;
     }
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || 'User')}&color=4F46E5&background=EEF2FF`;
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || 'User')}&color=2563EB&background=EFF6FF`;
 });
 
 // --- FIX TANGGAL & JAM REGISTRASI ---
@@ -49,129 +49,128 @@ const formatDate = (dateString) => {
 };
 
 const motivation = "Masa depan adalah milik mereka yang menyiapkan diri hari ini. Konsistensi adalah kunci kemenangan.";
-
-// Kalkulasi Lingkaran Progres (Disederhanakan untuk efisiensi)
-const strokeDashoffset = computed(() => {
-    const score = props.stats?.average_score || 0;
-    return 213.6 - (Math.min(score, 100) / 100) * 213.6;
-});
 </script>
 
 <template>
-    <Head title="Dashboard Peserta" />
+    <Head title="Dashboard Peserta - CPNS Nusantara" />
 
     <AuthenticatedLayout>
         <div class="mb-6 md:mb-10 animate-in fade-in slide-in-from-top-4 duration-1000">
-            <div class="bg-gradient-to-br from-slate-900 via-gray-900 to-indigo-950 rounded-[2rem] md:rounded-[3.5rem] shadow-2xl shadow-indigo-200/10 overflow-hidden relative border border-white/5">
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden relative">
                 
-                <div class="absolute top-0 right-0 w-1/2 h-full bg-white/5 -skew-x-12 translate-x-20 hidden md:block"></div>
+                <div class="absolute top-0 right-0 w-[300px] h-[300px] bg-blue-50 rounded-full blur-[80px] pointer-events-none -mr-20 -mt-20"></div>
+                <div class="absolute bottom-0 left-0 w-[200px] h-[200px] bg-slate-100 rounded-full blur-[60px] pointer-events-none -ml-20 -mb-20"></div>
 
-                <div class="p-6 md:p-14 flex flex-col md:flex-row items-center gap-6 md:gap-10 relative z-10">
+                <div class="p-6 md:p-10 flex flex-col md:flex-row items-center gap-6 md:gap-8 relative z-10">
                     
                     <div class="relative shrink-0 group">
-                        <div class="absolute -inset-1.5 bg-gradient-to-tr from-indigo-500/30 to-blue-400/30 rounded-3xl md:rounded-[2.5rem] blur opacity-50"></div>
-                        <div class="relative w-24 h-24 md:w-36 md:h-36 bg-white rounded-3xl md:rounded-[2.5rem] overflow-hidden border-2 md:border-4 border-white/20">
+                        <div class="absolute -inset-1 bg-gradient-to-tr from-blue-600/20 to-blue-400/20 rounded-2xl blur opacity-40"></div>
+                        <div class="relative w-24 h-24 md:w-32 md:h-32 bg-white rounded-2xl overflow-hidden border border-slate-200 p-1 shadow-sm">
                             <img 
                                 :src="userAvatar" 
                                 :alt="user.name"
-                                class="w-full h-full object-cover"
+                                class="w-full h-full object-cover rounded-xl"
                             />
                         </div>
-                        <div class="absolute -bottom-1 -right-1 bg-emerald-500 border-2 md:border-4 border-slate-900 p-1 rounded-full shadow-lg">
+                        <div class="absolute -bottom-1 -right-1 bg-blue-600 p-1 rounded-full shadow-md border-2 border-white">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
                             </svg>
                         </div>
                     </div>
 
-                    <div class="flex-1 text-center md:text-left">
+                    <div class="flex-1 text-center md:text-left z-10">
                         <div class="space-y-2">
-                            <div class="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
-                                <h2 class="text-xl md:text-3xl font-medium text-white tracking-tight uppercase">
+                            <div class="flex flex-col md:flex-row md:items-center gap-2 md:gap-3 justify-center md:justify-start">
+                                <h2 class="text-xl md:text-2xl font-bold text-slate-900 tracking-tight uppercase">
                                     {{ user.name }}
                                 </h2>
-                                <span class="px-3 py-1 bg-white/10 border border-white/10 text-indigo-200 text-[9px] font-medium uppercase tracking-widest rounded-full self-center">
+                                <span class="inline-block px-2.5 py-0.5 bg-blue-50 border border-blue-100 text-blue-700 text-[10px] font-semibold uppercase tracking-wider rounded-md self-center">
                                     Premium Account
                                 </span>
                             </div>
                             
                             <div class="flex flex-wrap justify-center md:justify-start gap-2 mt-1">
-                                <p class="text-[10px] font-mono font-medium text-indigo-300/70 uppercase tracking-wider bg-white/5 px-2 py-0.5 rounded-md">
+                                <p class="text-[10px] font-mono font-semibold text-slate-600 bg-slate-100 border border-slate-200/60 px-2 py-0.5 rounded">
                                     #{{ user.participant_number || 'PENDING' }}
                                 </p>
-                                <p class="text-[10px] font-medium text-indigo-300/40 uppercase tracking-widest self-center">
-                                    Aktif: {{ formatDate(user.created_at) }}
+                                <p class="text-[10px] font-medium text-slate-400 uppercase tracking-wider self-center">
+                                    Aktif sejak: {{ formatDate(user.created_at) }}
                                 </p>
                             </div>
                         </div>
 
-                        <div class="mt-5 md:mt-6 bg-white/5 backdrop-blur-sm border border-white/5 p-4 rounded-xl md:inline-block max-w-xl">
-                            <p class="text-[10px] md:text-[11px] font-medium text-white/70 uppercase tracking-widest leading-relaxed italic">
+                        <div class="mt-4 bg-slate-50/80 border border-slate-200/60 p-3.5 rounded-xl md:inline-block max-w-xl">
+                            <p class="text-xs font-light text-slate-600 leading-relaxed font-serif italic">
                                 "{{ motivation }}"
                             </p>
                         </div>
                     </div>
 
-                    <div class="hidden sm:flex items-center gap-5 bg-white/5 p-5 rounded-[2rem] border border-white/5">
-                        <div class="relative w-16 h-16 flex items-center justify-center">
+                    <div class="hidden sm:flex items-center gap-4 bg-slate-50/60 border border-slate-200/60 p-4 rounded-2xl">
+                        <div class="relative w-14 h-14 flex items-center justify-center">
                             <svg class="w-full h-full transform -rotate-90">
-                                <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="4" fill="transparent" class="text-white/5" />
-                                <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="4" fill="transparent" stroke-dasharray="175.8" :stroke-dashoffset="175.8 - (Math.min(stats?.average_score || 0, 100) / 100) * 175.8" class="text-indigo-500 transition-all duration-1000" />
+                                <circle cx="28" cy="28" r="24" stroke="currentColor" stroke-width="3.5" fill="transparent" class="text-slate-200/60" />
+                                <circle cx="28" cy="28" r="24" stroke="currentColor" stroke-width="3.5" fill="transparent" stroke-dasharray="150.7" :stroke-dashoffset="150.7 - (Math.min(stats?.average_score || 0, 100) / 100) * 150.7" class="text-blue-600 transition-all duration-1000" />
                             </svg>
-                            <span class="absolute text-xs font-medium text-white tracking-tighter">{{ stats?.average_score || 0 }}%</span>
+                            <span class="absolute text-xs font-bold text-slate-800 tracking-tighter">{{ stats?.average_score || 0 }}%</span>
                         </div>
                         <div class="flex flex-col">
-                            <p class="text-[8px] font-medium text-indigo-300/60 uppercase tracking-widest">Siap Ujian</p>
-                            <p class="text-[10px] font-medium text-white uppercase tracking-wider">Target Skor</p>
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-tight">Siap Ujian</p>
+                            <p class="text-xs font-bold text-slate-800 uppercase tracking-wide">Target Skor</p>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-8 mb-10">
-            <div class="bg-white p-6 md:p-8 rounded-3xl border border-slate-100 shadow-sm transition-all">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-lg">📝</div>
-                    <span class="text-[9px] font-medium text-indigo-400 uppercase tracking-widest">Progress</span>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-10">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition-all">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="w-9 h-9 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-center text-sm">📝</div>
+                    <span class="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded uppercase tracking-wider">Progress</span>
                 </div>
-                <p class="text-3xl md:text-4xl font-medium text-slate-900 tracking-tighter mb-1">{{ stats?.completed_count || 0 }}</p>
-                <p class="text-[10px] font-medium text-slate-400 uppercase tracking-widest">Simulasi Selesai</p>
+                <p class="text-3xl font-bold text-slate-900 tracking-tight mb-0.5">{{ stats?.completed_count || 0 }}</p>
+                <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Simulasi Selesai</p>
             </div>
 
-            <div class="bg-white p-6 md:p-8 rounded-3xl border border-slate-100 shadow-sm">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-lg">📈</div>
-                    <span class="text-[9px] font-medium text-emerald-500 uppercase tracking-widest">Akumulasi</span>
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="w-9 h-9 bg-green-50 border border-green-100 rounded-lg flex items-center justify-center text-sm">📈</div>
+                    <span class="text-[10px] font-bold text-green-700 bg-green-50 border border-green-100 px-2 py-0.5 rounded uppercase tracking-wider">Akumulasi</span>
                 </div>
-                <p class="text-3xl md:text-4xl font-medium text-slate-900 tracking-tighter mb-1">{{ stats?.average_score || 0 }}</p>
-                <p class="text-[10px] font-medium text-slate-400 uppercase tracking-widest">Skor Rata-Rata</p>
+                <p class="text-3xl font-bold text-slate-900 tracking-tight mb-0.5">{{ stats?.average_score || 0 }}</p>
+                <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Skor Rata-Rata</p>
             </div>
 
-            <div class="bg-white p-6 md:p-8 rounded-3xl border border-slate-100 shadow-sm sm:col-span-2 md:col-span-1">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center text-lg">🕒</div>
-                    <span class="text-[9px] font-medium text-amber-500 uppercase tracking-widest">Aktivitas</span>
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm sm:col-span-2 md:col-span-1">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="w-9 h-9 bg-amber-50 border border-amber-100 rounded-lg flex items-center justify-center text-sm">🕒</div>
+                    <span class="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded uppercase tracking-wider">Aktivitas</span>
                 </div>
-                <p class="text-sm md:text-base font-medium text-slate-900 tracking-tight mb-1 uppercase truncate">{{ stats?.last_activity || 'Belum ada' }}</p>
-                <p class="text-[10px] font-medium text-slate-400 uppercase tracking-widest">Terakhir Belajar</p>
+                <p class="text-sm font-bold text-slate-800 tracking-tight mb-1 uppercase truncate">{{ stats?.last_activity || 'Belum ada' }}</p>
+                <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Terakhir Belajar</p>
             </div>
         </div>
 
-        <div class="mb-6 flex items-center justify-between px-2 md:px-4">
-            <h3 class="font-medium text-[11px] md:text-xs text-slate-900 uppercase tracking-[0.2em]">Rekomendasi Paket</h3>
-            <Link :href="route('tryout.index')" class="text-[9px] md:text-[10px] font-medium text-indigo-600 uppercase tracking-widest hover:text-slate-900 transition">Lihat Semua →</Link>
+        <div class="mb-5 flex items-center justify-between px-1">
+            <h3 class="font-bold text-xs text-slate-900 uppercase tracking-[0.18em]">Rekomendasi Paket</h3>
+            <Link :href="route('tryout.index')" class="text-[10px] font-bold text-blue-600 uppercase tracking-wider hover:text-blue-700 transition">Lihat Semua →</Link>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-8 pb-10">
-            <div v-for="tryout in availableTryouts" :key="tryout.id" class="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-500 group">
-                <div class="h-20 bg-slate-50 p-6 flex items-center justify-between border-b border-slate-100">
-                    <div class="w-9 h-9 bg-slate-900 rounded-xl flex items-center justify-center text-white font-medium text-[10px]">TO</div>
-                    <span class="text-[8px] font-medium text-slate-400 uppercase tracking-widest tracking-[0.1em]">Premium Preparation</span>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 pb-10">
+            <div v-for="tryout in availableTryouts" :key="tryout.id" class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between group">
+                <div class="p-5 bg-slate-50 border-b border-slate-200/60 flex items-center justify-between">
+                    <div class="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white font-bold text-[11px] shadow-sm">TO</div>
+                    <span class="text-[9px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md uppercase tracking-wider">Premium Preparation</span>
                 </div>
-                <div class="p-6 md:p-8">
-                    <h4 class="font-medium text-base text-slate-900 leading-snug uppercase mb-6 md:mb-8 tracking-tight h-10 overflow-hidden">{{ tryout.title }}</h4>
-                    <Link :href="route('tryout.start', tryout.id)" class="block w-full text-center bg-slate-900 text-white py-4 rounded-xl font-medium text-[9px] uppercase tracking-[0.25em] hover:bg-indigo-600 transition-all shadow-lg active:scale-95">Mulai Ujian</Link>
+                <div class="p-6 flex flex-col justify-between flex-1">
+                    <h4 class="font-bold text-base text-slate-900 leading-snug uppercase mb-6 tracking-tight h-12 overflow-hidden group-hover:text-blue-600 transition-colors">
+                        {{ tryout.title }}
+                    </h4>
+                    <Link :href="route('tryout.start', tryout.id)" class="block w-full text-center bg-blue-600 text-white py-3 rounded-xl font-semibold text-xs uppercase tracking-wider hover:bg-blue-700 transition-colors shadow-sm active:scale-95">
+                        Mulai Ujian
+                    </Link>
                 </div>
             </div>
         </div>
@@ -184,10 +183,13 @@ const strokeDashoffset = computed(() => {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
 
-.font-serif { font-family: Georgia, serif; }
+.font-serif {
+    font-family: Georgia, 'Times New Roman', Times, serif;
+}
 
-/* Custom smooth animation */
 .animate-in {
+    animation-duration: 0.6s;
+    animation-fill-mode: both;
     animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 </style>
