@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Tryout;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Carbon; // Pastikan import Carbon untuk waktu
 
 class TryoutManagerController extends Controller
 {
@@ -40,12 +41,19 @@ class TryoutManagerController extends Controller
             'is_paid' => 'required|boolean',
             'price' => 'required_if:is_paid,true|numeric|min:0',
             'is_published' => 'boolean',
-            'published_at' => 'nullable|date', // <--- TAMBAHKAN INI
-            'started_at' => 'nullable|date',   // <--- TAMBAHKAN INI
-            'end_date' => 'nullable|date',     // <--- PASTIKAN INI ADA
+            'started_at' => 'nullable|date', // <--- WAJIB DITAMBAHKAN
+            'end_date' => 'nullable|date',     
         ]);
 
         $validated['type'] = 'general'; // Default tipe
+        
+        // WAJIB: Samakan is_active dengan is_published
+        $validated['is_active'] = $request->is_published; 
+        
+        // WAJIB: Isi published_at jika dipublish agar lolos filter tanggal
+        if ($request->is_published) {
+            $validated['published_at'] = Carbon::now();
+        }
 
         Tryout::create($validated);
 
@@ -61,10 +69,19 @@ class TryoutManagerController extends Controller
             'is_paid' => 'required|boolean',
             'price' => 'required_if:is_paid,true|numeric|min:0',
             'is_published' => 'boolean',
-            'published_at' => 'nullable|date', // <--- TAMBAHKAN INI
-            'started_at' => 'nullable|date',   // <--- TAMBAHKAN INI
-            'end_date' => 'nullable|date',     // <--- PASTIKAN INI ADA
+            'started_at' => 'nullable|date', // <--- WAJIB DITAMBAHKAN
+            'end_date' => 'nullable|date',     
         ]);
+        
+        // WAJIB: Samakan is_active dengan is_published
+        $validated['is_active'] = $request->is_published;
+        
+        // Cek jika statusnya berubah dari false ke true, set published_at
+        if ($request->is_published && !$tryout->published_at) {
+            $validated['published_at'] = Carbon::now();
+        } else if (!$request->is_published) {
+            $validated['published_at'] = null; // Tarik kembali (unpublish)
+        }
 
         $tryout->update($validated);
 

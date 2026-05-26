@@ -26,26 +26,25 @@ class TryoutController extends Controller
         $user = auth()->user();
         $isPremiumMember = $user->membership_expires_at && now()->lt($user->membership_expires_at);
 
-        // --- 1. DATA KATALOG (Belum Dimiliki) ---
-        // Jika Premium, katalog kosong karena semua otomatis jadi "Milik Saya"
-        $catalogTryouts = collect();
-        if (!$isPremiumMember) {
-            $catalogTryouts = Tryout::query()
-                ->where('is_published', true)
-                ->where(function ($query) {
-                    $query->whereNotIn('type', ['akbar', 'adidaya'])->orWhereNull('type');
-                })
-                ->whereDoesntHave('transactions', function($q) use ($user) {
+        // --- 1. DATA KATALOG (DIPERBAIKI: Tidak dikosongkan untuk Premium) ---
+        $catalogTryouts = Tryout::query()
+            ->where('is_published', true)
+            ->where(function ($query) {
+                $query->whereNotIn('type', ['akbar', 'adidaya'])->orWhereNull('type');
+            })
+            // Jika BUKAN member premium, filter tryout yang belum dibeli saja
+            ->when(!$isPremiumMember, function($query) use ($user) {
+                $query->whereDoesntHave('transactions', function($q) use ($user) {
                     $q->whereIn('status', ['paid', 'success'])
                       ->where(function($subQuery) use ($user) {
                           $subQuery->where('user_id', $user->id)
                                    ->orWhereJsonContains('participants_data', $user->email);
                       });
-                })
-                ->when($request->search, fn($q, $s) => $q->where('title', 'like', "%{$s}%"))
-                ->latest()
-                ->get();
-        }
+                });
+            })
+            ->when($request->search, fn($q, $s) => $q->where('title', 'like', "%{$s}%"))
+            ->latest()
+            ->get();
 
         // --- 2. DATA TRYOUT SAYA (Sudah Dibeli / Akses Premium) ---
         $myTryouts = Tryout::query()
@@ -84,15 +83,15 @@ class TryoutController extends Controller
     }
 
     public function show(Tryout $tryout)
-{
-    // Cek apakah pendaftaran ditutup
-    $isClosed = $tryout->end_date && now()->greaterThan($tryout->end_date);
+    {
+        // Cek apakah pendaftaran ditutup
+        $isClosed = $tryout->end_date && now()->greaterThan($tryout->end_date);
 
-    return Inertia::render('User/Tryout/Show', [
-        'tryout' => $tryout,
-        'is_registration_closed' => $isClosed, // Kirim status ke frontend
-    ]);
-}
+        return Inertia::render('User/Tryout/Show', [
+            'tryout' => $tryout,
+            'is_registration_closed' => $isClosed, // Kirim status ke frontend
+        ]);
+    }
 
     /**
      * Proses Pendaftaran Tryout

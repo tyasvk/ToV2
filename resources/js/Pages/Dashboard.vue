@@ -168,9 +168,11 @@ const motivation = "Masa depan adalah milik mereka yang menyiapkan diri hari ini
                     <h4 class="font-bold text-base text-slate-900 leading-snug uppercase mb-6 tracking-tight h-12 overflow-hidden group-hover:text-blue-600 transition-colors">
                         {{ tryout.title }}
                     </h4>
-                    <Link :href="route('tryout.start', tryout.id)" class="block w-full text-center bg-blue-600 text-white py-3 rounded-xl font-semibold text-xs uppercase tracking-wider hover:bg-blue-700 transition-colors shadow-sm active:scale-95">
-                        Mulai Ujian
+                    
+                    <Link :href="route('tryout.show', tryout.id)" class="block w-full text-center bg-blue-600 text-white py-3 rounded-xl font-semibold text-xs uppercase tracking-wider hover:bg-blue-700 transition-colors shadow-sm active:scale-95">
+                        Lihat Detail & Mulai
                     </Link>
+                    
                 </div>
             </div>
         </div>

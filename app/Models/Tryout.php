@@ -26,19 +26,21 @@ class Tryout extends Model
         'requirements',   // <--- WAJIB DITAMBAH
         'ended_at',       // <--- WAJIB DITAMBAH
         'duration',       // <--- WAJIB DITAMBAH (Sesuaikan dengan Controller)
-        'end_date', // Tambahkan ini
-        'duration',       // Pastikan menggunakan 'duration' sesuai form
+        'end_date',       // Tambahkan ini
+        // 'duration',    // Dihapus karena duplikat di atas
     ];
 
     protected $casts = [
-        'published_at' => 'datetime',
-        'started_at' => 'datetime',
-        'is_active' => 'boolean',
+        // PERBAIKAN: Tambahkan format :Y-m-d\TH:i agar jam tidak berubah-ubah saat diedit
+        'published_at' => 'datetime:Y-m-d\TH:i',
+        'started_at'   => 'datetime:Y-m-d\TH:i',
+        'ended_at'     => 'datetime:Y-m-d\TH:i', 
+        'end_date'     => 'datetime:Y-m-d\TH:i', 
+        
+        'is_active'    => 'boolean',
         'is_published' => 'boolean',
-        'ended_at'   => 'datetime', // <--- Tambahkan casting ini juga
-        'end_date' => 'datetime', // Tambahkan casting ini
-        'is_paid' => 'boolean',   
-        'price' => 'decimal:2',    
+        'is_paid'      => 'boolean',   
+        'price'        => 'decimal:2',    
     ];
 
     /**
