@@ -10,30 +10,34 @@ use Inertia\Inertia;
 class TransactionController extends Controller
 {
     public function index(Request $request)
-    {
-        // Query Dasar dengan Relasi
-        $query = Transaction::query()
-            ->with(['user', 'tryout']) // Load data User dan Tryout
-            ->where('amount', '>', 0); // <--- FILTER PENTING: Hanya ambil yang berbayar (Harga > 0)
+{
+    // 1. Mulai query dengan relasi yang dibutuhkan
+    $query = Transaction::query()
+        ->with(['user', 'tryout']); // Pastikan relasi 'user' dan 'tryout' ada di model
 
-        // Fitur Pencarian
-        if ($request->search) {
-            $query->where(function($q) use ($request) {
-                $q->where('invoice_code', 'like', '%' . $request->search . '%')
-                  ->orWhereHas('user', function($userQ) use ($request) {
-                      $userQ->where('name', 'like', '%' . $request->search . '%');
-                  });
-            });
-        }
-
-        // Ambil data terbaru, 10 per halaman
-        $transactions = $query->latest()->paginate(10)->withQueryString();
-
-        return Inertia::render('Admin/Transactions/Index', [
-            'transactions' => $transactions,
-            'filters' => $request->only(['search']),
-        ]);
+    // 2. Filter berdasarkan Pencarian (Search)
+    if ($request->filled('search')) {
+        $query->where(function($q) use ($request) {
+            $q->where('invoice_code', 'like', '%' . $request->search . '%')
+              ->orWhereHas('user', function($userQuery) use ($request) {
+                  $userQuery->where('name', 'like', '%' . $request->search . '%');
+              });
+        });
     }
+
+    // 3. Filter berdasarkan Status (Inilah yang membuat tombol Anda berfungsi)
+    if ($request->filled('status')) {
+        $query->where('status', $request->status);
+    }
+
+    // 4. Eksekusi pagination
+    $transactions = $query->latest()->paginate(10)->withQueryString();
+
+    return Inertia::render('Admin/Transactions/Index', [
+        'transactions' => $transactions,
+        'filters' => $request->only(['search', 'status']),
+    ]);
+}
 public function approve(Transaction $transaction)
 {
     if ($transaction->status === 'paid') return back();

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Tryout;
+use App\Models\Transaction;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -28,45 +29,23 @@ class TryoutAkbarController extends Controller
         ]);
     }
 
-    public function verifyRegistration(Request $request, \App\Models\Transaction $transaction)
-    {
-        $request->validate([
-            'action' => 'required|in:approve,reject',
-            'reason' => 'nullable|string|max:255' // Validasi input alasan
-        ]);
-
-        if ($request->action === 'approve') {
-            $transaction->update([
-                'status' => 'paid',
-                'rejection_note' => null // Hapus catatan jika akhirnya diterima
-            ]);
-            $message = 'Peserta berhasil diverifikasi (Diterima).';
-        } else {
-            $transaction->update([
-                'status' => 'failed',
-                'rejection_note' => $request->reason ?? 'Bukti tidak valid.' // Simpan alasan
-            ]);
-            $message = 'Peserta ditolak.';
-        }
-
-        return back()->with('success', $message);
-    }
-
     /**
-     * Halaman Verifikasi Peserta
+     * Menampilkan halaman detail/verifikasi peserta Tryout Akbar.
+     * Logika ini menggantikan fungsi participants() sebelumnya.
      */
-public function participants(Request $request, Tryout $tryout)
+    public function show(Request $request, $id)
     {
+        $tryout = Tryout::findOrFail($id);
+
         if($tryout->type !== 'akbar') abort(404);
 
-        // LOGIC BARU: Ambil hanya ID transaksi TERAKHIR untuk setiap user di tryout ini
-        // Ini memastikan "Satu Orang Satu Data" (data terbaru yang muncul)
-        $latestTransactionIds = \App\Models\Transaction::where('tryout_id', $tryout->id)
+        // Mengambil ID transaksi TERAKHIR untuk setiap user di tryout ini
+        $latestTransactionIds = Transaction::where('tryout_id', $tryout->id)
             ->selectRaw('MAX(id) as id')
             ->groupBy('user_id')
             ->pluck('id');
 
-        $query = \App\Models\Transaction::whereIn('id', $latestTransactionIds)
+        $query = Transaction::whereIn('id', $latestTransactionIds)
             ->with('user');
 
         // Filter Status
@@ -77,8 +56,8 @@ public function participants(Request $request, Tryout $tryout)
             $query->orderByRaw("FIELD(status, 'pending', 'failed', 'paid')");
         }
 
-        // Search (Opsional, untuk mencari nama peserta)
-        if ($request->has('search')) {
+        // Search berdasarkan nama atau email user
+        if ($request->has('search') && $request->search != '') {
             $query->whereHas('user', function($q) use ($request) {
                 $q->where('name', 'like', '%' . $request->search . '%')
                   ->orWhere('email', 'like', '%' . $request->search . '%');
@@ -88,8 +67,7 @@ public function participants(Request $request, Tryout $tryout)
         $participants = $query->paginate(20)->withQueryString();
 
         // Hitung statistik realtime
-        // Kita hitung berdasarkan data unik juga agar akurat
-        $baseStats = \App\Models\Transaction::whereIn('id', $latestTransactionIds);
+        $baseStats = Transaction::whereIn('id', $latestTransactionIds);
         
         $stats = [
             'total' => (clone $baseStats)->count(),
@@ -101,21 +79,42 @@ public function participants(Request $request, Tryout $tryout)
             'tryout' => $tryout,
             'participants' => $participants,
             'stats' => $stats,
-            'filters' => $request->only(['status', 'search'])
+            'filters' => [
+                'search' => $request->search ?? '',
+                'status' => $request->status ?? ''
+            ]
         ]);
     }
 
-    /**
-     * Menampilkan form pembuatan Tryout Akbar baru.
-     */
+    public function verifyRegistration(Request $request, Transaction $transaction)
+    {
+        $request->validate([
+            'action' => 'required|in:approve,reject',
+            'reason' => 'nullable|string|max:255'
+        ]);
+
+        if ($request->action === 'approve') {
+            $transaction->update([
+                'status' => 'paid',
+                'rejection_note' => null
+            ]);
+            $message = 'Peserta berhasil diverifikasi (Diterima).';
+        } else {
+            $transaction->update([
+                'status' => 'failed',
+                'rejection_note' => $request->reason ?? 'Bukti tidak valid.'
+            ]);
+            $message = 'Peserta ditolak.';
+        }
+
+        return back()->with('success', $message);
+    }
+
     public function create()
     {
         return Inertia::render('Admin/TryoutAkbar/Create');
     }
 
-    /**
-     * Menyimpan Tryout Akbar baru ke database.
-     */
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -125,14 +124,11 @@ public function participants(Request $request, Tryout $tryout)
             'duration' => 'required|integer|min:1',
             'price' => 'required|numeric|min:0',
             'description' => 'nullable|string',
-            'requirements' => 'nullable|string', // Kolom khusus Akbar
+            'requirements' => 'nullable|string',
             'is_published' => 'boolean',
         ]);
 
-        // Paksa type menjadi 'akbar'
         $validated['type'] = 'akbar';
-        
-        // Default published false jika tidak ada request
         $validated['is_published'] = $request->boolean('is_published', false);
 
         Tryout::create($validated);
@@ -141,10 +137,6 @@ public function participants(Request $request, Tryout $tryout)
             ->with('success', 'Event Tryout Akbar berhasil dibuat.');
     }
 
-    /**
-     * Menampilkan form edit.
-     * Note: Parameter di route resource biasanya 'tryout_akbar', kita bind ke model Tryout.
-     */
     public function edit($id)
     {
         $tryout = Tryout::where('id', $id)->where('type', 'akbar')->firstOrFail();
@@ -154,10 +146,7 @@ public function participants(Request $request, Tryout $tryout)
         ]);
     }
 
-    /**
-     * Update data Tryout Akbar.
-     */
-public function update(Request $request, $id)
+    public function update(Request $request, $id)
     {
         $tryout = Tryout::where('id', $id)->where('type', 'akbar')->firstOrFail();
 
@@ -172,24 +161,17 @@ public function update(Request $request, $id)
             'is_published' => 'boolean',
         ]);
 
-        // Pastikan tipe boolean terbaca dengan benar
         $validated['is_published'] = $request->boolean('is_published');
-
-        // Update data
         $tryout->update($validated);
 
         return redirect()->route('admin.tryout-akbar.index')
             ->with('success', 'Event Tryout Akbar berhasil diperbarui.');
     }
 
-    /**
-     * Hapus Tryout Akbar.
-     */
     public function destroy($id)
     {
         $tryout = Tryout::where('id', $id)->where('type', 'akbar')->firstOrFail();
         
-        // Opsional: Cek jika sudah ada transaksi, cegah hapus
         if ($tryout->transactions()->exists()) {
             return back()->with('error', 'Tidak dapat menghapus event yang sudah memiliki peserta.');
         }
