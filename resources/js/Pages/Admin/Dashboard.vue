@@ -18,100 +18,106 @@ const currentDate = new Date().toLocaleDateString('id-ID', { weekday: 'long', ye
 
 const getStatusClass = (status) => {
     const classes = {
-        paid: 'text-emerald-500 bg-emerald-50 border-emerald-100',
-        success: 'text-emerald-500 bg-emerald-50 border-emerald-100',
-        pending: 'text-amber-500 bg-amber-50 border-amber-100',
-        failed: 'text-rose-500 bg-rose-50 border-rose-100'
+        paid: 'text-emerald-600 bg-emerald-50 border-emerald-200',
+        success: 'text-emerald-600 bg-emerald-50 border-emerald-200',
+        pending: 'text-amber-600 bg-amber-50 border-amber-200',
+        failed: 'text-rose-600 bg-rose-50 border-rose-200'
     };
-    return classes[status] || 'text-slate-500 bg-slate-50 border-slate-100';
+    return classes[status] || 'text-slate-600 bg-slate-50 border-slate-200';
 };
 </script>
 
 <template>
-    <Head title="Admin Dashboard" />
+    <Head title="Admin Dashboard - CPNS Nusantara" />
 
     <AuthenticatedLayout>
-        <div class="space-y-8 md:space-y-12 animate-in fade-in duration-700">
+        <div class="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             
-            <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-6 px-1">
-                <div class="space-y-2">
-                    <h1 class="text-2xl md:text-3xl font-medium text-slate-900 tracking-tight uppercase italic leading-none">Command Center</h1>
-                    <p class="text-[10px] md:text-[11px] text-slate-400 font-medium uppercase tracking-[0.3em]">
-                        Halo, <span class="text-indigo-600">{{ user.name }}</span> — {{ currentDate }}
-                    </p>
-                </div>
+            <div class="bg-white p-6 md:p-8 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+                <div class="absolute right-0 top-0 w-64 h-64 bg-blue-50 rounded-full blur-[60px] pointer-events-none -mr-20 -mt-20"></div>
+                
+                <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+                    <div class="space-y-1.5">
+                        <h1 class="text-2xl md:text-3xl font-medium text-slate-900 tracking-tight">Command Center</h1>
+                        <p class="text-xs md:text-sm text-slate-500 font-medium">
+                            Halo, <span class="text-blue-600 font-semibold">{{ user.name }}</span> — {{ currentDate }}
+                        </p>
+                    </div>
 
-                <div class="flex flex-wrap gap-3">
-                    <Link :href="route('admin.tryouts.index')" class="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-slate-900 text-white px-6 py-3.5 rounded-2xl text-[10px] font-medium uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-slate-200">
-                        Kelola Tryout
-                    </Link>
-                    <Link :href="route('admin.users.index')" class="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-white border border-slate-100 text-slate-600 px-6 py-3.5 rounded-2xl text-[10px] font-medium uppercase tracking-widest transition-all active:scale-95">
-                        Kelola User
-                    </Link>
+                    <div class="flex flex-col sm:flex-row gap-3 mt-2 md:mt-0">
+                        <Link :href="route('admin.tryouts.index')" class="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 shadow-sm text-center">
+                            Kelola Tryout
+                        </Link>
+                        <Link :href="route('admin.users.index')" class="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 px-6 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 text-center shadow-sm">
+                            Kelola User
+                        </Link>
+                    </div>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div class="bg-indigo-600 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-indigo-100 relative overflow-hidden group">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                <div class="bg-blue-600 rounded-2xl p-6 text-white shadow-sm relative overflow-hidden group">
+                    <div class="absolute -right-6 -top-6 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
                     <div class="relative z-10">
-                        <p class="text-[9px] font-medium uppercase tracking-[0.2em] opacity-60 mb-2">Total Pendapatan</p>
-                        <h3 class="text-2xl font-medium tracking-tighter">{{ formatRupiah(stats.total_revenue) }}</h3>
-                        <div class="mt-4 inline-block px-2 py-1 bg-white/10 rounded-lg text-[8px] font-medium uppercase tracking-widest">Real-time Data</div>
+                        <div class="flex items-center justify-between mb-3">
+                            <p class="text-[10px] font-medium uppercase tracking-widest opacity-80">Total Pendapatan</p>
+                            <svg class="w-5 h-5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </div>
+                        <h3 class="text-2xl font-semibold tracking-tight">{{ formatRupiah(stats.total_revenue) }}</h3>
                     </div>
-                    <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
                 </div>
 
                 <div v-for="(val, label, index) in { 
                     'User Terdaftar': stats.total_users, 
                     'Tryout Aktif': stats.active_tryouts, 
                     'Perlu Approval': stats.pending_transactions 
-                }" :key="index" class="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm hover:shadow-xl transition-all duration-500">
-                    <p class="text-[9px] font-medium text-slate-400 uppercase tracking-[0.2em] mb-2">{{ label }}</p>
-                    <h3 :class="label === 'Perlu Approval' && val > 0 ? 'text-amber-500 animate-pulse' : 'text-slate-900'" class="text-2xl font-medium tracking-tighter leading-none">
+                }" :key="index" class="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300">
+                    <p class="text-[10px] font-medium text-slate-400 uppercase tracking-widest mb-3">{{ label }}</p>
+                    <h3 :class="label === 'Perlu Approval' && val > 0 ? 'text-amber-500' : 'text-slate-900'" class="text-2xl font-semibold tracking-tight leading-none">
                         {{ val }}
                     </h3>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 pb-20">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-10">
                 
-                <div class="lg:col-span-8 space-y-6">
-                    <div class="bg-white border border-slate-100 rounded-[2.5rem] overflow-hidden shadow-sm">
-                        <div class="px-8 py-6 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
-                            <h3 class="text-[10px] font-medium text-slate-900 uppercase tracking-widest italic">Transaksi Terakhir</h3>
-                            <Link :href="route('admin.transactions.index')" class="text-[9px] font-medium text-indigo-600 uppercase tracking-widest">Lihat Semua</Link>
+                <div class="lg:col-span-8 space-y-4">
+                    <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col h-full">
+                        <div class="px-6 py-5 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
+                            <h3 class="text-sm font-semibold text-slate-900 uppercase tracking-wider">Transaksi Terakhir</h3>
+                            <Link :href="route('admin.transactions.index')" class="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors uppercase tracking-wider">Lihat Semua</Link>
                         </div>
                         
                         <div class="overflow-x-auto custom-scrollbar">
-                            <table class="w-full text-left">
+                            <table class="w-full text-left whitespace-nowrap">
                                 <thead>
-                                    <tr class="border-b border-slate-50">
-                                        <th class="px-8 py-5 text-[9px] font-medium text-slate-400 uppercase tracking-widest">Pembeli</th>
-                                        <th class="px-8 py-5 text-[9px] font-medium text-slate-400 uppercase tracking-widest">Item</th>
-                                        <th class="px-8 py-5 text-[9px] font-medium text-slate-400 uppercase tracking-widest text-right">Nominal</th>
-                                        <th class="px-8 py-5 text-[9px] font-medium text-slate-400 uppercase tracking-widest text-center">Status</th>
+                                    <tr class="border-b border-slate-100 bg-slate-50/30">
+                                        <th class="px-6 py-4 text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Pembeli</th>
+                                        <th class="px-6 py-4 text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Item</th>
+                                        <th class="px-6 py-4 text-[10px] font-semibold text-slate-500 uppercase tracking-widest text-right">Nominal</th>
+                                        <th class="px-6 py-4 text-[10px] font-semibold text-slate-500 uppercase tracking-widest text-center">Status</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-slate-50">
-                                    <tr v-for="trx in recentTransactions" :key="trx.id" class="hover:bg-slate-50 transition-colors">
-                                        <td class="px-8 py-5">
-                                            <p class="text-xs font-medium text-slate-900 uppercase tracking-tight truncate max-w-[120px]">{{ trx.user?.name || 'User Terhapus' }}</p>
-                                            <p class="text-[8px] text-slate-400 font-medium mt-1 uppercase">{{ formatDate(trx.created_at) }}</p>
+                                <tbody class="divide-y divide-slate-100">
+                                    <tr v-for="trx in recentTransactions" :key="trx.id" class="hover:bg-slate-50/80 transition-colors">
+                                        <td class="px-6 py-4">
+                                            <p class="text-sm font-medium text-slate-900 truncate max-w-[150px]">{{ trx.user?.name || 'User Terhapus' }}</p>
+                                            <p class="text-xs text-slate-500 mt-0.5">{{ formatDate(trx.created_at) }}</p>
                                         </td>
-                                        <td class="px-8 py-5 text-[10px] font-medium text-slate-500 uppercase italic truncate max-w-[150px]">
+                                        <td class="px-6 py-4 text-sm font-medium text-slate-600 truncate max-w-[180px]">
                                             {{ trx.tryout?.title || 'Produk' }}
                                         </td>
-                                        <td class="px-8 py-5 text-right text-xs font-medium text-slate-900">
+                                        <td class="px-6 py-4 text-right text-sm font-semibold text-slate-900">
                                             {{ formatRupiah(trx.amount) }}
                                         </td>
-                                        <td class="px-8 py-5 text-center">
-                                            <span :class="getStatusClass(trx.status)" class="text-[8px] font-medium uppercase tracking-widest px-2.5 py-1 rounded-md border">
+                                        <td class="px-6 py-4 text-center">
+                                            <span :class="getStatusClass(trx.status)" class="text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md border">
                                                 {{ trx.status }}
                                             </span>
                                         </td>
                                     </tr>
                                     <tr v-if="!recentTransactions.length">
-                                        <td colspan="4" class="px-8 py-16 text-center text-[9px] text-slate-300 font-medium uppercase tracking-[0.3em] italic">Belum ada transaksi</td>
+                                        <td colspan="4" class="px-6 py-12 text-center text-sm text-slate-400 font-medium">Belum ada transaksi saat ini.</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -119,27 +125,27 @@ const getStatusClass = (status) => {
                     </div>
                 </div>
 
-                <div class="lg:col-span-4 space-y-6">
-                    <div class="bg-white border border-slate-100 rounded-[2.5rem] shadow-sm overflow-hidden flex flex-col h-full">
-                        <div class="px-8 py-6 bg-slate-50/50 border-b border-slate-100">
-                            <h3 class="text-[10px] font-medium text-slate-900 uppercase tracking-widest italic">Member Baru</h3>
+                <div class="lg:col-span-4 space-y-4">
+                    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full">
+                        <div class="px-6 py-5 bg-slate-50/50 border-b border-slate-100">
+                            <h3 class="text-sm font-semibold text-slate-900 uppercase tracking-wider">Member Baru</h3>
                         </div>
                         <div class="p-2 space-y-1 flex-1">
-                            <div v-for="user in newUsers" :key="user.id" class="flex items-center gap-4 p-4 hover:bg-slate-50 rounded-3xl transition-all group">
-                                <div class="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center text-xs font-medium shadow-lg shrink-0 group-hover:bg-indigo-600 transition-colors">
+                            <div v-for="user in newUsers" :key="user.id" class="flex items-center gap-4 p-4 hover:bg-slate-50 rounded-xl transition-all group">
+                                <div class="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center text-sm font-semibold shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                                     {{ user.name.charAt(0).toUpperCase() }}
                                 </div>
                                 <div class="min-w-0">
-                                    <p class="text-[11px] font-medium text-slate-900 uppercase tracking-tight truncate">{{ user.name }}</p>
-                                    <p class="text-[9px] text-slate-400 font-medium truncate">{{ user.email }}</p>
+                                    <p class="text-sm font-medium text-slate-900 truncate">{{ user.name }}</p>
+                                    <p class="text-xs text-slate-500 truncate mt-0.5">{{ user.email }}</p>
                                 </div>
                             </div>
-                            <div v-if="!newUsers.length" class="p-12 text-center text-[9px] text-slate-300 font-medium uppercase tracking-widest italic leading-relaxed">
-                                Belum ada user bergabung.
+                            <div v-if="!newUsers.length" class="p-10 text-center text-sm text-slate-400 font-medium">
+                                Belum ada user yang bergabung.
                             </div>
                         </div>
-                        <div class="p-6 bg-slate-50/50 border-t border-slate-50 text-center">
-                            <Link :href="route('admin.users.index')" class="text-[9px] font-medium text-indigo-600 uppercase tracking-widest border-b border-indigo-100 pb-0.5">Kelola Semua User</Link>
+                        <div class="p-4 bg-slate-50/50 border-t border-slate-100 text-center">
+                            <Link :href="route('admin.users.index')" class="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors uppercase tracking-wider">Kelola Semua User</Link>
                         </div>
                     </div>
                 </div>
@@ -151,24 +157,17 @@ const getStatusClass = (status) => {
 
 <style scoped>
 .animate-in {
-    animation-duration: 0.8s;
-    animation-fill-mode: both;
-}
-
-@keyframes slideUp {
-    from { opacity: 0; transform: translateY(15px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.grid > div {
-    animation: slideUp 0.6s ease-out forwards;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-    height: 3px;
+    height: 4px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #F1F5F9;
+    background: #E2E8F0;
     border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
 }
 </style>

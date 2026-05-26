@@ -1,75 +1,72 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import DeleteUserForm from './Partials/DeleteUserForm.vue';
 import UpdatePasswordForm from './Partials/UpdatePasswordForm.vue';
 import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm.vue';
 import { Head } from '@inertiajs/vue3';
 
 defineProps({
-    mustVerifyEmail: Boolean,
-    status: String,
+    mustVerifyEmail: {
+        type: Boolean,
+    },
+    status: {
+        type: String,
+    },
 });
 </script>
 
 <template>
-    <Head title="Profil & Ranking" />
+    <Head title="Profil Saya" />
 
     <AuthenticatedLayout>
-        <template #header>
-            <div class="space-y-2 animate-in fade-in slide-in-from-top-4 duration-700">
-                <h2 class="font-black text-4xl text-gray-900 tracking-tighter uppercase leading-none">
-                    Pengaturan Akun
-                </h2>
-                <p class="text-[10px] text-gray-400 font-black uppercase tracking-[0.3em]">
-                    Lengkapi data wilayah untuk sinkronisasi ranking nasional
+        <div class="max-w-4xl mx-auto space-y-6 md:space-y-8 animate-in fade-in duration-700">
+            
+            <div>
+                <h1 class="text-xl md:text-2xl font-medium text-slate-900 tracking-tight">Profil Saya</h1>
+                <p class="text-[11px] text-slate-500 font-medium tracking-wide mt-1">
+                    Kelola informasi akun dan pengaturan keamanan Anda di sini.
                 </p>
             </div>
-        </template>
 
-        <div class="max-w-5xl space-y-10 pb-24">
+            <div class="space-y-6">
+                <div class="bg-white border border-slate-100 rounded-[1.5rem] p-5 md:p-8 shadow-sm transition-all hover:shadow-md">
+                    <UpdateProfileInformationForm
+                        :must-verify-email="mustVerifyEmail"
+                        :status="status"
+                        class="max-w-xl"
+                    />
+                </div>
+
+                <div class="bg-white border border-slate-100 rounded-[1.5rem] p-5 md:p-8 shadow-sm transition-all hover:shadow-md">
+                    <UpdatePasswordForm class="max-w-xl" />
+                </div>
+
+                <div class="bg-white border border-slate-100 rounded-[1.5rem] p-5 md:p-8 shadow-sm transition-all hover:shadow-md hover:border-rose-100">
+                    <DeleteUserForm class="max-w-xl" />
+                </div>
+            </div>
             
-            <div class="bg-white rounded-[3.5rem] border border-gray-100 shadow-sm relative overflow-hidden group">
-                <div class="absolute top-0 left-0 w-full h-2 bg-indigo-600"></div>
-                
-                <div class="p-10 md:p-16 relative z-10">
-                    <div class="flex flex-col md:flex-row gap-12">
-                        <div class="md:w-1/3 space-y-4">
-                            <div class="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center text-2xl">🌍</div>
-                            <h3 class="text-xl font-black text-gray-900 uppercase tracking-tighter leading-tight">Data Wilayah & Identitas</h3>
-                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-relaxed">
-                                Pilih provinsi domisili anda dengan benar. Data ini akan digunakan untuk menentukan peringkat anda dalam skala regional dan nasional.
-                            </p>
-                        </div>
-
-                        <div class="md:w-2/3 bg-gray-50/50 p-8 md:p-10 rounded-[2.5rem] border border-gray-100">
-                            <UpdateProfileInformationForm
-                                :must-verify-email="mustVerifyEmail"
-                                :status="status"
-                            />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-[3.5rem] border border-gray-100 shadow-sm relative overflow-hidden group">
-                <div class="absolute top-0 left-0 w-full h-2 bg-amber-400"></div>
-                
-                <div class="p-10 md:p-16 relative z-10">
-                    <div class="flex flex-col md:flex-row gap-12">
-                        <div class="md:w-1/3 space-y-4">
-                            <div class="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center text-2xl">🔑</div>
-                            <h3 class="text-xl font-black text-gray-900 uppercase tracking-tighter leading-tight">Keamanan Akses</h3>
-                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-relaxed">
-                                Perbarui kata sandi secara berkala untuk memastikan akun dan hasil ujian anda tetap terlindungi.
-                            </p>
-                        </div>
-
-                        <div class="md:w-2/3 bg-gray-50/50 p-8 md:p-10 rounded-[2.5rem] border border-gray-100">
-                            <UpdatePasswordForm />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
         </div>
     </AuthenticatedLayout>
 </template>
+
+<style scoped>
+.animate-in {
+    animation-duration: 0.8s;
+    animation-fill-mode: both;
+}
+
+@keyframes slideUpFade {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.space-y-6 > div {
+    animation: slideUpFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Penundaan animasi untuk setiap form agar muncul satu per satu (efek berurutan) */
+.space-y-6 > div:nth-child(1) { animation-delay: 0s; }
+.space-y-6 > div:nth-child(2) { animation-delay: 0.1s; }
+.space-y-6 > div:nth-child(3) { animation-delay: 0.2s; }
+</style>
