@@ -16,20 +16,24 @@ class User extends Authenticatable
      *
      * @var array<int, string>
      */
-    protected $fillable = [
+   protected $fillable = [
         'name',
         'email',
         'password',
         'balance',
         'affiliate_code',
         'affiliate_balance',
-        'membership_expires_at', // Tambahkan ini agar membership bisa diupdate
-        'province',
+        'membership_expires_at', 
         'city',
         'district',
-        'agency_name',
         'participant_number',
         'avatar',
+        
+        // --- SESUAIKAN DENGAN VUE & DATABASE ANDA ---
+        'province_code',  // Menggantikan 'provinsi' / 'province'
+        'agency_name',    // Menggantikan 'instansi'
+        'instance_type',  // Wajib ditambahkan karena Vue mengirimkan data ini
+        'gender',         // Menggantikan 'jenis_kelamin'
     ];
 
     /**

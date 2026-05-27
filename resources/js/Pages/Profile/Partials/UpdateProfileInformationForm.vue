@@ -15,10 +15,10 @@ defineProps({
 const user = usePage().props.auth.user;
 
 const form = useForm({
-    _method: 'PATCH', // Penting untuk upload file di Inertia saat update
+    _method: 'PATCH',
     name: user.name,
     email: user.email,
-    avatar: null, // Field baru untuk file
+    avatar: null,
     participant_number: user.participant_number || '-',
     province_code: user.province_code || '',
     agency_name: user.agency_name || '',
@@ -30,7 +30,6 @@ const form = useForm({
 const photoPreview = ref(null);
 const photoInput = ref(null);
 
-// Generate URL foto (User Avatar atau Default Initials)
 const currentPhotoUrl = computed(() => {
     return user.avatar 
         ? `/storage/${user.avatar}` 
@@ -45,9 +44,8 @@ const updatePhotoPreview = () => {
     const photo = photoInput.value.files[0];
     if (!photo) return;
 
-    form.avatar = photo; // Masukkan ke form
+    form.avatar = photo;
     
-    // Buat preview lokal
     const reader = new FileReader();
     reader.onload = (e) => {
         photoPreview.value = e.target.result;
@@ -93,7 +91,6 @@ watch(() => form.agency_name, (newVal) => {
     }
 });
 
-// Submit Form (Gunakan POST dengan _method: PATCH agar file terkirim)
 const submitForm = () => {
     form.post(route('profile.update'), {
         preserveScroll: true,
@@ -116,7 +113,7 @@ const submitForm = () => {
 
         <form @submit.prevent="submitForm" class="mt-6 space-y-6">
             
-            <div class="flex items-center gap-6">
+            <div class="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
                 <input 
                     ref="photoInput"
                     type="file" 
@@ -124,8 +121,8 @@ const submitForm = () => {
                     @change="updatePhotoPreview"
                 >
 
-                <div class="relative">
-                    <div class="w-20 h-20 rounded-full overflow-hidden border-2 border-indigo-100 shadow-sm">
+                <div class="relative shrink-0">
+                    <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-indigo-100 shadow-sm bg-gray-50">
                         <img 
                             :src="photoPreview || currentPhotoUrl" 
                             alt="Foto Profil" 
@@ -134,11 +131,11 @@ const submitForm = () => {
                     </div>
                 </div>
 
-                <div>
-                    <InputLabel value="Foto Profil" class="mb-1" />
+                <div class="flex flex-col justify-center">
+                    <InputLabel value="Foto Profil" class="mb-2 hidden sm:block" />
                     <button 
                         type="button" 
-                        class="text-xs font-bold text-indigo-600 uppercase tracking-widest border border-indigo-200 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition"
+                        class="text-xs font-bold text-indigo-600 uppercase tracking-widest border border-indigo-200 px-4 py-2 sm:px-3 sm:py-1.5 rounded-lg hover:bg-indigo-50 transition w-full sm:w-auto text-center"
                         @click="selectNewPhoto"
                     >
                         Pilih Foto Baru
@@ -149,26 +146,26 @@ const submitForm = () => {
 
             <div>
                 <InputLabel value="Nomor Peserta" />
-                <div class="mt-1 px-4 py-2 bg-gray-100 border border-gray-300 rounded-md text-gray-500 font-mono font-bold tracking-widest select-all">
+                <div class="mt-1 px-4 py-3 sm:py-2 bg-gray-100 border border-gray-300 rounded-md text-gray-500 font-mono font-bold tracking-widest select-all text-sm sm:text-base">
                     {{ form.participant_number }}
                 </div>
             </div>
 
             <div>
                 <InputLabel for="name" value="Nama Lengkap" />
-                <TextInput id="name" type="text" class="mt-1 block w-full" v-model="form.name" required />
+                <TextInput id="name" type="text" class="mt-1 block w-full py-2.5 sm:py-2" v-model="form.name" required />
                 <InputError class="mt-2" :message="form.errors.name" />
             </div>
 
             <div>
                 <InputLabel for="email" value="Email" />
-                <TextInput id="email" type="email" class="mt-1 block w-full" v-model="form.email" required />
+                <TextInput id="email" type="email" class="mt-1 block w-full py-2.5 sm:py-2" v-model="form.email" required />
                 <InputError class="mt-2" :message="form.errors.email" />
             </div>
 
             <div>
                 <InputLabel for="province_code" value="Provinsi Domisili" />
-                <select id="province_code" v-model="form.province_code" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" required>
+                <select id="province_code" v-model="form.province_code" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm py-2.5 sm:py-2 text-sm sm:text-base bg-white" required>
                     <option value="" disabled>Pilih Provinsi</option>
                     <option v-for="prov in provinces" :key="prov.code" :value="prov.code">{{ prov.name }}</option>
                 </select>
@@ -181,7 +178,7 @@ const submitForm = () => {
                     <TextInput 
                         id="agency_name" 
                         type="text" 
-                        class="mt-1 block w-full pr-10" 
+                        class="mt-1 block w-full pr-10 py-2.5 sm:py-2" 
                         v-model="searchAgency"
                         @input="onSearchInput"
                         @focus="isDropdownOpen = true"
@@ -194,20 +191,20 @@ const submitForm = () => {
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg>
                     </div>
                 </div>
-                <div v-if="isDropdownOpen" class="absolute z-50 mt-1 w-full bg-white shadow-xl max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm border border-gray-200">
+                <div v-if="isDropdownOpen" class="absolute z-50 mt-1 w-full bg-white shadow-xl max-h-60 rounded-md py-1 text-sm ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none border border-gray-200">
                     <ul v-if="filteredAgencies.length > 0">
-                        <li v-for="(agency, index) in filteredAgencies" :key="index" @mousedown.prevent="selectAgency(agency)" class="cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-indigo-50 hover:text-indigo-700 text-gray-700 border-b border-gray-50 last:border-0">
+                        <li v-for="(agency, index) in filteredAgencies" :key="index" @mousedown.prevent="selectAgency(agency)" class="cursor-pointer select-none relative py-3 sm:py-2 pl-3 pr-9 hover:bg-indigo-50 hover:text-indigo-700 text-gray-700 border-b border-gray-50 last:border-0">
                             <span class="block truncate font-medium">{{ agency }}</span>
                         </li>
                     </ul>
-                    <div v-else class="py-2 px-3 text-gray-500 italic text-center">Instansi tidak ditemukan.</div>
+                    <div v-else class="py-3 px-3 text-gray-500 italic text-center">Instansi tidak ditemukan.</div>
                 </div>
                 <InputError class="mt-2" :message="form.errors.agency_name" />
             </div>
 
             <div>
                 <InputLabel for="gender" value="Jenis Kelamin" />
-                <select id="gender" v-model="form.gender" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" required>
+                <select id="gender" v-model="form.gender" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm py-2.5 sm:py-2 text-sm sm:text-base bg-white" required>
                     <option value="" disabled>Pilih Gender</option>
                     <option value="1">Laki-laki</option>
                     <option value="2">Perempuan</option>
@@ -215,12 +212,15 @@ const submitForm = () => {
                 <InputError class="mt-2" :message="form.errors.gender" />
             </div>
 
-            <div class="flex items-center gap-4">
-                <PrimaryButton :disabled="form.processing">Simpan Perubahan</PrimaryButton>
+            <div class="flex flex-col sm:flex-row sm:items-center gap-4 pt-2">
+                <PrimaryButton :disabled="form.processing" class="w-full sm:w-auto justify-center py-3 sm:py-2">
+                    Simpan Perubahan
+                </PrimaryButton>
+                
                 <Transition enter-active-class="transition ease-in-out duration-300" enter-from-class="opacity-0 translate-y-2" enter-to-class="opacity-100 translate-y-0" leave-active-class="transition ease-in-out duration-1000" leave-from-class="opacity-100" leave-to-class="opacity-0">
-                    <div v-if="form.recentlySuccessful" class="flex items-center gap-2 text-sm font-medium text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100">
+                    <div v-if="form.recentlySuccessful" class="flex items-center justify-center sm:justify-start gap-2 text-sm font-medium text-emerald-600 bg-emerald-50 px-3 py-2 sm:py-1.5 rounded-lg border border-emerald-100">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
-                        Perubahan Berhasil Disimpan
+                        Berhasil Disimpan
                     </div>
                 </Transition>
             </div>

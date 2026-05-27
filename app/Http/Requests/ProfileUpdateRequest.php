@@ -29,10 +29,11 @@ class ProfileUpdateRequest extends FormRequest
             'avatar' => ['nullable', 'image', 'max:2048'], // Max 2MB
 
             // Validasi Data Informasi Pendaftaran
-            'province_code' => ['required', 'string', 'size:2'],
-            'agency_name' => ['required', 'string', 'max:255'],
-            'instance_type' => ['required', 'in:1,2'], // 1=Pusat, 2=Daerah
-            'gender' => ['required', 'in:1,2'],
+            // Pastikan baris ini ada di dalam function rules()
+'province_code' => ['nullable', 'string', 'max:255'],
+'agency_name'   => ['nullable', 'string', 'max:255'],
+'instance_type' => ['nullable', 'string', 'max:255'],
+'gender'        => ['nullable', 'string', 'in:1,2'],
         ];
     }
 }

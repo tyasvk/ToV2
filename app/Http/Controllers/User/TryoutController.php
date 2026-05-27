@@ -26,13 +26,12 @@ class TryoutController extends Controller
         $user = auth()->user();
         $isPremiumMember = $user->membership_expires_at && now()->lt($user->membership_expires_at);
 
-        // --- 1. DATA KATALOG (DIPERBAIKI: Tidak dikosongkan untuk Premium) ---
+        // --- 1. DATA KATALOG ---
         $catalogTryouts = Tryout::query()
             ->where('is_published', true)
             ->where(function ($query) {
                 $query->whereNotIn('type', ['akbar', 'adidaya'])->orWhereNull('type');
             })
-            // Jika BUKAN member premium, filter tryout yang belum dibeli saja
             ->when(!$isPremiumMember, function($query) use ($user) {
                 $query->whereDoesntHave('transactions', function($q) use ($user) {
                     $q->whereIn('status', ['paid', 'success'])
@@ -46,7 +45,7 @@ class TryoutController extends Controller
             ->latest()
             ->get();
 
-        // --- 2. DATA TRYOUT SAYA (Sudah Dibeli / Akses Premium) ---
+        // --- 2. DATA TRYOUT SAYA ---
         $myTryouts = Tryout::query()
             ->where('is_published', true)
             ->where(function ($query) {
@@ -84,12 +83,11 @@ class TryoutController extends Controller
 
     public function show(Tryout $tryout)
     {
-        // Cek apakah pendaftaran ditutup
         $isClosed = $tryout->end_date && now()->greaterThan($tryout->end_date);
 
         return Inertia::render('User/Tryout/Show', [
             'tryout' => $tryout,
-            'is_registration_closed' => $isClosed, // Kirim status ke frontend
+            'is_registration_closed' => $isClosed,
         ]);
     }
 
@@ -98,7 +96,6 @@ class TryoutController extends Controller
      */
     public function processRegistration(Request $request, Tryout $tryout)
     {
-        // --- 1. Validasi Batas Waktu Pendaftaran ---
         if ($tryout->end_date && now()->greaterThan($tryout->end_date)) {
             return back()->withErrors(['message' => 'Pendaftaran untuk tryout ini sudah ditutup karena melewati batas waktu.']);
         }
@@ -114,14 +111,12 @@ class TryoutController extends Controller
         $qty = $participants->count();
         $discount = match($qty) { 2 => 0.05, 3 => 0.10, 4 => 0.15, default => $qty >= 5 ? 0.20 : 0 };
 
-        // --- LOGIKA AFILIASI ---
         $referrerId = null;
         $discountVoucher = 0;
         $commission = 0;
 
         if ($request->voucher_code) {
             $referrer = User::where('affiliate_code', $request->voucher_code)->first();
-            // Cek agar tidak pakai kode sendiri
             if ($referrer && $referrer->id !== auth()->id()) {
                 $referrerId = $referrer->id;
                 $discountVoucher = 3000;
@@ -130,7 +125,7 @@ class TryoutController extends Controller
         }
 
         $finalAmount = ($tryout->price * $qty) * (1 - $discount) - $discountVoucher;
-        $finalAmount = max(0, $finalAmount); // Pastikan tidak negatif
+        $finalAmount = max(0, $finalAmount); 
         $invoice = 'INV-' . strtoupper(Str::random(10));
 
         if ($request->payment_method === 'wallet') {
@@ -145,18 +140,17 @@ class TryoutController extends Controller
                 $transaction = Transaction::create([
                     'user_id' => $user->id, 
                     'tryout_id' => $tryout->id, 
-                    'referrer_id' => $referrerId, // Simpan Referrer
+                    'referrer_id' => $referrerId,
                     'invoice_code' => $invoice, 
                     'unit_price' => $tryout->price, 
                     'qty' => $qty, 
                     'amount' => $finalAmount, 
-                    'discount_amount' => $discountVoucher, // Simpan Diskon
-                    'affiliate_commission' => $commission, // Simpan Komisi
+                    'discount_amount' => $discountVoucher,
+                    'affiliate_commission' => $commission,
                     'participants_data' => $participants->all(), 
                     'status' => 'paid'
                 ]);
 
-                // INPUT KOMISI KE REFERRER (Jika bayar pakai wallet)
                 if ($referrerId) {
                     User::find($referrerId)->increment('affiliate_balance', $commission);
                 }
@@ -165,7 +159,6 @@ class TryoutController extends Controller
             return redirect()->route('tryout.index')->with('success', 'Pembelian berhasil!');
         }
 
-        // Untuk Midtrans: Simpan data referal, komisi akan cair saat status jadi 'paid' di callback
         $transaction = Transaction::create([
             'user_id' => auth()->id(), 
             'tryout_id' => $tryout->id, 
@@ -183,9 +176,6 @@ class TryoutController extends Controller
         return redirect()->route('checkout.show', $transaction->id);
     }
 
-    /**
-     * Tampilkan halaman Nusantara Adidaya (Premium Membership)
-     */
     public function adidaya()
     {
         $exclusiveTryouts = Tryout::where('type', 'adidaya')
@@ -199,9 +189,6 @@ class TryoutController extends Controller
         ]);
     }
 
-    /**
-     * Halaman Tryout Saya
-     */
     public function myTryouts(Request $request)
     {
         $user = auth()->user();
@@ -211,13 +198,11 @@ class TryoutController extends Controller
 
         $tryouts = Tryout::query()
             ->where('is_published', true)
-            // Hanya tampilkan paket umum (Bukan akbar/adidaya)
             ->where(function ($query) {
                 $query->whereNotIn('type', ['akbar', 'adidaya'])
                       ->orWhereNull('type');
             })
             ->where(function($query) use ($userId, $userEmail, $isPremiumMember) {
-                // Akses via Transaksi Manual
                 $query->whereHas('transactions', function($q) use ($userId, $userEmail) {
                     $q->whereIn('status', ['paid', 'success'])
                       ->where(function($sq) use ($userId, $userEmail) {
@@ -226,7 +211,6 @@ class TryoutController extends Controller
                       });
                 });
 
-                // Member Premium otomatis memiliki semua paket umum tanpa beli lagi
                 if ($isPremiumMember) {
                     $query->orWhere(function($q) {
                         $q->whereNotIn('type', ['akbar', 'adidaya'])
@@ -263,9 +247,9 @@ class TryoutController extends Controller
             ->distinct('user_id')
             ->count();
 
-        $pgTwk = ExamAttempt::PASSING_GRADE_TWK;
-        $pgTiu = ExamAttempt::PASSING_GRADE_TIU;
-        $pgTkp = ExamAttempt::PASSING_GRADE_TKP;
+        $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65;
+        $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80;
+        $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
 
         $scoreDetails = [
             ['category' => 'Tes Wawasan Kebangsaan (TWK)', 'score' => $attempt->twk_score, 'passing_grade' => $pgTwk, 'is_passed' => $attempt->twk_score >= $pgTwk],
@@ -289,7 +273,6 @@ class TryoutController extends Controller
         $user = auth()->user();
         $isPremiumMember = $user->membership_expires_at && now()->lt($user->membership_expires_at);
 
-        // Akses diberikan jika Member (Adidaya/Umum) ATAU punya transaksi manual
         $hasAccess = ($isPremiumMember && $tryout->type !== 'akbar') || Transaction::where('tryout_id', $tryout->id)
             ->whereIn('status', ['paid', 'success'])
             ->where(function($query) use ($user) {
@@ -322,7 +305,6 @@ class TryoutController extends Controller
         $now = now();
         $isPremiumMember = $user->membership_expires_at && now()->lt($user->membership_expires_at);
         
-        // Akses via Membership (Adidaya & Umum) atau Transaksi Manual
         $hasAccess = ($isPremiumMember && $tryout->type !== 'akbar') || Transaction::where('tryout_id', $tryout->id)
             ->whereIn('status', ['paid', 'success'])
             ->where(function($query) use ($user) {
@@ -346,7 +328,6 @@ class TryoutController extends Controller
             }
         }
 
-        // Batas Pengerjaan: Akbar 1x, Adidaya & Umum 3x
         $maxAttempts = ($tryout->type === 'akbar') ? 1 : 3;
         $attemptsCount = ExamAttempt::where('user_id', $user->id)->where('tryout_id', $tryout->id)->count();
 
@@ -364,7 +345,6 @@ class TryoutController extends Controller
 
     public function registerForm(Tryout $tryout)
     {
-        // --- Validasi Tambahan: Cek Tanggal ---
         if ($tryout->end_date && now()->greaterThan($tryout->end_date)) {
             return redirect()->route('tryout.show', $tryout->id)
                 ->with('error', 'Pendaftaran untuk tryout ini telah ditutup.');
@@ -415,7 +395,18 @@ class TryoutController extends Controller
             }
         }
 
-        $attempt = ExamAttempt::create(['user_id' => auth()->id(), 'tryout_id' => $tryout->id, 'answers' => $answers, 'twk_score' => $twk, 'tiu_score' => $tiu, 'tkp_score' => $tkp, 'total_score' => $twk + $tiu + $tkp, 'completed_at' => now()]);
+        // PASTIKAN COMPLETED_AT DISIMPAN
+        $attempt = ExamAttempt::create([
+            'user_id' => auth()->id(), 
+            'tryout_id' => $tryout->id, 
+            'answers' => $answers, 
+            'twk_score' => $twk, 
+            'tiu_score' => $tiu, 
+            'tkp_score' => $tkp, 
+            'total_score' => $twk + $tiu + $tkp, 
+            'completed_at' => now() 
+        ]);
+        
         return redirect()->route('tryout.result', $attempt->id);
     }
 
@@ -443,7 +434,9 @@ class TryoutController extends Controller
     public function leaderboard(Request $request, Tryout $tryout)
     {
         $user = auth()->user();
-        $pgTwk = ExamAttempt::PASSING_GRADE_TWK; $pgTiu = ExamAttempt::PASSING_GRADE_TIU; $pgTkp = ExamAttempt::PASSING_GRADE_TKP;
+        $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65; 
+        $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80; 
+        $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
 
         $rankings = ExamAttempt::query()
             ->where('tryout_id', $tryout->id)
@@ -455,7 +448,29 @@ class TryoutController extends Controller
             ->sortByDesc(fn($a) => sprintf('%d-%03d-%03d-%03d-%03d', ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp), $a->total_score, $a->tkp_score, $a->tiu_score, $a->twk_score))
             ->values()
             ->map(fn($a, $i) => [
-                'rank' => $i + 1, 'name' => $a->user->name, 'score' => $a->total_score, 'twk' => $a->twk_score, 'tiu' => $a->tiu_score, 'tkp' => $a->tkp_score, 'is_passed' => ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp), 'duration' => $a->created_at->diff($a->completed_at)->format('%H:%I:%S'), 'is_me' => $a->user_id === auth()->id()
+                'id' => $a->id,
+                'rank' => $i + 1, 
+                
+                // DATA USER & INSTANSI
+                'name' => $a->user ? $a->user->name : 'User', 
+                'avatar' => $a->user ? $a->user->avatar : null,
+                'agency_name' => $a->user ? $a->user->agency_name : null, 
+                'province_code' => $a->user ? $a->user->province_code : null,
+                'gender' => $a->user ? $a->user->gender : null, 
+                
+                // SKOR & STATUS
+                'score' => $a->total_score, 
+                'twk' => $a->twk_score, 
+                'tiu' => $a->tiu_score, 
+                'tkp' => $a->tkp_score, 
+                'is_passed' => ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp), 
+                
+                // DURASI WAKTU PENGERJAAN (Dihitung dalam detik)
+                'duration' => ($a->created_at) 
+                    ? \Carbon\Carbon::parse($a->created_at)->diffInSeconds($a->completed_at ?? $a->updated_at) 
+                    : 0,
+                
+                'is_me' => $a->user_id === auth()->id()
             ]);
 
         return Inertia::render('User/Tryout/Leaderboard', [
