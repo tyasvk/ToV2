@@ -54,12 +54,45 @@ const isFemale = (user) => {
     return g == 2 || g == '2' || g === 'Perempuan';
 };
 
+// --- HELPER PARSING TANGGAL LEBIH AKURAT ---
+const parseSafeDate = (dateVal) => {
+    if (!dateVal) return new Date(NaN);
+    if (typeof dateVal === 'string') {
+        // Jika format stringnya 'YYYY-MM-DD HH:mm:ss', ubah spasi jadi 'T' agar standar ISO
+        if (dateVal.includes(' ') && !dateVal.includes('T')) {
+            return new Date(dateVal.replace(' ', 'T'));
+        }
+        return new Date(dateVal);
+    }
+    return new Date(dateVal);
+};
+
+// --- HELPER DURASI PENGERJAAN ---
 const getDuration = (user) => {
     if (!user) return '-';
-    let dur = user.duration || user.waktu_pengerjaan || user.time_taken || (user.user && user.user.duration);
+    
+    // PRIORITAS 1: Hitung manual dari created_at dan completed_at (Paling Akurat)
+    if (user.created_at && user.completed_at) {
+        const start = parseSafeDate(user.created_at);
+        const end = parseSafeDate(user.completed_at);
+        
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+            const diffSeconds = Math.floor((end.getTime() - start.getTime()) / 1000);
+            if (diffSeconds > 0) {
+                const h = Math.floor(diffSeconds / 3600);
+                const m = Math.floor((diffSeconds % 3600) / 60);
+                const s = diffSeconds % 60;
+                return h > 0 ? `${h}j ${m}m ${s}d` : `${m}m ${s}d`;
+            }
+        }
+    }
+
+    // PRIORITAS 2: Gunakan data durasi bawaan backend (jika dikirim)
+    let dur = user.duration || user.waktu_pengerjaan;
     
     if (!dur || dur === '00:00:00' || dur === 0 || dur === '0') return '-';
 
+    // Jika format HH:MM:SS
     if (typeof dur === 'string' && dur.includes(':')) {
         const parts = dur.split(':');
         if (parts.length === 3) {
@@ -67,21 +100,20 @@ const getDuration = (user) => {
             const m = parseInt(parts[1], 10);
             const s = parseInt(parts[2], 10);
             if (h === 0 && m === 0 && s === 0) return '-';
-            if (h > 0) return `${h}j ${m}m ${s}d`;
-            return `${m}m ${s}d`;
+            return h > 0 ? `${h}j ${m}m ${s}d` : `${m}m ${s}d`;
         }
     }
 
+    // Jika format detik (integer)
     if (!isNaN(dur) && Number(dur) > 0) {
         const val = Number(dur);
         const h = Math.floor(val / 3600);
         const m = Math.floor((val % 3600) / 60);
         const s = val % 60;
-        if (h > 0) return `${h}j ${m}m ${s}d`;
-        return `${m}m ${s}d`;
+        return h > 0 ? `${h}j ${m}m ${s}d` : `${m}m ${s}d`;
     }
 
-    return dur;
+    return '-';
 };
 
 const sortedRankings = computed(() => {
@@ -226,6 +258,11 @@ const paginatedRankings = computed(() => {
                             <div class="mt-auto pt-2">
                                 <div class="text-slate-700 font-medium text-lg sm:text-xl tabular-nums leading-none">{{ sortedRankings[1].score }}</div>
                                 <span v-if="sortedRankings[1].is_passed" class="inline-block mt-1.5 text-[9px] bg-emerald-50 border border-emerald-100 text-emerald-600 px-2 py-0.5 rounded uppercase tracking-wider font-medium">Lulus</span>
+                                
+                                <div class="flex items-center justify-center gap-1 mt-2 text-[9px] text-slate-400 font-medium">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    {{ getDuration(sortedRankings[1]) }}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -248,6 +285,11 @@ const paginatedRankings = computed(() => {
                             <div class="mt-auto pt-2">
                                 <div class="text-blue-700 font-medium text-2xl sm:text-3xl tabular-nums leading-none">{{ sortedRankings[0].score }}</div>
                                 <span v-if="sortedRankings[0].is_passed" class="inline-block mt-2 text-[9px] sm:text-[10px] bg-emerald-50 border border-emerald-100 text-emerald-600 px-2 py-0.5 rounded uppercase tracking-wider font-medium">Lulus SKD</span>
+                                
+                                <div class="flex items-center justify-center gap-1 mt-2 text-[10px] text-slate-400 font-medium">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    {{ getDuration(sortedRankings[0]) }}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -267,6 +309,11 @@ const paginatedRankings = computed(() => {
                             <div class="mt-auto pt-2">
                                 <div class="text-slate-700 font-medium text-lg sm:text-xl tabular-nums leading-none">{{ sortedRankings[2].score }}</div>
                                 <span v-if="sortedRankings[2].is_passed" class="inline-block mt-1.5 text-[9px] bg-emerald-50 border border-emerald-100 text-emerald-600 px-2 py-0.5 rounded uppercase tracking-wider font-medium">Lulus</span>
+                                
+                                <div class="flex items-center justify-center gap-1 mt-2 text-[9px] text-slate-400 font-medium">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    {{ getDuration(sortedRankings[2]) }}
+                                </div>
                             </div>
                         </div>
                     </div>

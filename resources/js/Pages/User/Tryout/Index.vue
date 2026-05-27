@@ -149,7 +149,8 @@ const filteredTryouts = computed(() => {
                                 {{ tryout.title }}
                             </h2>
                             
-                            <p class="text-[9px] md:text-[10px] text-slate-500 font-medium line-clamp-2 leading-snug italic mt-1">
+                            <!-- CLASS line-clamp-2 DIHAPUS DISINI -->
+                            <p class="text-[9px] md:text-[10px] text-slate-500 font-medium leading-snug italic mt-1 break-words">
                                 {{ tryout.description || 'Wujudkan impianmu menjadi Abdi Negara! Terus berlatih, pantang menyerah, dan raih NIP tahun ini.' }}
                             </p>
 
@@ -165,24 +166,60 @@ const filteredTryouts = computed(() => {
                             </div>
                         </div>
 
-                        <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                            <div class="flex flex-col shrink-0">
-                                <span class="text-[7px] md:text-[8px] text-slate-400 uppercase tracking-widest mb-0.5">Biaya Akses</span>
-                                <span class="text-xs md:text-sm font-bold text-slate-900 tracking-tight leading-none">
+                        <!-- Action & Footer Card -->
+                        <div class="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-2.5">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex flex-col shrink-0">
                                     <template v-if="activeTab === 'my_tryouts'">
-                                        <span class="text-emerald-600 text-[10px] md:text-xs uppercase">Dimiliki</span>
+                                        <span class="text-[7px] md:text-[8px] text-slate-400 uppercase tracking-widest mb-0.5">Sisa Percobaan</span>
+                                        <span class="text-xs md:text-sm font-bold tracking-tight leading-none" :class="(tryout.exam_attempts_count || 0) >= 3 ? 'text-rose-500' : 'text-slate-900'">
+                                            {{ Math.max(0, 3 - (tryout.exam_attempts_count || 0)) }}x / 3
+                                        </span>
                                     </template>
                                     <template v-else>
-                                        {{ tryout.price > 0 ? `Rp ${Number(tryout.price).toLocaleString('id-ID')}` : 'GRATIS' }}
+                                        <span class="text-[7px] md:text-[8px] text-slate-400 uppercase tracking-widest mb-0.5">Biaya Akses</span>
+                                        <span class="text-xs md:text-sm font-bold text-slate-900 tracking-tight leading-none">
+                                            {{ tryout.price > 0 ? `Rp ${Number(tryout.price).toLocaleString('id-ID')}` : 'GRATIS' }}
+                                        </span>
                                     </template>
-                                </span>
+                                </div>
+
+                                <template v-if="activeTab === 'my_tryouts'">
+                                    <!-- Tombol Mulai (Hanya jika < 3 percobaan) -->
+                                    <Link 
+                                        v-if="(tryout.exam_attempts_count || 0) < 3"
+                                        :href="route('tryout.wait', tryout.id)"
+                                        class="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-1.5 rounded-lg text-[9px] md:text-[10px] uppercase tracking-wider transition-all active:scale-95 shadow-sm text-center font-medium"
+                                    >
+                                        Mulai
+                                    </Link>
+                                    <!-- Tombol Batas Maksimal (Jika sudah 3x percobaan) -->
+                                    <button 
+                                        v-else
+                                        disabled
+                                        class="bg-slate-100 text-slate-400 px-3 md:px-4 py-1.5 rounded-lg text-[9px] md:text-[10px] uppercase tracking-wider cursor-not-allowed shadow-none border border-slate-200 text-center font-medium"
+                                    >
+                                        Maksimal
+                                    </button>
+                                </template>
+                                <template v-else>
+                                    <!-- Tombol Detail di tab Katalog -->
+                                    <Link 
+                                        :href="route('tryout.show', tryout.id)"
+                                        class="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-1.5 rounded-lg text-[9px] md:text-[10px] uppercase tracking-wider transition-all active:scale-95 shadow-sm text-center font-medium"
+                                    >
+                                        Detail
+                                    </Link>
+                                </template>
                             </div>
 
+                            <!-- Tombol Ekstra: Lihat Riwayat (Hanya muncul jika sudah ada percobaan) -->
                             <Link 
-                                :href="activeTab === 'my_tryouts' ? route('tryout.wait', tryout.id) : route('tryout.show', tryout.id)"
-                                class="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-1.5 rounded-lg text-[9px] md:text-[10px] uppercase tracking-wider transition-all active:scale-95 shadow-sm text-center font-medium"
+                                v-if="activeTab === 'my_tryouts' && (tryout.exam_attempts_count || 0) > 0"
+                                :href="route('tryout.history.detail', tryout.id)"
+                                class="w-full text-center border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-600 px-3 py-1.5 rounded-lg text-[9px] md:text-[10px] uppercase tracking-wider transition-all active:scale-95 font-medium"
                             >
-                                {{ activeTab === 'my_tryouts' ? 'Mulai' : 'Detail' }}
+                                Lihat Riwayat Ujian
                             </Link>
                         </div>
                     </div>

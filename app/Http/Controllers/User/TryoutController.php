@@ -232,7 +232,7 @@ class TryoutController extends Controller
         ]);
     }
 
-    public function result(ExamAttempt $attempt)
+public function result(ExamAttempt $attempt)
     {
         if ($attempt->user_id !== auth()->id()) abort(403);
         
@@ -259,12 +259,32 @@ class TryoutController extends Controller
 
         $attempt->status = $attempt->is_passed ? 'lulus' : 'tidak_lulus';
 
+        // --- LOGIKA PERHITUNGAN WAKTU ---
+        $durationSeconds = 0;
+        if ($attempt->created_at) {
+            $endTime = $attempt->completed_at ?? ($attempt->updated_at ?? $attempt->created_at);
+            $durationSeconds = \Carbon\Carbon::parse($attempt->created_at)->diffInSeconds($endTime);
+            $durationSeconds = max(1, $durationSeconds); // Minimal 1 detik agar tidak 0
+        }
+
+        // Ambil jumlah soal (Jika tidak ada, set default ke 110)
+        $totalQuestions = $tryout->questions()->count() ?: 110;
+        
+        // Rata-rata waktu per soal dalam detik
+        $averageSeconds = $totalQuestions > 0 ? round($durationSeconds / $totalQuestions) : 0;
+
         return Inertia::render('User/Tryout/Result', [
             'attempt' => $attempt,
             'tryout' => $tryout,
             'totalScore' => $attempt->total_score,
             'scoreDetails' => $scoreDetails,
-            'ranking' => ['rank' => $rank, 'total_participants' => $totalParticipants]
+            'ranking' => ['rank' => $rank, 'total_participants' => $totalParticipants],
+            // Data waktu dikirim ke Frontend
+            'timeStats' => [
+                'total_seconds' => $durationSeconds,
+                'average_seconds' => $averageSeconds,
+                'total_questions' => $totalQuestions
+            ]
         ]);
     }
 
@@ -431,7 +451,7 @@ class TryoutController extends Controller
         return Inertia::render('User/Tryout/Review', ['attempt' => $attempt, 'questions' => $questions, 'tryout' => $attempt->tryout]);
     }
 
-    public function leaderboard(Request $request, Tryout $tryout)
+public function leaderboard(Request $request, Tryout $tryout)
     {
         $user = auth()->user();
         $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65; 
@@ -465,9 +485,10 @@ class TryoutController extends Controller
                 'tkp' => $a->tkp_score, 
                 'is_passed' => ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp), 
                 
-                // DURASI WAKTU PENGERJAAN (Dihitung dalam detik)
-                'duration' => ($a->created_at) 
-                    ? \Carbon\Carbon::parse($a->created_at)->diffInSeconds($a->completed_at ?? $a->updated_at) 
+                // DURASI WAKTU PENGERJAAN (DIPERBAIKI: Tanpa Error Syntax)
+                // Jika selisihnya 0 (karena waktu mulai & selesai sama), paksa jadi minimal 1 detik dengan fungsi max()
+                'duration' => $a->created_at 
+                    ? max(1, \Carbon\Carbon::parse($a->created_at)->diffInSeconds($a->completed_at ?? $a->updated_at ?? $a->created_at))
                     : 0,
                 
                 'is_me' => $a->user_id === auth()->id()
