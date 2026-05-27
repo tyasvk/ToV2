@@ -14,7 +14,9 @@ const page = usePage();
 const currentIndex = ref(0);
 const answers = ref({});
 
-// PERBAIKAN DISINI: Ganti duration_minutes jadi duration
+// State tambahan HANYA untuk toggle menu di layar HP
+const isSidebarOpen = ref(false); 
+
 const timeLeft = ref((props.tryout?.duration || 110) * 60);
 
 const isSubmitting = ref(false);
@@ -91,7 +93,11 @@ const finishExam = () => {
     showConfirmModal.value = true;
 };
 
-const goTo = (index) => { currentIndex.value = index; };
+const goTo = (index) => { 
+    currentIndex.value = index; 
+    isSidebarOpen.value = false; 
+};
+
 const next = () => { 
     if (currentIndex.value < (props.questions?.length - 1)) {
         currentIndex.value++; 
@@ -111,135 +117,177 @@ const formatTime = (seconds) => {
 <template>
     <Head :title="'CAT BKN - ' + tryout?.title" />
 
-    <div class="min-h-screen bg-[#F0F2F5] flex flex-col font-sans text-slate-700">
+    <div class="h-screen bg-slate-50 flex flex-col font-sans text-slate-700 overflow-hidden">
         
-        <header class="bg-white border-b border-slate-200 sticky top-0 z-50 h-16 flex items-center shadow-sm">
-            <div class="w-full px-6 flex justify-between items-center">
-                <div class="flex items-center gap-4">
-                    <img src="/images/logo.png" alt="Logo" class="h-10 w-auto">
-                    <div class="hidden md:block border-l border-slate-200 pl-4">
-                        <h1 class="text-sm font-black text-[#004a87] uppercase leading-none">Simulasi CAT Nusantara</h1>
+        <header class="bg-white border-b border-slate-200 sticky top-0 z-40 h-14 shrink-0 flex items-center shadow-sm px-3 md:px-6">
+            <div class="w-full flex justify-between items-center gap-2">
+                <div class="flex items-center gap-3">
+                    <img src="/images/logo.png" alt="Logo" class="h-7 md:h-8 w-auto">
+                    <div class="hidden md:block border-l border-slate-200 pl-3">
+                        <h1 class="text-xs font-medium text-[#004a87] uppercase tracking-wide leading-none">Simulasi CAT Nusantara</h1>
                     </div>
                 </div>
 
-                <div class="flex items-center gap-6">
-                    <div class="bg-slate-900 text-white px-4 py-2 rounded-lg font-mono text-lg font-bold flex items-center gap-2 tabular-nums">
-                        <span class="text-yellow-400 text-sm">⏳</span> {{ formatTime(timeLeft) }}
+                <div class="flex items-center gap-2 md:gap-4">
+                    <div class="bg-slate-50 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg font-mono text-sm font-medium flex items-center gap-1.5 tabular-nums">
+                        <span class="text-xs">⏱️</span> {{ formatTime(timeLeft) }}
                     </div>
-                    <button @click="finishExam" class="bg-rose-600 hover:bg-rose-700 text-white px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all shadow-md active:scale-95">
+                    
+                    <button @click="finishExam" class="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 px-3 md:px-5 py-1.5 rounded-lg text-xs font-medium uppercase tracking-wider transition-colors active:scale-95 hidden sm:block">
                         Selesai Ujian
+                    </button>
+
+                    <button @click="isSidebarOpen = !isSidebarOpen" class="md:hidden p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg bg-white border border-slate-200 active:scale-95 transition-all">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
                     </button>
                 </div>
             </div>
         </header>
 
-        <main class="flex-1 flex flex-col md:flex-row h-[calc(100vh-64px)] overflow-hidden">
+        <main class="flex-1 flex overflow-hidden relative">
             
-            <aside class="w-full md:w-[320px] bg-white border-r border-slate-200 flex flex-col overflow-y-auto custom-scrollbar">
-                <div class="p-5 border-b border-slate-100">
-                    <div class="flex items-center gap-4 mb-4">
-                        <div class="w-12 h-12 bg-slate-100 rounded-xl overflow-hidden border border-slate-200 flex-shrink-0">
-                            <img v-if="page.props.auth?.user?.image" :src="page.props.auth?.user?.image" class="w-full h-full object-cover">
-                            <span v-else class="text-[9px] font-black text-slate-300 flex items-center justify-center h-full uppercase">USER</span>
+            <aside :class="[
+                'absolute md:static inset-y-0 left-0 z-50 w-72 md:w-80 bg-white border-r border-slate-200 flex flex-col transition-transform duration-300 transform shadow-2xl md:shadow-none h-full',
+                isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+            ]">
+                <div class="p-4 border-b border-slate-100">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-slate-100 rounded-full overflow-hidden border border-slate-200 flex-shrink-0">
+                                <img v-if="page.props.auth?.user?.image" :src="page.props.auth?.user?.image" class="w-full h-full object-cover">
+                                <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-300 m-auto mt-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                            </div>
+                            <div class="overflow-hidden text-left leading-tight">
+                                <p class="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Peserta</p>
+                                <h4 class="text-xs font-medium text-slate-800 truncate">{{ page.props.auth?.user?.name }}</h4>
+                            </div>
                         </div>
-                        <div class="overflow-hidden text-left leading-tight">
-                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Peserta</p>
-                            <h4 class="text-[13px] font-black text-slate-900 truncate uppercase">{{ page.props.auth?.user?.name }}</h4>
-                        </div>
+                        <button @click="isSidebarOpen = false" class="md:hidden text-slate-400 hover:text-slate-600 p-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
                     </div>
-                    <div class="space-y-1.5">
-                        <div class="flex justify-between text-[9px] font-bold uppercase">
-                            <span class="text-slate-400 italic">Email</span>
-                            <span class="text-slate-700 truncate ml-2 lowercase">{{ page.props.auth?.user?.email }}</span>
+
+                    <div class="space-y-2 text-xs">
+                        <div class="flex justify-between font-normal">
+                            <span class="text-slate-400">Email</span>
+                            <span class="text-slate-600 truncate ml-2">{{ page.props.auth?.user?.email }}</span>
                         </div>
                         <div class="pt-2">
-                            <span class="block w-full text-center bg-blue-50 text-[#004a87] py-1.5 rounded-lg text-[9px] font-black border border-blue-100 uppercase tracking-tighter">
+                            <div class="w-full text-center bg-blue-50/50 text-[#004a87] py-2 rounded-lg text-[10px] font-medium border border-blue-100/50 uppercase tracking-wide">
                                 {{ subtestLabel }}
-                            </span>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="p-5">
-                    <div class="grid grid-cols-2 gap-3 mb-5 text-center">
-                        <div class="bg-emerald-50 p-2 rounded-xl border border-emerald-100">
-                            <p class="text-[8px] font-bold text-emerald-600 uppercase">Dijawab</p>
-                            <p class="text-base font-black text-emerald-700 leading-none mt-1">{{ answeredCount }}</p>
-                        </div>
-                        <div class="bg-rose-50 p-2 rounded-xl border border-rose-100">
-                            <p class="text-[8px] font-bold text-rose-600 uppercase">Sisa</p>
-                            <p class="text-base font-black text-rose-700 leading-none mt-1">{{ unansweredCount }}</p>
+                <div class="flex flex-col flex-1 overflow-hidden">
+                    <div class="p-4 shrink-0">
+                        <div class="grid grid-cols-2 gap-2 text-center">
+                            <div class="bg-emerald-50/50 p-2 rounded-lg border border-emerald-100">
+                                <p class="text-[9px] font-medium text-emerald-600 uppercase tracking-wider">Dijawab</p>
+                                <p class="text-sm font-medium text-emerald-700 mt-0.5">{{ answeredCount }}</p>
+                            </div>
+                            <div class="bg-amber-50/50 p-2 rounded-lg border border-amber-100">
+                                <p class="text-[9px] font-medium text-amber-600 uppercase tracking-wider">Sisa</p>
+                                <p class="text-sm font-medium text-amber-700 mt-0.5">{{ unansweredCount }}</p>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="flex flex-wrap justify-center gap-1">
-                        <button v-for="(q, i) in questions" :key="q.id" @click="goTo(i)"
-                            :class="[
-                                currentIndex === i ? 'ring-2 ring-blue-600 ring-offset-1 scale-105 z-10 shadow-sm' : '',
-                                answers[q.id] ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white text-slate-400 border-slate-200'
-                            ]"
-                            class="w-6 h-6 border rounded-md text-[8px] font-black flex items-center justify-center transition-all hover:border-blue-400 active:scale-90">
-                            {{ i + 1 }}
-                        </button>
+                    <div class="flex-1 overflow-y-auto px-4 pb-4 pt-2 custom-scrollbar">
+                        <div class="flex flex-wrap content-start gap-1.5 sm:gap-2">
+                            <button v-for="(q, i) in questions" :key="q.id" @click="goTo(i)"
+                                :class="[
+                                    currentIndex === i ? 'ring-2 ring-blue-400 ring-offset-1 z-10' : '',
+                                    answers[q.id] ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white text-slate-500 border-slate-200'
+                                ]"
+                                class="w-8 h-8 sm:w-9 sm:h-9 shrink-0 border rounded text-[10px] sm:text-[11px] font-medium flex items-center justify-center transition-all hover:border-blue-300">
+                                {{ i + 1 }}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </aside>
 
-            <section class="flex-1 flex flex-col bg-slate-50 relative overflow-hidden">
-                <div class="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar">
-                    <div class="max-w-[1000px] mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div class="bg-slate-50 px-6 py-2 border-b border-slate-100">
-                            <span class="text-[11px] font-black text-[#004a87] uppercase tracking-[0.2em]">Soal Nomor {{ currentIndex + 1 }}</span>
+            <div v-if="isSidebarOpen" @click="isSidebarOpen = false" class="fixed inset-0 bg-slate-900/40 z-40 md:hidden backdrop-blur-sm"></div>
+
+            <section class="flex-1 flex flex-col relative overflow-hidden bg-slate-50/50">
+                
+                <div class="flex-1 overflow-y-auto p-3 md:p-6 custom-scrollbar">
+                    <div class="max-w-3xl mx-auto bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-full">
+                        
+                        <div class="bg-slate-50/50 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
+                            <span class="text-[11px] font-medium text-[#004a87] uppercase tracking-wider">Soal Nomor {{ currentIndex + 1 }}</span>
                         </div>
 
-                        <div v-if="currentQuestion" class="p-6 md:p-8 text-left">
-                            <div v-if="currentQuestion?.image" class="mb-5 rounded-xl overflow-hidden border border-slate-200 max-w-md mx-auto shadow-sm">
-                                <img :src="'/storage/' + currentQuestion.image" class="w-full h-auto" alt="Gambar Soal">
+                        <div v-if="currentQuestion" class="p-4 md:p-6 text-left flex-1">
+                            <div v-if="currentQuestion?.image" class="mb-5 rounded-lg overflow-hidden border border-slate-200 max-w-sm mx-auto shadow-sm">
+                                <img :src="'/storage/' + currentQuestion.image" class="w-full h-auto bg-slate-50 p-1" alt="Gambar Soal">
                             </div>
 
-                            <div class="text-[13px] md:text-base leading-relaxed text-slate-800 mb-3 font-medium" v-html="currentQuestion?.content"></div>
+                            <div class="text-[13px] md:text-sm leading-relaxed text-slate-700 mb-5 font-normal whitespace-pre-wrap" v-html="currentQuestion?.content"></div>
                             
-                            <div class="space-y-1">
+                            <div class="space-y-2">
                                 <label v-for="(option, key) in currentQuestion?.options" :key="key" 
-                                    class="flex items-start gap-3 p-1.5 rounded-lg border border-slate-100 cursor-pointer transition-all hover:bg-blue-50/50 group"
-                                    :class="{'bg-blue-50 border-blue-200 ring-1 ring-blue-50': answers[currentQuestion?.id] === key}">
-                                    <input type="radio" :name="'q-'+currentQuestion?.id" :value="key" v-model="answers[currentQuestion?.id]" class="mt-1 w-4 h-4 text-blue-600 border-slate-300">
-                                    <span class="text-xs font-black text-[#004a87] w-4 uppercase">{{ key }}.</span>
-                                    <span class="text-[12px] md:text-sm font-bold text-slate-600 group-hover:text-slate-900 flex-1 leading-snug">{{ option }}</span>
+                                    class="flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all active:scale-[0.99]"
+                                    :class="answers[currentQuestion?.id] === key ? 'bg-blue-50/50 border-blue-300 ring-1 ring-blue-100' : 'border-slate-200 hover:bg-slate-50'">
+                                    
+                                    <input type="radio" :name="'q-'+currentQuestion?.id" :value="key" v-model="answers[currentQuestion?.id]" class="hidden">
+                                    
+                                    <div class="w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors mt-0.5 text-[10px]"
+                                        :class="answers[currentQuestion?.id] === key ? 'border-blue-500 bg-blue-500 text-white' : 'border-slate-300 text-slate-400'">
+                                        <span class="font-medium">{{ key.toUpperCase() }}</span>
+                                    </div>
+
+                                    <span class="text-xs md:text-sm font-normal text-slate-600 flex-1 leading-relaxed">{{ option }}</span>
                                 </label>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-white border-t border-slate-200 p-4 shadow-sm">
-                    <div class="max-w-[1000px] mx-auto flex justify-start items-center gap-3">
-                        <button @click="next" class="px-5 py-2.5 bg-white border border-slate-300 rounded-xl text-[10px] font-black uppercase text-slate-500 hover:bg-slate-100 transition-all shadow-sm">
-                            Lewatkan Soal Ini
+                <div class="bg-white border-t border-slate-200 p-3 sm:p-4 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.02)] z-10">
+                    <div class="max-w-3xl mx-auto flex justify-between items-center gap-2 sm:gap-3">
+                        <button @click="next" class="flex-1 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-lg text-[11px] sm:text-xs font-medium uppercase text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors">
+                            Lewatkan
                         </button>
-                        <button @click="next" class="px-8 py-2.5 bg-[#f37021] text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-orange-600 active:scale-95 transition-all">
-                            Simpan dan Lanjutkan
+                        
+                        <button @click="next" class="flex-[1.5] sm:flex-1 py-2.5 sm:py-3 bg-[#f37021] border border-[#f37021] text-white rounded-lg text-[11px] sm:text-xs font-medium uppercase tracking-wider hover:bg-orange-600 transition-colors shadow-sm flex justify-center items-center gap-1.5">
+                            Simpan & Lanjut
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                        </button>
+                    </div>
+                    
+                    <div class="max-w-3xl mx-auto mt-2 sm:hidden">
+                        <button @click="finishExam" class="w-full py-2 bg-rose-50 text-rose-600 rounded-lg text-[11px] font-medium uppercase tracking-wider">
+                            Selesai Ujian
                         </button>
                     </div>
                 </div>
+
             </section>
         </main>
 
-        <div v-if="showConfirmModal" class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-            <div class="bg-white rounded-[2rem] shadow-2xl max-w-xl w-full overflow-hidden animate-in zoom-in duration-300">
-                <div class="bg-rose-600 p-4 text-white text-center">
-                    <h3 class="text-xl font-black uppercase tracking-widest">Konfirmasi Selesai</h3>
+        <div v-if="showConfirmModal" class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm transition-opacity">
+            <div class="bg-white rounded-2xl shadow-xl max-w-sm w-full overflow-hidden animate-in">
+                <div class="bg-rose-50 p-4 border-b border-rose-100 flex items-center justify-center gap-2 text-rose-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                    <h3 class="text-sm font-medium uppercase tracking-wider">Akhiri Ujian</h3>
                 </div>
-                <div class="p-8 text-slate-700">
-                    <p class="text-lg font-bold mb-6 text-center italic">SOAL BELUM DIJAWAB : <span class="text-rose-600 underline underline-offset-4">{{ unansweredCount }}</span></p>
-                    <div class="space-y-4 text-sm leading-relaxed text-center">
-                        <p class="font-black text-slate-900 text-base">Apakah Anda yakin ingin mengakhiri simulasi?</p>
-                        <p class="text-slate-500">Jika "Ya", jawaban Anda akan dikirim dan hasil ujian akan segera diproses. Anda tidak bisa kembali setelah ini.</p>
+                <div class="p-6 text-slate-600 text-center">
+                    <div class="mb-4">
+                        <p class="text-sm font-medium mb-1">Soal Belum Dijawab:</p>
+                        <p class="text-2xl font-medium text-rose-500">{{ unansweredCount }}</p>
                     </div>
+                    <p class="text-xs font-normal leading-relaxed text-slate-500">
+                        Apakah Anda yakin ingin mengakhiri simulasi ini? Sisa waktu Anda akan hangus.
+                    </p>
                 </div>
-                <div class="p-6 bg-slate-50 border-t border-slate-100 flex justify-center gap-3">
-                    <button @click="autoSubmit" class="flex-1 py-3 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-emerald-700 shadow-xl transition-all active:scale-95">Ya, Selesai</button>
-                    <button @click="showConfirmModal = false" class="flex-1 py-3 bg-slate-200 text-slate-600 rounded-2xl font-black uppercase tracking-widest hover:bg-slate-300 transition-all active:scale-95">Tidak</button>
+                <div class="p-4 bg-slate-50 border-t border-slate-100 flex gap-2">
+                    <button @click="showConfirmModal = false" class="flex-1 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-medium uppercase tracking-wider hover:bg-slate-50 transition-colors">Batal</button>
+                    <button @click="autoSubmit" class="flex-1 py-2.5 bg-emerald-600 text-white border border-emerald-600 rounded-lg text-xs font-medium uppercase tracking-wider hover:bg-emerald-700 transition-colors">Ya, Selesai</button>
                 </div>
             </div>
         </div>
@@ -248,13 +296,14 @@ const formatTime = (seconds) => {
 </template>
 
 <style scoped>
-.custom-scrollbar::-webkit-scrollbar { width: 5px; }
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 .tabular-nums { font-variant-numeric: tabular-nums; }
 
-@keyframes zoomIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes zoomIn { 
+    from { transform: scale(0.95); opacity: 0; } 
+    to { transform: scale(1); opacity: 1; } 
+}
 .animate-in { animation: zoomIn 0.2s ease-out forwards; }
 </style>
