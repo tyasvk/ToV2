@@ -42,10 +42,10 @@ const isBalanceEnough = computed(() => {
 const processPayment = () => {
     if (!selectedMethod.value) {
         Swal.fire({
-            title: 'Pilih Metode Dulu',
+            title: 'Metode belum dipilih',
             text: 'Silakan pilih metode pembayaran Dompet atau Transfer.',
             icon: 'warning',
-            confirmButtonColor: '#1e293b'
+            confirmButtonColor: '#334155'
         });
         return;
     }
@@ -59,13 +59,13 @@ const processPayment = () => {
 
 const handleWalletPayment = () => {
     Swal.fire({
-        title: 'Bayar pakai Dompet?',
-        text: `Saldo akan terpotong ${formatRupiah(props.transaction?.amount)}`,
+        title: 'Konfirmasi Pembayaran',
+        text: `Saldo akan terpotong sebesar ${formatRupiah(props.transaction?.amount)}`,
         icon: 'question',
         showCancelButton: true,
-        confirmButtonText: 'Ya, Bayar Sekarang',
+        confirmButtonText: 'Bayar Sekarang',
         cancelButtonText: 'Batal',
-        confirmButtonColor: '#1e293b',
+        confirmButtonColor: '#334155',
         reverseButtons: true
     }).then((result) => {
         if (result.isConfirmed) {
@@ -84,7 +84,7 @@ const handleWalletPayment = () => {
 
 const handleMidtransPayment = () => {
     if (typeof window.snap === 'undefined') {
-        Swal.fire({ title: 'Sistem Belum Siap', text: 'Gagal memuat Midtrans. Refresh halaman.', icon: 'error' });
+        Swal.fire({ title: 'Sistem', text: 'Gagal memuat metode pembayaran.', icon: 'error' });
         return;
     }
 
@@ -96,11 +96,11 @@ const handleMidtransPayment = () => {
         },
         onPending: function(result) {
             isProcessing.value = false;
-            Swal.fire('Menunggu Pembayaran', 'Selesaikan sesuai instruksi.', 'info');
+            Swal.fire('Menunggu Pembayaran', 'Selesaikan transaksi Anda.', 'info');
         },
         onError: function(result) {
             isProcessing.value = false;
-            Swal.fire('Gagal', 'Pembayaran gagal.', 'error');
+            Swal.fire('Gagal', 'Pembayaran gagal diproses.', 'error');
         },
         onClose: function() {
             isProcessing.value = false;
@@ -110,80 +110,75 @@ const handleMidtransPayment = () => {
 </script>
 
 <template>
-    <Head title="Checkout - Nusantara Adidaya" />
+    <Head title="Checkout Pembayaran" />
 
     <AuthenticatedLayout>
-        <div class="relative bg-slate-900 overflow-hidden shadow-md -mx-6 -mt-6 md:-mx-12 md:-mt-12 mb-10 pb-10 pt-10 md:pt-16 text-center">
-            <div class="absolute inset-0 bg-gradient-to-r from-indigo-950 to-slate-900 opacity-95"></div>
-            <div class="relative max-w-5xl mx-auto px-6 z-10 text-white font-black uppercase">
-                <h1 class="text-3xl md:text-5xl tracking-tighter">Selesaikan <span class="italic text-indigo-300">Investasi Anda.</span></h1>
-            </div>
+        <div class="bg-white border-b border-slate-100 py-8 px-6 text-center">
+            <h1 class="text-xl md:text-2xl text-slate-900 tracking-tight font-medium">Selesaikan Transaksi</h1>
+            <p class="text-xs text-slate-500 mt-2 uppercase tracking-widest">Silakan pilih metode untuk melanjutkan</p>
         </div>
 
-        <div class="max-w-6xl mx-auto px-4 -mt-16 relative z-10 pb-20">
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div class="max-w-4xl mx-auto px-4 py-8">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 
-                <div class="lg:col-span-7 space-y-6">
-                    <div class="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100">
-                        <h3 class="text-[10px] font-black text-slate-900 uppercase tracking-widest mb-8">Metode Pembayaran</h3>
+                <div class="lg:col-span-7 space-y-4">
+                    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                        <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest mb-6">Pilih Metode</h3>
 
                         <div class="space-y-3">
                             <div v-if="isMembership"
                                 @click="isBalanceEnough && !isProcessing ? selectedMethod = 'wallet' : null"
-                                :class="['p-5 rounded-2xl border-2 transition-all flex items-center justify-between cursor-pointer', selectedMethod === 'wallet' ? 'border-indigo-600 bg-indigo-50/30' : 'border-slate-50', !isBalanceEnough ? 'opacity-50 grayscale cursor-not-allowed' : '']"
+                                :class="['p-4 rounded-xl border transition-all flex items-center justify-between cursor-pointer', selectedMethod === 'wallet' ? 'border-blue-600 bg-blue-50/50' : 'border-slate-200', !isBalanceEnough ? 'opacity-50 grayscale cursor-not-allowed' : '']"
                             >
-                                <div class="flex items-center gap-4">
-                                    <div class="text-2xl">💳</div>
+                                <div class="flex items-center gap-3">
+                                    <div class="text-lg">💳</div>
                                     <div>
-                                        <p class="text-[11px] font-black text-slate-900 uppercase">Dompet Nusantara</p>
-                                        <p class="text-[10px] font-bold" :class="isBalanceEnough ? 'text-slate-500' : 'text-rose-500'">Saldo: {{ formatRupiah(user_balance) }}</p>
+                                        <p class="text-sm text-slate-900 font-medium">Dompet Nusantara</p>
+                                        <p class="text-[10px]" :class="isBalanceEnough ? 'text-slate-500' : 'text-red-500'">Saldo: {{ formatRupiah(user_balance) }}</p>
                                     </div>
                                 </div>
-                                <div v-if="selectedMethod === 'wallet'">✓</div>
+                                <div v-if="selectedMethod === 'wallet'" class="text-blue-600">✓</div>
                             </div>
 
                             <div @click="!isProcessing ? selectedMethod = 'midtrans' : null"
-                                class="p-5 rounded-2xl border-2 transition-all flex items-center justify-between cursor-pointer"
-                                :class="selectedMethod === 'midtrans' ? 'border-indigo-600 bg-indigo-50/30' : 'border-slate-50'"
+                                class="p-4 rounded-xl border transition-all flex items-center justify-between cursor-pointer"
+                                :class="selectedMethod === 'midtrans' ? 'border-blue-600 bg-blue-50/50' : 'border-slate-200'"
                             >
-                                <div class="flex items-center gap-4">
-                                    <div class="text-2xl">📸</div>
+                                <div class="flex items-center gap-3">
+                                    <div class="text-lg">📸</div>
                                     <div>
-                                        <p class="text-[11px] font-black text-slate-900 uppercase">Transfer & QRIS</p>
-                                        <p class="text-[10px] font-bold text-slate-500 italic">Otomatis • Instan • Aman</p>
+                                        <p class="text-sm text-slate-900 font-medium">Transfer & QRIS</p>
+                                        <p class="text-[10px] text-slate-500 italic">Otomatis • Instan</p>
                                     </div>
                                 </div>
-                                <div v-if="selectedMethod === 'midtrans'">✓</div>
+                                <div v-if="selectedMethod === 'midtrans'" class="text-blue-600">✓</div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="lg:col-span-5 sticky top-8">
-                    <div class="bg-white p-10 rounded-[3rem] shadow-xl border border-slate-100">
-                        <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-10 text-center">Rincian Pembayaran</h3>
+                <div class="lg:col-span-5 sticky top-6 h-fit">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <h3 class="text-xs font-medium text-slate-400 uppercase tracking-widest mb-6">Ringkasan</h3>
                         
-                        <div class="space-y-6 mb-12">
+                        <div class="space-y-4 mb-8">
                             <div class="flex flex-col">
-                                <span class="text-[9px] font-black text-slate-400 uppercase">Produk Layanan</span>
-                                <span class="text-[11px] font-black text-slate-900 uppercase italic">{{ props.transaction?.description }}</span>
+                                <span class="text-[10px] text-slate-400 uppercase">Layanan</span>
+                                <span class="text-sm text-slate-900 font-medium mt-1">{{ props.transaction?.description }}</span>
                             </div>
 
-                            <div class="pt-8 border-t-2 border-dashed border-slate-100 flex justify-between items-end">
-                                <span class="text-[10px] font-black text-slate-900 uppercase">Total Bayar</span>
-                                <span class="text-3xl font-black text-slate-900 tracking-tighter leading-none">
+                            <div class="pt-4 border-t border-slate-100 flex justify-between items-center">
+                                <span class="text-xs text-slate-500 uppercase">Total Bayar</span>
+                                <span class="text-xl text-slate-900 font-medium tracking-tight">
                                     {{ selectedMethod === 'midtrans' ? formatRupiah(props.transaction?.total_amount) : formatRupiah(props.transaction?.amount) }}
                                 </span>
                             </div>
-                            <p v-if="selectedMethod === 'midtrans'" class="text-[9px] text-center text-slate-400 font-bold italic">
-                                *Sudah termasuk biaya layanan & PPN
-                            </p>
                         </div>
 
                         <button @click="processPayment" :disabled="isProcessing"
-                            class="w-full py-6 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all bg-slate-900 text-white hover:bg-indigo-600 disabled:bg-slate-300 shadow-xl"
+                            class="w-full py-3.5 rounded-xl text-xs font-medium uppercase tracking-widest transition-all bg-slate-900 text-white hover:bg-blue-600 disabled:bg-slate-300"
                         >
-                            {{ isProcessing ? 'Menghubungkan...' : 'Konfirmasi Pembayaran' }}
+                            {{ isProcessing ? 'Memproses...' : 'Bayar Sekarang' }}
                         </button>
                     </div>
                 </div>

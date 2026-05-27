@@ -104,72 +104,73 @@ const filteredTryouts = computed(() => {
                 </button>
             </div>
 
-            <div v-if="filteredTryouts.length > 0" class="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 pb-10">
+            <div v-if="filteredTryouts.length > 0" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 pb-10">
                 <div 
                     v-for="tryout in filteredTryouts" 
                     :key="tryout.id"
-                    class="group bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex flex-col"
+                    class="group bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex flex-col"
                 >
-                    <div class="relative h-48 md:h-56 bg-slate-100 overflow-hidden border-b border-slate-100">
+                    <div class="relative h-28 md:h-32 bg-slate-100 overflow-hidden border-b border-slate-100 font-sans">
                         <img 
-                            :src="tryout.image_url || '/images/default-tryout.png'" 
-                            class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                            onerror="this.src='https://placehold.co/600x400/eff6ff/1e3a8a?text=CAT+SYSTEM'"
+                            :src="tryout.image_url || '/images/logo.png'" 
+                            class="w-full h-full group-hover:scale-105 transition-transform duration-700"
+                            :class="tryout.image_url ? 'object-cover object-center' : 'object-contain object-top pt-1 px-2 pb-10 md:pb-11 bg-slate-50/50'"
+                            @error="(e) => { e.target.src = '/images/logo.png'; e.target.className = 'w-full h-full group-hover:scale-105 transition-transform duration-700 object-contain object-top pt-1 px-2 pb-10 md:pb-11 bg-slate-50/50'; }"
                         >
-                        <div class="absolute top-4 left-4 flex gap-2">
-                            <span :class="tryout.price > 0 || tryout.is_paid ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'" class="px-3 py-1.5 md:px-4 md:py-1.5 rounded-lg md:rounded-xl text-[9px] uppercase tracking-widest shadow-sm backdrop-blur-md border border-white/20">
+                        <div class="absolute top-2 left-2 flex gap-1">
+                            <span :class="tryout.price > 0 || tryout.is_paid ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'" class="px-2 py-0.5 rounded text-[8px] uppercase tracking-widest shadow-sm backdrop-blur-md border border-white/20 font-medium">
                                 {{ tryout.price > 0 || tryout.is_paid ? 'PREMIUM' : 'GRATIS' }}
                             </span>
-                            <span v-if="activeTab === 'my_tryouts'" class="px-3 py-1.5 md:px-4 md:py-1.5 rounded-lg md:rounded-xl text-[9px] uppercase tracking-widest bg-blue-600 text-white shadow-sm border border-white/20">
+                            <span v-if="activeTab === 'my_tryouts'" class="px-2 py-0.5 rounded text-[8px] uppercase tracking-widest bg-blue-600 text-white shadow-sm border border-white/20 font-medium">
                                 TERSEDIA
                             </span>
                         </div>
                         
-                        <div class="absolute bottom-4 left-4 right-4 md:bottom-5 md:left-5 md:right-5">
-                            <div class="bg-slate-900/70 backdrop-blur-md border border-white/10 rounded-xl p-3 flex items-center gap-3">
-                                <div class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center text-white shrink-0 shadow-sm">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                        <div class="absolute bottom-2 left-2 right-2">
+                            <div class="bg-slate-900/70 backdrop-blur-md border border-white/10 rounded-lg p-1.5 flex items-center gap-1.5">
+                                <div class="w-5 h-5 bg-white/20 rounded flex items-center justify-center text-white shrink-0 shadow-sm">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 1.875 1.875v5.25a1.875 1.875 0 0 1-1.875 1.875H5.625a1.875 1.875 0 0 1-1.875-1.875V6.375A1.875 1.875 0 0 1 5.625 4.5Z" />
                                     </svg>
                                 </div>
                                 <div class="flex flex-col min-w-0">
-                                    <span class="text-[8px] text-slate-300 uppercase tracking-widest">Akses Simulasi</span>
-                                    <span class="text-xs text-white truncate tracking-wide">
-                                        {{ activeTab === 'my_tryouts' ? 'Siap Dikerjakan Kapan Saja' : 'Sistem CAT Reguler' }}
+                                    <span class="text-[6px] text-slate-300 uppercase tracking-widest leading-none">Akses Simulasi</span>
+                                    <span class="text-[9px] text-white truncate tracking-wide leading-none mt-0.5">
+                                        {{ activeTab === 'my_tryouts' ? 'Siap Dikerjakan' : 'Sistem CAT Reguler' }}
                                     </span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="p-5 md:p-6 flex-1 flex flex-col">
-                        <div class="flex-1 space-y-3">
-                            <h2 class="text-lg md:text-xl text-slate-900 leading-snug tracking-tight group-hover:text-blue-600 transition-colors uppercase line-clamp-2">
+                    <div class="p-3 md:p-4 flex-1 flex flex-col">
+                        <div class="flex-1 space-y-1.5">
+                            <h2 class="text-sm md:text-base font-semibold text-slate-900 leading-tight tracking-tight group-hover:text-blue-600 transition-colors uppercase line-clamp-2">
                                 {{ tryout.title }}
                             </h2>
                             
-                            <p class="text-sm text-slate-500 font-medium line-clamp-2 leading-relaxed italic">
-                                {{ tryout.description || 'Siapkan diri Anda untuk menghadapi simulasi ujian kompetitif dengan fitur CAT.' }}
+                            <p class="text-[9px] md:text-[10px] text-slate-500 font-medium leading-snug italic mt-1">
+                                {{ tryout.description || 'Wujudkan impianmu menjadi Abdi Negara! Terus berlatih, pantang menyerah, dan raih NIP tahun ini.' }}
                             </p>
 
-                            <div class="flex flex-wrap gap-3 py-2">
-                                <div class="flex items-center gap-1.5 text-slate-600 bg-slate-50 border border-slate-100 px-2 py-1 rounded-md">
-                                    <svg class="w-3.5 h-3.5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
-                                    <span class="text-[10px] uppercase tracking-widest">{{ tryout.questions_count || 110 }} Soal</span>
+                            <div class="flex flex-wrap gap-1.5 pt-1">
+                                <div class="flex items-center gap-1 text-slate-600 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded">
+                                    <svg class="w-2.5 h-2.5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+                                    <span class="text-[8px] md:text-[9px] uppercase tracking-widest font-medium">{{ tryout.questions_count || 110 }} Soal</span>
                                 </div>
-                                <div class="flex items-center gap-1.5 text-slate-600 bg-slate-50 border border-slate-100 px-2 py-1 rounded-md">
-                                    <svg class="w-3.5 h-3.5 text-orange-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
-                                    <span class="text-[10px] uppercase tracking-widest">{{ tryout.duration || 100 }} Menit</span>
+                                <div class="flex items-center gap-1 text-slate-600 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded">
+                                    <svg class="w-2.5 h-2.5 text-orange-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                                    <span class="text-[8px] md:text-[9px] uppercase tracking-widest font-medium">{{ tryout.duration || 100 }} Menit</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between gap-4">
+                        <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                             <div class="flex flex-col shrink-0">
-                                <span class="text-[9px] text-slate-400 uppercase tracking-widest mb-0.5">Biaya Akses</span>
-                                <span class="text-base text-slate-900 tracking-tight leading-none">
+                                <span class="text-[7px] md:text-[8px] text-slate-400 uppercase tracking-widest mb-0.5">Biaya Akses</span>
+                                <span class="text-xs md:text-sm font-bold text-slate-900 tracking-tight leading-none">
                                     <template v-if="activeTab === 'my_tryouts'">
-                                        <span class="text-emerald-600 text-sm uppercase">Dimiliki</span>
+                                        <span class="text-emerald-600 text-[10px] md:text-xs uppercase">Dimiliki</span>
                                     </template>
                                     <template v-else>
                                         {{ tryout.price > 0 ? `Rp ${Number(tryout.price).toLocaleString('id-ID')}` : 'GRATIS' }}
@@ -179,7 +180,7 @@ const filteredTryouts = computed(() => {
 
                             <Link 
                                 :href="route('tryout.show', tryout.id)"
-                                class="bg-blue-600 hover:bg-blue-700 text-white px-6 md:px-8 py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all active:scale-95 shadow-sm text-center"
+                                class="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-1.5 rounded-lg text-[9px] md:text-[10px] uppercase tracking-wider transition-all active:scale-95 shadow-sm text-center font-medium"
                             >
                                 {{ activeTab === 'my_tryouts' ? 'Mulai' : 'Detail' }}
                             </Link>
