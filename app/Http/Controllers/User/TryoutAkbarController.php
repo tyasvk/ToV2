@@ -22,13 +22,15 @@ class TryoutAkbarController extends Controller
         $tryouts = Tryout::where('type', 'akbar')
             ->where('is_published', true)
             ->withExists(['transactions as is_registered' => function ($query) use ($user) {
-                $query->whereIn('status', ['paid', 'success'])
+                // PERBAIKAN: Tambahkan 'pending' di sini agar saat baru unggah bukti, 
+                // sistem sudah mendeteksi bahwa user tersebut terdaftar (is_registered = true)
+                $query->whereIn('status', ['pending', 'paid', 'success'])
                       ->where(function($q) use ($user) {
                           $q->where('user_id', $user->id)
                             ->orWhereJsonContains('participants_data', $user->email);
                       });
             }])
-            // --- TAMBAHAN: Ambil data pengerjaan (attempt) terakhir user ini ---
+            // Ambil data pengerjaan (attempt) terakhir user ini
             ->with(['examAttempts' => function ($query) use ($user) {
                 $query->where('user_id', $user->id)
                       ->orderBy('id', 'desc')
@@ -37,7 +39,7 @@ class TryoutAkbarController extends Controller
             ->latest()
             ->get();
 
-        // --- TAMBAHAN: Map data agar mudah dibaca di frontend ---
+        // Map data agar mudah dibaca di frontend
         $tryouts->transform(function ($tryout) {
             // Ambil ID attempt pertama (jika ada)
             $attempt = $tryout->examAttempts->first();

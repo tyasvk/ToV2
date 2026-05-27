@@ -259,19 +259,19 @@ public function result(ExamAttempt $attempt)
 
         $attempt->status = $attempt->is_passed ? 'lulus' : 'tidak_lulus';
 
-        // --- LOGIKA PERHITUNGAN WAKTU ---
+        // --- TAMBAHAN KALKULASI STATISTIK WAKTU ---
         $durationSeconds = 0;
-        if ($attempt->created_at) {
-            $endTime = $attempt->completed_at ?? ($attempt->updated_at ?? $attempt->created_at);
-            $durationSeconds = \Carbon\Carbon::parse($attempt->created_at)->diffInSeconds($endTime);
-            $durationSeconds = max(1, $durationSeconds); // Minimal 1 detik agar tidak 0
+        if ($attempt->created_at && $attempt->completed_at) {
+            $durationSeconds = \Carbon\Carbon::parse($attempt->created_at)->diffInSeconds($attempt->completed_at);
         }
-
-        // Ambil jumlah soal (Jika tidak ada, set default ke 110)
-        $totalQuestions = $tryout->questions()->count() ?: 110;
         
-        // Rata-rata waktu per soal dalam detik
-        $averageSeconds = $totalQuestions > 0 ? round($durationSeconds / $totalQuestions) : 0;
+        $totalQuestions = $tryout->questions()->count() ?? 110;
+        
+        $timeStats = [
+            'total_seconds' => max(0, $durationSeconds),
+            'average_seconds' => $totalQuestions > 0 ? max(0, floor($durationSeconds / $totalQuestions)) : 0,
+            'total_questions' => $totalQuestions,
+        ];
 
         return Inertia::render('User/Tryout/Result', [
             'attempt' => $attempt,
@@ -279,12 +279,7 @@ public function result(ExamAttempt $attempt)
             'totalScore' => $attempt->total_score,
             'scoreDetails' => $scoreDetails,
             'ranking' => ['rank' => $rank, 'total_participants' => $totalParticipants],
-            // Data waktu dikirim ke Frontend
-            'timeStats' => [
-                'total_seconds' => $durationSeconds,
-                'average_seconds' => $averageSeconds,
-                'total_questions' => $totalQuestions
-            ]
+            'timeStats' => $timeStats // <-- Kirim properti ini ke vue
         ]);
     }
 
@@ -396,9 +391,11 @@ public function result(ExamAttempt $attempt)
         return Inertia::render('User/Tryout/ExamSheet', ['tryout' => $tryout, 'questions' => $tryout->questions()->orderBy('order', 'asc')->get(), 'user' => auth()->user()]);
     }
 
-    public function finish(Request $request, Tryout $tryout)
+public function finish(Request $request, Tryout $tryout)
     {
         $answers = $request->answers ?? [];
+        $timeLeft = $request->time_left ?? 0; // Ambil sisa waktu dari frontend
+        
         $questions = $tryout->questions;
         $twk = 0; $tiu = 0; $tkp = 0;
 
@@ -426,6 +423,17 @@ public function result(ExamAttempt $attempt)
             'total_score' => $twk + $tiu + $tkp, 
             'completed_at' => now() 
         ]);
+        
+        // --- PERBAIKAN WAKTU ---
+        // Hitung waktu riil yang dihabiskan berdasarkan durasi tryout dan sisa waktu
+        $tryoutDurationSeconds = ($tryout->duration ?? 110) * 60;
+        $timeTaken = $tryoutDurationSeconds - $timeLeft;
+        $timeTaken = max(0, $timeTaken); // Memastikan tidak negatif
+        
+        // Memundurkan created_at agar rentang durasi terhitung benar (juga berpengaruh pada Leaderboard)
+        $attempt->timestamps = false; // Matikan auto-update waktu Laravel
+        $attempt->created_at = now()->subSeconds($timeTaken);
+        $attempt->save();
         
         return redirect()->route('tryout.result', $attempt->id);
     }

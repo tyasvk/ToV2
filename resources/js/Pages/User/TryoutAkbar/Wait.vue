@@ -1,154 +1,208 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link, router } from '@inertiajs/vue3';
-import { ref, onMounted, onUnmounted } from 'vue';
+import { Head, Link } from '@inertiajs/vue3';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 
 const props = defineProps({
     tryout: Object,
-    transaction: Object, 
+    transaction: Object,
 });
 
-const timeLeft = ref('');
-const canStart = ref(false);
-let timer = null;
+// Fungsi format tanggal & waktu pengerjaan serentak
+const formatEventDateTime = (event) => {
+    const startDateRaw = event.started_at || event.start_date;
+    const endDateRaw = event.end_date || event.ended_at;
 
-const updateTimer = () => {
-    const now = new Date();
-    const start = new Date(props.tryout.started_at);
-    const end = new Date(props.tryout.ended_at);
+    if (!startDateRaw) return 'Jadwal Belum Ditentukan';
     
-    if (now >= start && now <= end) {
-        canStart.value = true;
-        timeLeft.value = "Event Sedang Berlangsung!";
-    } else if (now > end) {
-        timeLeft.value = "Event Telah Selesai";
+    const start = new Date(startDateRaw);
+    if (isNaN(start.getTime())) return 'Jadwal Belum Ditentukan';
+
+    const optionsDate = { day: '2-digit', month: 'short', year: 'numeric' };
+    const optionsTime = { hour: '2-digit', minute: '2-digit' };
+    
+    const startDateStr = start.toLocaleDateString('id-ID', optionsDate);
+    const startTimeStr = start.toLocaleTimeString('id-ID', optionsTime).replace('.', ':');
+
+    if (!endDateRaw) {
+        return `${startDateStr} • ${startTimeStr} WIB`;
+    }
+
+    const end = new Date(endDateRaw);
+    if (isNaN(end.getTime())) {
+        return `${startDateStr} • ${startTimeStr} WIB`;
+    }
+
+    const endDateStr = end.toLocaleDateString('id-ID', optionsDate);
+    const endTimeStr = end.toLocaleTimeString('id-ID', optionsTime).replace('.', ':');
+
+    if (startDateStr === endDateStr) {
+        return `${startDateStr} • ${startTimeStr} - ${endTimeStr} WIB`;
     } else {
-        const diff = start - now;
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-        timeLeft.value = `${days}h ${hours}j ${minutes}m ${seconds}d`;
+        return `${startDateStr} ${startTimeStr} - ${endDateStr} ${endTimeStr} WIB`;
     }
 };
 
+// --- LOGIKA AKSES UJIAN ---
+const isOpen = ref(false);
+let intervalId = null;
+
+const checkSchedules = () => {
+    const startDateRaw = props.tryout.started_at || props.tryout.start_date;
+    if (!startDateRaw) return;
+    const startTime = new Date(startDateRaw);
+    const now = new Date();
+    isOpen.value = now >= startTime;
+};
+
+// Cek apakah pendaftaran sudah disetujui (status paid atau success)
+const isApproved = computed(() => {
+    return props.transaction?.status === 'paid' || props.transaction?.status === 'success';
+});
+
+// Syarat mutlak masuk ujian: waktu sudah mulai DAN sudah disetujui admin
+const canEnterExam = computed(() => {
+    return isOpen.value && isApproved.value;
+});
+
 onMounted(() => {
-    updateTimer();
-    timer = setInterval(updateTimer, 1000);
+    checkSchedules();
+    intervalId = setInterval(checkSchedules, 5000); // Sinkronisasi otomatis tiap 5 detik
 });
 
 onUnmounted(() => {
-    clearInterval(timer);
+    if (intervalId) clearInterval(intervalId);
 });
 
-const startExam = () => {
-    router.get(route('tryout.show', props.tryout.id));
+const refreshLobby = () => {
+    window.location.reload();
 };
-
-const formatDate = (dateString) => new Date(dateString).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 </script>
 
 <template>
-    <Head title="Waiting Room" />
+    <Head title="Ruang Tunggu Event" />
 
     <AuthenticatedLayout>
-        <div class="min-h-[calc(100vh-65px)] bg-[#F8FAFC] flex items-center justify-center relative overflow-hidden font-sans p-4">
+        <div class="min-h-screen bg-slate-50 font-sans selection:bg-indigo-100 selection:text-indigo-700 py-6 md:py-12 flex flex-col justify-center">
             
-            <div class="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 pointer-events-none"></div>
-            <div class="absolute top-[-10%] right-[-5%] w-96 h-96 bg-indigo-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob pointer-events-none"></div>
-            <div class="absolute bottom-[-10%] left-[-5%] w-96 h-96 bg-amber-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000 pointer-events-none"></div>
-
-            <div class="relative z-10 max-w-3xl w-full">
+            <div class="max-w-xl mx-auto w-full px-4 sm:px-6 relative z-10">
                 
-                <div class="mb-6 text-center">
-                    <Link :href="route('tryout-akbar.index')" class="text-sm font-bold text-slate-400 hover:text-indigo-600 transition">
-                        &larr; Kembali ke Katalog
+                <div class="mb-5 text-center">
+                    <Link :href="route('tryout-akbar.index')" class="inline-flex items-center gap-2 text-[11px] md:text-xs text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-widest font-normal bg-white px-4 py-2 rounded-full border border-slate-200/60 shadow-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                        </svg>
+                        Keluar Ruang Tunggu
                     </Link>
                 </div>
 
-                <div class="bg-white rounded-[2rem] shadow-xl shadow-indigo-100/60 overflow-hidden border border-slate-100 relative">
+                <div class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/40 border border-slate-100 overflow-hidden">
                     
-                    <div class="h-2 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-amber-500"></div>
-
-                    <div class="p-8 md:p-12 text-center relative z-20">
+                    <div class="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="relative flex h-2 w-2">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                            </span>
+                            <span class="text-[10px] text-slate-500 uppercase tracking-widest font-normal">Lobby Ruang Tunggu</span>
+                        </div>
                         
-                        <div v-if="transaction.status === 'pending'">
-                            <div class="w-24 h-24 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6 relative border border-amber-100">
-                                <div class="absolute inset-0 border-4 border-amber-100 rounded-full animate-ping"></div>
-                                <span class="text-4xl">⏳</span>
-                            </div>
-                            
-                            <h1 class="text-2xl font-black text-slate-800 mb-2">Menunggu Verifikasi Admin</h1>
-                            <p class="text-slate-500 max-w-md mx-auto mb-8 font-medium leading-relaxed">
-                                Bukti pendaftaran Anda telah kami terima. Admin sedang melakukan pengecekan. Mohon tunggu, proses ini biasanya memakan waktu 1x24 jam.
-                            </p>
+                        <span class="text-[9px] px-2.5 py-1 rounded-md border uppercase tracking-wider font-normal"
+                            :class="isApproved ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'"
+                        >
+                            {{ isApproved ? 'Disetujui Admin' : 'Menunggu Persetujuan' }}
+                        </span>
+                    </div>
 
-                            <div class="bg-slate-50 rounded-xl p-4 inline-block border border-slate-200 mb-8">
-                                <p class="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Kode Pendaftaran</p>
-                                <p class="text-lg font-mono font-bold text-slate-700 select-all">{{ transaction.invoice_code }}</p>
-                            </div>
-
-                            <button onclick="window.location.reload()" class="block w-full md:w-auto mx-auto px-8 py-3 bg-white border-2 border-slate-200 text-slate-600 font-bold rounded-xl hover:border-indigo-500 hover:text-indigo-600 transition shadow-sm active:scale-95">
-                                Refresh Status
-                            </button>
+                    <div class="p-6 md:p-10 text-center space-y-6 md:space-y-8">
+                        
+                        <div class="space-y-2">
+                            <span class="text-[9px] md:text-[10px] text-slate-400 uppercase tracking-[0.2em] block font-normal">
+                                Simulasi Akbar
+                            </span>
+                            <h1 class="text-xl md:text-2xl text-slate-800 leading-snug uppercase tracking-wide font-normal max-w-md mx-auto">
+                                {{ tryout.title }}
+                            </h1>
                         </div>
 
-                        <div v-else-if="transaction.status === 'paid' || transaction.status === 'success'">
+                        <div class="bg-indigo-50/40 border border-indigo-100/50 rounded-2xl p-5 max-w-sm mx-auto space-y-3">
+                            <div class="w-9 h-9 bg-white text-indigo-500 rounded-full border border-indigo-100/80 shadow-sm flex items-center justify-center mx-auto">
+                                <svg xmlns="http://www.w3.org/2000/xl" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+                                </svg>
+                            </div>
+                            <div class="space-y-0.5">
+                                <span class="text-[9px] text-indigo-400 uppercase tracking-widest block font-normal">Waktu Pelaksanaan</span>
+                                <p class="text-xs md:text-sm text-indigo-900 font-normal">
+                                    {{ formatEventDateTime(tryout) }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="max-w-sm mx-auto text-xs md:text-sm text-slate-500 font-normal leading-relaxed">
+                            <p v-if="!isApproved" class="text-amber-600/90 bg-amber-50/30 border border-amber-100/50 p-3 rounded-xl italic">
+                                Akun Anda belum disetujui oleh admin. Anda tidak dapat memulai ujian meskipun waktu pelaksanaan sudah dimulai. Silakan segarkan halaman berkala.
+                            </p>
+                            <p v-else-if="isApproved && !isOpen" class="text-slate-500">
+                                Pendaftaran Anda sudah diverifikasi & disetujui! Pengerjaan belum dimulai, silakan tunggu sampai gerbang ujian dibuka otomatis.
+                            </p>
+                            <p v-else-if="canEnterExam" class="text-emerald-600 font-normal">
+                                Verifikasi sukses dan waktu pengerjaan telah aktif! Silakan klik tombol di bawah untuk langsung menuju ruang pengerjaan soal.
+                            </p>
+                        </div>
+
+                        <div class="border-t border-slate-100 max-w-xs mx-auto"></div>
+
+                        <div class="max-w-sm mx-auto">
                             
-                            <div class="inline-flex items-center gap-2 px-4 py-1.5 bg-green-100 text-green-700 rounded-full text-xs font-black uppercase tracking-widest mb-6 border border-green-200">
-                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                                Pendaftaran Berhasil
-                            </div>
-
-                            <h1 class="text-3xl md:text-4xl font-black text-slate-900 mb-2">{{ tryout.title }}</h1>
-                            <p class="text-slate-500 font-bold mb-8">Selamat! Anda telah terdaftar sebagai peserta.</p>
-
-                            <div class="bg-slate-900 text-white rounded-2xl p-6 mb-8 relative overflow-hidden group shadow-lg shadow-slate-900/20">
-                                <div class="absolute inset-0 bg-gradient-to-r from-indigo-600 to-purple-600 opacity-20 group-hover:opacity-30 transition"></div>
-                                
-                                <p class="text-xs font-bold text-indigo-200 uppercase tracking-widest mb-2">Menuju Waktu Pelaksanaan</p>
-                                <div class="text-3xl md:text-5xl font-mono font-black tracking-tight text-white">
-                                    {{ timeLeft }}
+                            <div v-if="!isApproved" class="space-y-3">
+                                <div class="w-full py-4 bg-slate-100 text-slate-400 text-xs uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 cursor-not-allowed font-normal border border-slate-200/40">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                                    </svg>
+                                    Menunggu Persetujuan Admin
                                 </div>
-                                <p class="text-xs text-slate-300 mt-2 font-medium">{{ formatDate(tryout.started_at) }} WIB</p>
+                                <button @click="refreshLobby" class="w-full py-3.5 bg-white border border-slate-200 hover:border-indigo-200 text-slate-600 hover:text-indigo-600 transition-all active:scale-[0.98] text-[11px] md:text-xs uppercase tracking-widest rounded-2xl font-normal shadow-sm">
+                                    Segarkan Ruangan
+                                </button>
                             </div>
 
-                            <div v-if="canStart">
-                                <button @click="startExam" class="w-full md:w-auto px-10 py-4 bg-emerald-500 text-white font-black rounded-xl hover:bg-emerald-600 shadow-lg shadow-emerald-200/50 transition transform hover:scale-105 animate-pulse">
-                                    MULAI UJIAN SEKARANG 🚀
+                            <div v-else-if="isApproved && !isOpen" class="space-y-3">
+                                <div class="w-full py-4 bg-slate-100 text-slate-400 text-xs uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 cursor-not-allowed font-normal border border-slate-200/40">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Ujian Belum Dimulai
+                                </div>
+                                <button @click="refreshLobby" class="w-full py-3.5 bg-white border border-slate-200 hover:border-indigo-200 text-slate-600 hover:text-indigo-600 transition-all active:scale-[0.98] text-[11px] md:text-xs uppercase tracking-widest rounded-2xl font-normal shadow-sm">
+                                    Segarkan Ruangan
                                 </button>
                             </div>
-                            <div v-else>
-                                <button disabled class="w-full md:w-auto px-10 py-4 bg-slate-100 text-slate-400 font-bold rounded-xl cursor-not-allowed border border-slate-200">
-                                    Tombol Ujian Belum Aktif
-                                </button>
-                                <p class="text-xs text-slate-500 mt-3 font-medium">Tombol akan aktif otomatis saat waktu mulai tiba.</p>
+
+                            <div v-else-if="canEnterExam">
+                                <Link 
+                                    :href="route('tryout.show', tryout.id)"
+                                    class="w-full py-4 bg-slate-900 text-white text-xs uppercase tracking-widest rounded-2xl hover:bg-slate-800 transition-all active:scale-[0.98] flex items-center justify-center gap-2 font-normal shadow-xl shadow-slate-900/10"
+                                >
+                                    Masuk Ruang Ujian
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                                    </svg>
+                                </Link>
                             </div>
+
                         </div>
 
                     </div>
-
-                    <div class="absolute top-1/2 left-0 w-6 h-6 bg-[#F8FAFC] rounded-r-full -translate-y-1/2 z-20 border-r border-slate-100"></div>
-                    <div class="absolute top-1/2 right-0 w-6 h-6 bg-[#F8FAFC] rounded-l-full -translate-y-1/2 z-20 border-l border-slate-100"></div>
-                    <div class="absolute top-1/2 left-6 right-6 border-t-2 border-dashed border-slate-200 -translate-y-1/2 z-10"></div>
-
                 </div>
+
             </div>
         </div>
     </AuthenticatedLayout>
 </template>
 
 <style scoped>
-@keyframes blob {
-    0% { transform: translate(0px, 0px) scale(1); }
-    33% { transform: translate(30px, -50px) scale(1.1); }
-    66% { transform: translate(-20px, 20px) scale(0.9); }
-    100% { transform: translate(0px, 0px) scale(1); }
-}
-.animate-blob {
-    animation: blob 7s infinite;
-}
-.animation-delay-2000 {
-    animation-delay: 2s;
+.animate-in {
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 </style>

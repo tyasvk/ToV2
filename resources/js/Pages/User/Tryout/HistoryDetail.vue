@@ -15,6 +15,23 @@ const formatDate = (dateString) => {
     });
 };
 
+// Helper untuk menghitung total waktu pengerjaan riil
+const getDuration = (start, end) => {
+    if (!start || !end) return '0 detik';
+    const startTime = new Date(start);
+    const endTime = new Date(end);
+    const seconds = Math.floor((endTime - startTime) / 1000);
+    
+    if (seconds <= 0) return '0 detik';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    
+    if (h > 0) return `${h}j ${m}m ${s}d`;
+    if (m > 0) return `${m}m ${s}d`;
+    return `${s} detik`;
+};
+
 // Menghitung Skor Tertinggi dari list attempts
 const highestScore = computed(() => {
     if (!props.attempts || props.attempts.length === 0) return 0;
@@ -111,13 +128,19 @@ const highestScore = computed(() => {
                         class="group bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-300 flex flex-col md:flex-row items-start md:items-center gap-6"
                     >
                         
-                        <div class="flex items-center gap-4 md:w-1/4">
-                            <div class="bg-blue-50 text-[#004a87] font-black text-xl w-12 h-12 flex items-center justify-center rounded-xl border border-blue-100">
+                        <div class="flex items-start md:items-center gap-4 md:w-1/3">
+                            <div class="bg-blue-50 text-[#004a87] font-black text-xl w-12 h-12 shrink-0 flex items-center justify-center rounded-xl border border-blue-100">
                                 #{{ attempts.length - index }}
                             </div>
-                            <div>
-                                <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Tanggal</div>
-                                <div class="text-sm font-bold text-slate-700">{{ formatDate(attempt.created_at) }}</div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 w-full">
+                                <div>
+                                    <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Tanggal</div>
+                                    <div class="text-sm font-bold text-slate-700">{{ formatDate(attempt.created_at) }}</div>
+                                </div>
+                                <div>
+                                    <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Waktu Pengerjaan</div>
+                                    <div class="text-sm font-bold text-emerald-600 font-mono">{{ getDuration(attempt.created_at, attempt.completed_at) }}</div>
+                                </div>
                             </div>
                         </div>
 
@@ -142,7 +165,7 @@ const highestScore = computed(() => {
                             </div>
                         </div>
 
-                        <div class="w-full md:w-auto flex gap-2 mt-2 md:mt-0">
+                        <div class="w-full md:w-auto flex gap-2 mt-2 md:mt-0 shrink-0">
                             <Link :href="route('tryout.result', attempt.id)" 
                                 class="flex-1 md:flex-none inline-flex justify-center items-center px-4 py-2 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 text-xs font-bold rounded-lg transition-all"
                             >

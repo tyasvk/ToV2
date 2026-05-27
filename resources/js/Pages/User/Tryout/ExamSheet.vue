@@ -80,7 +80,8 @@ const autoSubmit = () => {
     isSubmitting.value = true;
     router.post(route('tryout.finish', props.tryout?.id), { 
         answers: answers.value,
-        mode: 'BKN' 
+        mode: 'BKN',
+        time_left: timeLeft.value // <--- Tambahkan baris ini untuk mengirim sisa waktu
     }, {
         onSuccess: () => {
             localStorage.removeItem(answersKey.value);

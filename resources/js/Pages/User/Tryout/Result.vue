@@ -45,9 +45,9 @@ const formatTime = (seconds) => {
                     </div>
                 </div>
                 
-                <Link :href="route('tryout.index')" class="text-[11px] font-medium text-slate-600 hover:text-blue-600 transition-colors uppercase tracking-wide flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-blue-200 hover:bg-blue-50 rounded-md shadow-sm">
-                    Kembali
-                </Link>
+                <Link :href="route('tryout.history.detail', tryout.id)" class="text-[11px] font-medium text-slate-600 hover:text-blue-600 transition-colors uppercase tracking-wide flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-blue-200 hover:bg-blue-50 rounded-md shadow-sm">
+    Kembali
+</Link>
             </div>
         </nav>
 
