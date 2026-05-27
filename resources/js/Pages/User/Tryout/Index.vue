@@ -179,7 +179,7 @@ const filteredTryouts = computed(() => {
                             </div>
 
                             <Link 
-                                :href="route('tryout.show', tryout.id)"
+                                :href="activeTab === 'my_tryouts' ? route('tryout.wait', tryout.id) : route('tryout.show', tryout.id)"
                                 class="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-1.5 rounded-lg text-[9px] md:text-[10px] uppercase tracking-wider transition-all active:scale-95 shadow-sm text-center font-medium"
                             >
                                 {{ activeTab === 'my_tryouts' ? 'Mulai' : 'Detail' }}
