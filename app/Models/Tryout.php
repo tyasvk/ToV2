@@ -27,21 +27,29 @@ class Tryout extends Model
         'ended_at',       // <--- WAJIB DITAMBAH
         'duration',       // <--- WAJIB DITAMBAH (Sesuaikan dengan Controller)
         'end_date',       // Tambahkan ini
-        // 'duration',    // Dihapus karena duplikat di atas
     ];
 
     protected $casts = [
-        // PERBAIKAN: Tambahkan format :Y-m-d\TH:i agar jam tidak berubah-ubah saat diedit
-        'published_at' => 'datetime:Y-m-d\TH:i',
-        'started_at'   => 'datetime:Y-m-d\TH:i',
-        'ended_at'     => 'datetime:Y-m-d\TH:i', 
-        'end_date'     => 'datetime:Y-m-d\TH:i', 
+        // PERBAIKAN: Hapus \TH:i agar menggunakan format standar serializeDate di bawah
+        'published_at' => 'datetime',
+        'started_at'   => 'datetime',
+        'ended_at'     => 'datetime', 
+        'end_date'     => 'datetime', 
         
         'is_active'    => 'boolean',
         'is_published' => 'boolean',
         'is_paid'      => 'boolean',   
         'price'        => 'decimal:2',    
     ];
+
+    /**
+     * Memaksa format waktu menjadi YYYY-MM-DD HH:MM:SS tanpa huruf T dan Z.
+     * Ini memastikan Vue merendernya sebagai Waktu Lokal (WIB/WITA/WIT).
+     */
+    protected function serializeDate(\DateTimeInterface $date)
+    {
+        return $date->format('Y-m-d H:i:s');
+    }
 
     /**
      * Relasi ke tabel transactions
@@ -62,7 +70,6 @@ class Tryout extends Model
 
     /**
      * Relasi ke model ExamAttempt (Riwayat Pengerjaan)
-     * INI YANG HILANG SEBELUMNYA
      */
     public function examAttempts(): HasMany
     {

@@ -8,33 +8,46 @@ const props = defineProps({
     transaction: Object,
 });
 
+// Helper untuk memastikan waktu dibaca persis seperti yang di-set admin (Waktu Lokal)
+const normalizeDate = (dateString) => {
+    if (!dateString) return null;
+    
+    // Ganti spasi dengan 'T' agar format string menjadi standar ISO (YYYY-MM-DDTHH:MM:SS)
+    let cleanString = String(dateString).replace(' ', 'T');
+    
+    // Buang pecahan detik desimal (misal: .000000Z)
+    if (cleanString.includes('.')) {
+        cleanString = cleanString.split('.')[0];
+    }
+    
+    // Hapus huruf Z (Z = UTC). Jika huruf Z ada, browser akan menggeser jamnya!
+    if (cleanString.endsWith('Z')) {
+        cleanString = cleanString.slice(0, -1);
+    }
+
+    const parsedDate = new Date(cleanString);
+    return isNaN(parsedDate.getTime()) ? null : parsedDate;
+};
+
 // Fungsi format tanggal & waktu pengerjaan serentak
 const formatEventDateTime = (event) => {
-    const startDateRaw = event.started_at || event.start_date;
-    const endDateRaw = event.end_date || event.ended_at;
+    const start = normalizeDate(event.started_at || event.start_date);
+    const end = normalizeDate(event.end_date || event.ended_at);
 
-    if (!startDateRaw) return 'Jadwal Belum Ditentukan';
-    
-    const start = new Date(startDateRaw);
-    if (isNaN(start.getTime())) return 'Jadwal Belum Ditentukan';
+    if (!start) return 'Jadwal Belum Ditentukan';
 
     const optionsDate = { day: '2-digit', month: 'short', year: 'numeric' };
     const optionsTime = { hour: '2-digit', minute: '2-digit' };
     
     const startDateStr = start.toLocaleDateString('id-ID', optionsDate);
-    const startTimeStr = start.toLocaleTimeString('id-ID', optionsTime).replace('.', ':');
+    const startTimeStr = start.toLocaleTimeString('id-ID', optionsTime).replace(/\./g, ':');
 
-    if (!endDateRaw) {
-        return `${startDateStr} • ${startTimeStr} WIB`;
-    }
-
-    const end = new Date(endDateRaw);
-    if (isNaN(end.getTime())) {
+    if (!end) {
         return `${startDateStr} • ${startTimeStr} WIB`;
     }
 
     const endDateStr = end.toLocaleDateString('id-ID', optionsDate);
-    const endTimeStr = end.toLocaleTimeString('id-ID', optionsTime).replace('.', ':');
+    const endTimeStr = end.toLocaleTimeString('id-ID', optionsTime).replace(/\./g, ':');
 
     if (startDateStr === endDateStr) {
         return `${startDateStr} • ${startTimeStr} - ${endTimeStr} WIB`;
@@ -48,9 +61,14 @@ const isOpen = ref(false);
 let intervalId = null;
 
 const checkSchedules = () => {
-    const startDateRaw = props.tryout.started_at || props.tryout.start_date;
-    if (!startDateRaw) return;
-    const startTime = new Date(startDateRaw);
+    const startTime = normalizeDate(props.tryout.started_at || props.tryout.start_date);
+    
+    if (!startTime) {
+        isOpen.value = false;
+        return;
+    }
+    
+    // Bandingkan waktu mulai (startTime) dengan jam lokal PC peserta saat ini
     const now = new Date();
     isOpen.value = now >= startTime;
 };
@@ -67,7 +85,7 @@ const canEnterExam = computed(() => {
 
 onMounted(() => {
     checkSchedules();
-    intervalId = setInterval(checkSchedules, 5000); // Sinkronisasi otomatis tiap 5 detik
+    intervalId = setInterval(checkSchedules, 1000); // Sinkronisasi otomatis tiap 1 detik (agar lebih responsif)
 });
 
 onUnmounted(() => {
@@ -155,7 +173,7 @@ const refreshLobby = () => {
 
                         <div class="max-w-sm mx-auto">
                             
-                            <div v-if="!isApproved" class="space-y-3">
+                            <div class="space-y-3" v-if="!isApproved">
                                 <div class="w-full py-4 bg-slate-100 text-slate-400 text-xs uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 cursor-not-allowed font-normal border border-slate-200/40">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
@@ -167,7 +185,7 @@ const refreshLobby = () => {
                                 </button>
                             </div>
 
-                            <div v-else-if="isApproved && !isOpen" class="space-y-3">
+                            <div class="space-y-3" v-else-if="isApproved && !isOpen">
                                 <div class="w-full py-4 bg-slate-100 text-slate-400 text-xs uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 cursor-not-allowed font-normal border border-slate-200/40">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -181,7 +199,7 @@ const refreshLobby = () => {
 
                             <div v-else-if="canEnterExam">
                                 <Link 
-                                    :href="route('tryout.show', tryout.id)"
+                                    :href="route('tryout-akbar.exam', tryout.id)"
                                     class="w-full py-4 bg-slate-900 text-white text-xs uppercase tracking-widest rounded-2xl hover:bg-slate-800 transition-all active:scale-[0.98] flex items-center justify-center gap-2 font-normal shadow-xl shadow-slate-900/10"
                                 >
                                     Masuk Ruang Ujian
