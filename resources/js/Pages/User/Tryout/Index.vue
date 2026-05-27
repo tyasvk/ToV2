@@ -149,7 +149,7 @@ const filteredTryouts = computed(() => {
                                 {{ tryout.title }}
                             </h2>
                             
-                            <p class="text-[9px] md:text-[10px] text-slate-500 font-medium leading-snug italic mt-1">
+                            <p class="text-[9px] md:text-[10px] text-slate-500 font-medium line-clamp-2 leading-snug italic mt-1">
                                 {{ tryout.description || 'Wujudkan impianmu menjadi Abdi Negara! Terus berlatih, pantang menyerah, dan raih NIP tahun ini.' }}
                             </p>
 
