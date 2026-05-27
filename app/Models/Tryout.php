@@ -22,19 +22,20 @@ class Tryout extends Model
         'price',         
         'published_at', 
         'started_at',
-        'type',           // <--- WAJIB DITAMBAH
-        'requirements',   // <--- WAJIB DITAMBAH
-        'ended_at',       // <--- WAJIB DITAMBAH
-        'duration',       // <--- WAJIB DITAMBAH (Sesuaikan dengan Controller)
-        'end_date',       // Tambahkan ini
+        'type',           
+        'requirements',   
+        'ended_at',       
+        'duration',       
+        'end_date',       
     ];
 
     protected $casts = [
-        // PERBAIKAN: Hapus \TH:i agar menggunakan format standar serializeDate di bawah
-        'published_at' => 'datetime',
-        'started_at'   => 'datetime',
-        'ended_at'     => 'datetime', 
-        'end_date'     => 'datetime', 
+        // FORMAT KUNCI: Laravel dipaksa mengeluarkan output murni (Contoh: "2026-05-28 08:00:00")
+        // Tidak akan ada lagi huruf 'T', 'Z', atau konversi zona waktu yang mengacaukan browser.
+        'published_at' => 'datetime:Y-m-d H:i:s',
+        'started_at'   => 'datetime:Y-m-d H:i:s',
+        'ended_at'     => 'datetime:Y-m-d H:i:s', 
+        'end_date'     => 'datetime:Y-m-d H:i:s', 
         
         'is_active'    => 'boolean',
         'is_published' => 'boolean',
@@ -42,35 +43,16 @@ class Tryout extends Model
         'price'        => 'decimal:2',    
     ];
 
-    /**
-     * Memaksa format waktu menjadi YYYY-MM-DD HH:MM:SS tanpa huruf T dan Z.
-     * Ini memastikan Vue merendernya sebagai Waktu Lokal (WIB/WITA/WIT).
-     */
-    protected function serializeDate(\DateTimeInterface $date)
-    {
-        return $date->format('Y-m-d H:i:s');
-    }
-
-    /**
-     * Relasi ke tabel transactions
-     * Satu Tryout bisa memiliki banyak Transaksi
-     */
     public function transactions(): HasMany
     {
         return $this->hasMany(Transaction::class);
     }
 
-    /**
-     * Relasi ke model Question
-     */
     public function questions(): HasMany
     {
         return $this->hasMany(Question::class);
     }
 
-    /**
-     * Relasi ke model ExamAttempt (Riwayat Pengerjaan)
-     */
     public function examAttempts(): HasMany
     {
         return $this->hasMany(ExamAttempt::class);

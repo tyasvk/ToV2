@@ -8,28 +8,37 @@ const props = defineProps({
     transaction: Object,
 });
 
-// Helper untuk memastikan waktu dibaca persis seperti yang di-set admin (Waktu Lokal)
+// Pembaca Waktu Anti-Gagal (Membedah komponen tanggal secara manual)
 const normalizeDate = (dateString) => {
     if (!dateString) return null;
     
-    // Ganti spasi dengan 'T' agar format string menjadi standar ISO (YYYY-MM-DDTHH:MM:SS)
-    let cleanString = String(dateString).replace(' ', 'T');
+    // Ambil string mentah: "2026-05-28 01:45:00"
+    let clean = String(dateString).replace('T', ' ').replace('Z', '').split('.')[0];
     
-    // Buang pecahan detik desimal (misal: .000000Z)
-    if (cleanString.includes('.')) {
-        cleanString = cleanString.split('.')[0];
+    // Pecah menjadi bagian tanggal dan waktu
+    let parts = clean.split(' ');
+    if (parts.length !== 2) {
+        // Jika format tidak dikenali, fallback ke pembacaan standar
+        const fallback = new Date(clean.replace(/-/g, '/'));
+        return isNaN(fallback.getTime()) ? null : fallback;
     }
     
-    // Hapus huruf Z (Z = UTC). Jika huruf Z ada, browser akan menggeser jamnya!
-    if (cleanString.endsWith('Z')) {
-        cleanString = cleanString.slice(0, -1);
-    }
-
-    const parsedDate = new Date(cleanString);
+    let dateParts = parts[0].split('-'); // [2026, 05, 28]
+    let timeParts = parts[1].split(':'); // [01, 45, 00]
+    
+    // Buat Date object secara EKSPLISIT menggunakan Waktu Lokal
+    const parsedDate = new Date(
+        parseInt(dateParts[0]),       // Tahun
+        parseInt(dateParts[1]) - 1,   // Bulan (di JS indexnya 0)
+        parseInt(dateParts[2]),       // Tanggal
+        parseInt(timeParts[0]),       // Jam
+        parseInt(timeParts[1]),       // Menit
+        parseInt(timeParts[2] || 0)   // Detik
+    );
+    
     return isNaN(parsedDate.getTime()) ? null : parsedDate;
 };
 
-// Fungsi format tanggal & waktu pengerjaan serentak
 const formatEventDateTime = (event) => {
     const start = normalizeDate(event.started_at || event.start_date);
     const end = normalizeDate(event.end_date || event.ended_at);
@@ -49,43 +58,40 @@ const formatEventDateTime = (event) => {
     const endDateStr = end.toLocaleDateString('id-ID', optionsDate);
     const endTimeStr = end.toLocaleTimeString('id-ID', optionsTime).replace(/\./g, ':');
 
-    if (startDateStr === endDateStr) {
-        return `${startDateStr} • ${startTimeStr} - ${endTimeStr} WIB`;
-    } else {
-        return `${startDateStr} ${startTimeStr} - ${endDateStr} ${endTimeStr} WIB`;
-    }
+    return startDateStr === endDateStr 
+        ? `${startDateStr} • ${startTimeStr} - ${endTimeStr} WIB` 
+        : `${startDateStr} ${startTimeStr} - ${endDateStr} ${endTimeStr} WIB`;
 };
 
 // --- LOGIKA AKSES UJIAN ---
 const isOpen = ref(false);
+const currentTimeDisplay = ref(''); // Hanya untuk keperluan tampilan KOTAK DETEKTIF
 let intervalId = null;
 
 const checkSchedules = () => {
-    const startTime = normalizeDate(props.tryout.started_at || props.tryout.start_date);
-    
+    const startTime = normalizeDate(props.tryout?.started_at || props.tryout?.start_date);
+    const now = new Date();
+    currentTimeDisplay.value = now.toLocaleString('id-ID'); // Update detak jam di kotak detektif
+
     if (!startTime) {
         isOpen.value = false;
         return;
     }
-    
-    // Bandingkan waktu mulai (startTime) dengan jam lokal PC peserta saat ini
-    const now = new Date();
     isOpen.value = now >= startTime;
 };
 
-// Cek apakah pendaftaran sudah disetujui (status paid atau success)
 const isApproved = computed(() => {
-    return props.transaction?.status === 'paid' || props.transaction?.status === 'success';
+    const status = props.transaction?.status?.toLowerCase() || '';
+    return ['paid', 'success', 'settlement', 'approved', 'sukses'].includes(status);
 });
 
-// Syarat mutlak masuk ujian: waktu sudah mulai DAN sudah disetujui admin
 const canEnterExam = computed(() => {
     return isOpen.value && isApproved.value;
 });
 
 onMounted(() => {
     checkSchedules();
-    intervalId = setInterval(checkSchedules, 1000); // Sinkronisasi otomatis tiap 1 detik (agar lebih responsif)
+    intervalId = setInterval(checkSchedules, 1000); // Sinkronisasi otomatis tiap 1 detik
 });
 
 onUnmounted(() => {
@@ -139,8 +145,17 @@ const refreshLobby = () => {
                                 Simulasi Akbar
                             </span>
                             <h1 class="text-xl md:text-2xl text-slate-800 leading-snug uppercase tracking-wide font-normal max-w-md mx-auto">
-                                {{ tryout.title }}
+                                {{ tryout?.title }}
                             </h1>
+                        </div>
+
+                        <div class="bg-slate-900 text-green-400 p-4 rounded-xl text-left text-[11px] font-mono overflow-auto max-w-sm mx-auto shadow-inner">
+                            <p class="text-white mb-2 font-bold border-b border-slate-700 pb-1">🔎 BONGKAR ISI KEPALA BROWSER:</p>
+                            <p>1. Status Transaksi: <strong class="text-yellow-300">{{ transaction?.status || 'KOSONG' }}</strong></p>
+                            <p>2. Ujian di Database: <strong class="text-yellow-300">{{ tryout?.started_at || tryout?.start_date }}</strong></p>
+                            <p>3. Ujian di Browser: <strong class="text-pink-400">{{ normalizeDate(tryout?.started_at || tryout?.start_date)?.toLocaleString('id-ID') || 'GAGAL BACA' }}</strong></p>
+                            <p>4. Jam PC Saat Ini: <strong class="text-pink-400">{{ currentTimeDisplay }}</strong></p>
+                            <p>5. Buka Gerbang?: <strong :class="isOpen ? 'text-green-500 text-lg' : 'text-red-500 text-lg'">{{ isOpen ? 'YA BUKA!' : 'TIDAK' }}</strong></p>
                         </div>
 
                         <div class="bg-indigo-50/40 border border-indigo-100/50 rounded-2xl p-5 max-w-sm mx-auto space-y-3">
@@ -175,24 +190,18 @@ const refreshLobby = () => {
                             
                             <div class="space-y-3" v-if="!isApproved">
                                 <div class="w-full py-4 bg-slate-100 text-slate-400 text-xs uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 cursor-not-allowed font-normal border border-slate-200/40">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-                                    </svg>
                                     Menunggu Persetujuan Admin
                                 </div>
-                                <button @click="refreshLobby" class="w-full py-3.5 bg-white border border-slate-200 hover:border-indigo-200 text-slate-600 hover:text-indigo-600 transition-all active:scale-[0.98] text-[11px] md:text-xs uppercase tracking-widest rounded-2xl font-normal shadow-sm">
+                                <button @click="refreshLobby" class="w-full py-3.5 bg-white border border-slate-200 hover:border-indigo-200 text-slate-600 transition-all text-xs uppercase tracking-widest rounded-2xl shadow-sm">
                                     Segarkan Ruangan
                                 </button>
                             </div>
 
                             <div class="space-y-3" v-else-if="isApproved && !isOpen">
                                 <div class="w-full py-4 bg-slate-100 text-slate-400 text-xs uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 cursor-not-allowed font-normal border border-slate-200/40">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
                                     Ujian Belum Dimulai
                                 </div>
-                                <button @click="refreshLobby" class="w-full py-3.5 bg-white border border-slate-200 hover:border-indigo-200 text-slate-600 hover:text-indigo-600 transition-all active:scale-[0.98] text-[11px] md:text-xs uppercase tracking-widest rounded-2xl font-normal shadow-sm">
+                                <button @click="refreshLobby" class="w-full py-3.5 bg-white border border-slate-200 hover:border-indigo-200 text-slate-600 transition-all text-xs uppercase tracking-widest rounded-2xl shadow-sm">
                                     Segarkan Ruangan
                                 </button>
                             </div>
@@ -200,12 +209,9 @@ const refreshLobby = () => {
                             <div v-else-if="canEnterExam">
                                 <Link 
                                     :href="route('tryout-akbar.exam', tryout.id)"
-                                    class="w-full py-4 bg-slate-900 text-white text-xs uppercase tracking-widest rounded-2xl hover:bg-slate-800 transition-all active:scale-[0.98] flex items-center justify-center gap-2 font-normal shadow-xl shadow-slate-900/10"
+                                    class="w-full py-4 bg-slate-900 text-white text-xs uppercase tracking-widest rounded-2xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 font-normal shadow-xl shadow-slate-900/10"
                                 >
                                     Masuk Ruang Ujian
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                                    </svg>
                                 </Link>
                             </div>
 
@@ -218,9 +224,3 @@ const refreshLobby = () => {
         </div>
     </AuthenticatedLayout>
 </template>
-
-<style scoped>
-.animate-in {
-    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-}
-</style>
