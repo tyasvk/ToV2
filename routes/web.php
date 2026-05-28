@@ -23,6 +23,7 @@ use App\Http\Controllers\Admin\QuestionManagerController;
 use App\Http\Controllers\Admin\TransactionController;
 use App\Http\Controllers\Admin\TryoutAkbarController as AdminTryoutAkbarController;
 use App\Http\Controllers\Admin\AffiliateManagerController;
+use App\Http\Controllers\Admin\MembershipSettingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -135,7 +136,9 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
 
     // Tryout Management
     Route::resource('tryouts', TryoutManagerController::class);
-    Route::resource('adidaya-manage', \App\Http\Controllers\Admin\AdidayaManagerController::class);
+    
+    // PERBAIKAN: Menambahkan ->names('adidaya') agar route terbaca sebagai 'admin.adidaya.store'
+    Route::resource('adidaya-manage', \App\Http\Controllers\Admin\AdidayaManagerController::class)->names('adidaya');
     
     // Question Management
     Route::patch('/questions/reorder', [QuestionManagerController::class, 'reorder'])->name('questions.reorder');
@@ -151,6 +154,13 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::resource('tryout-akbar', AdminTryoutAkbarController::class);
     Route::get('tryout-akbar/{tryout}/participants', [AdminTryoutAkbarController::class, 'participants'])->name('tryout-akbar.participants');
     Route::post('tryout-akbar/verify/{transaction}', [AdminTryoutAkbarController::class, 'verifyRegistration'])->name('tryout-akbar.verify');
+
+    // Membership Settings
+    Route::get('/membership-setting', [MembershipSettingController::class, 'index'])->name('membership-setting.index');
+    Route::post('/membership-setting', [MembershipSettingController::class, 'update'])->name('membership-setting.update');
+
+    Route::get('/membership-packages', [App\Http\Controllers\Admin\MembershipPackageController::class, 'index'])->name('admin.membership-packages.index');
+Route::post('/membership-packages/{id}', [App\Http\Controllers\Admin\MembershipPackageController::class, 'update'])->name('admin.membership-packages.update');
 });
 
 require __DIR__.'/auth.php';

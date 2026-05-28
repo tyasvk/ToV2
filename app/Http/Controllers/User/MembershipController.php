@@ -24,15 +24,10 @@ class MembershipController extends Controller
         ['id' => '1_year', 'name' => 'Ultimate Pass', 'days' => 365, 'price' => 299000], // Menarik di kisaran 200rb++
     ];
 
-    public function index()
-    {
-        return Inertia::render('User/Membership/Index', [
-            'plans' => $this->plans,
-            'current_membership' => auth()->user()->membership_expires_at,
-            'is_member' => auth()->user()->isMember(),
-            'user_balance' => auth()->user()->balance
-        ]);
-    }
+public function index() {
+    $packages = \App\Models\MembershipPackage::where('is_active', true)->get();
+    return Inertia::render('User/Membership/Index', ['packages' => $packages]);
+}
 
     public function buy(Request $request)
     {

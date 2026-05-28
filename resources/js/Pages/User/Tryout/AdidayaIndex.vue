@@ -99,11 +99,11 @@ const filteredTryouts = computed(() => {
 
                     <div class="mt-auto">
                         <Link 
-                            :href="route('tryout.start', tryout.id)"
-                            class="block w-full text-center bg-slate-900 hover:bg-blue-600 text-white py-3 rounded-xl font-semibold text-[10px] uppercase tracking-[0.2em] transition-all active:scale-95 shadow-sm"
-                        >
-                            Mulai Simulasi
-                        </Link>
+    :href="route('tryout.wait', tryout.id)"
+    class="block w-full text-center bg-slate-900 hover:bg-blue-600 text-white py-3 rounded-xl font-semibold text-[10px] uppercase tracking-[0.2em] transition-all active:scale-95 shadow-sm"
+>
+    Mulai Simulasi
+</Link>
                     </div>
                 </div>
             </div>

@@ -176,19 +176,18 @@ class TryoutController extends Controller
         return redirect()->route('checkout.show', $transaction->id);
     }
 
-    public function adidaya()
+public function adidaya()
     {
-        $exclusiveTryouts = Tryout::where('type', 'adidaya')
-            ->where('is_published', true)
-            ->withCount('questions')
+        // Mengambil semua paket tryout bertipe 'adidaya' yang sudah di-publish
+        $tryouts = Tryout::where('type', 'adidaya')
+            ->where('is_published', true) // Opsional: hapus baris ini jika ingin yang belum dipublish tetap tampil
             ->latest()
             ->get();
 
         return Inertia::render('User/Tryout/AdidayaIndex', [
-            'exclusiveTryouts' => $exclusiveTryouts,
+            'tryouts' => $tryouts
         ]);
     }
-
     public function myTryouts(Request $request)
     {
         $user = auth()->user();
@@ -239,6 +238,27 @@ public function result(ExamAttempt $attempt)
         $attempt->load('tryout');
         $tryout = $attempt->tryout;
 
+        // --- UBAH LOGIKA BACK URL DI SINI ---
+        // Jika tryout akbar, arahkan ke waiting room. 
+        // Jika tryout biasa, arahkan ke history detail (sesuai tombol bawaan sebelumnya)
+        $backUrl = ($tryout->type === 'akbar') 
+            ? route('tryout-akbar.wait', $tryout->id) 
+            : route('tryout.history.detail', $tryout->id); 
+
+        $rank = ExamAttempt::where('tryout_id', $tryout->id)
+            ->where('total_score', '>', $attempt->total_score)
+            ->count() + 1;if ($attempt->user_id !== auth()->id()) abort(403);
+        
+        $attempt->load('tryout');
+        $tryout = $attempt->tryout;
+
+        // --- UBAH LOGIKA BACK URL DI SINI ---
+        // Jika tryout akbar, arahkan ke waiting room. 
+        // Jika tryout biasa, arahkan ke history detail (sesuai tombol bawaan sebelumnya)
+        $backUrl = ($tryout->type === 'akbar') 
+            ? route('tryout-akbar.wait', $tryout->id) 
+            : route('tryout.history.detail', $tryout->id); 
+
         $rank = ExamAttempt::where('tryout_id', $tryout->id)
             ->where('total_score', '>', $attempt->total_score)
             ->count() + 1;
@@ -279,7 +299,9 @@ public function result(ExamAttempt $attempt)
             'totalScore' => $attempt->total_score,
             'scoreDetails' => $scoreDetails,
             'ranking' => ['rank' => $rank, 'total_participants' => $totalParticipants],
-            'timeStats' => $timeStats // <-- Kirim properti ini ke vue
+            'timeStats' => $timeStats,
+            // --- 2. KIRIMKAN VARIABEL KE VUE ---
+            'backUrl' => $backUrl 
         ]);
     }
 

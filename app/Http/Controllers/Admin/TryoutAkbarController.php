@@ -31,7 +31,6 @@ class TryoutAkbarController extends Controller
 
     /**
      * Menampilkan halaman detail/verifikasi peserta Tryout Akbar.
-     * Logika ini menggantikan fungsi participants() sebelumnya.
      */
     public function show(Request $request, $id)
     {
@@ -168,16 +167,16 @@ class TryoutAkbarController extends Controller
             ->with('success', 'Event Tryout Akbar berhasil diperbarui.');
     }
 
-    public function destroy($id)
+public function destroy($id)
     {
         $tryout = Tryout::where('id', $id)->where('type', 'akbar')->firstOrFail();
         
-        if ($tryout->transactions()->exists()) {
-            return back()->with('error', 'Tidak dapat menghapus event yang sudah memiliki peserta.');
-        }
-
+        // KITA HAPUS BLOKIRANNYA.
+        // Langsung hapus eventnya. MySQL (Cascade) akan otomatis ikut membersihkan 
+        // semua soal dan transaksi yang terkait dengan event ini agar tidak ada data nyangkut.
         $tryout->delete();
 
-        return back()->with('success', 'Event Tryout Akbar berhasil dihapus.');
+        return redirect()->route('admin.tryout-akbar.index')
+            ->with('success', 'Event Tryout Akbar beserta seluruh datanya berhasil dihapus total.');
     }
 }

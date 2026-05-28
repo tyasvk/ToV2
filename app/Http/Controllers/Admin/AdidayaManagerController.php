@@ -36,6 +36,7 @@ class AdidayaManagerController extends Controller
             'is_published' => 'boolean',
             'published_at' => 'nullable|date',
             'started_at' => 'nullable|date',
+            'end_date' => 'nullable|date', // <--- Tambahkan ini di validasi
         ]);
 
         $validated['type'] = 'adidaya';
@@ -49,9 +50,9 @@ class AdidayaManagerController extends Controller
      * PERBAIKAN: Nama variabel harus sesuai dengan parameter rute {adidaya_manage}
      * Atau Anda bisa menggunakan Type Hinting (Tryout $adidayaManage)
      */
-    public function update(Request $request, $id)
+public function update(Request $request, $id)
     {
-        $tryout = Tryout::findOrFail($id); // Mencari data berdasarkan ID secara manual agar pasti ketemu
+        $tryout = Tryout::findOrFail($id);
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
@@ -62,6 +63,7 @@ class AdidayaManagerController extends Controller
             'is_published' => 'boolean',
             'published_at' => 'nullable|date',
             'started_at' => 'nullable|date',
+            'end_date' => 'nullable|date', // <--- PASTIKAN BARIS INI DITAMBAHKAN
         ]);
 
         $tryout->update($validated);

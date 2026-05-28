@@ -137,10 +137,15 @@ const activeTryoutType = computed(() => page.props.tryout?.type || 'general');
                         <span class="text-xs lg:text-[11px] uppercase tracking-wider">Kelola Tryout</span>
                     </Link>
 
-                    <Link :href="route('admin.adidaya-manage.index')" :class="[route().current('admin.adidaya-manage.*') || (route().current('admin.tryouts.questions.*') && activeTryoutType === 'adidaya') ? 'bg-rose-50 text-rose-600 active-link shadow-sm' : 'text-slate-500 hover:bg-rose-50', 'flex items-center gap-3 lg:gap-2 py-2.5 lg:py-2 px-4 rounded-xl font-medium transition-all group relative']">
+                    <Link :href="route('admin.adidaya.index')" :class="[route().current('admin.adidaya.*') || (route().current('admin.tryouts.questions.*') && activeTryoutType === 'adidaya') ? 'bg-rose-50 text-rose-600 active-link shadow-sm' : 'text-slate-500 hover:bg-rose-50', 'flex items-center gap-3 lg:gap-2 py-2.5 lg:py-2 px-4 rounded-xl font-medium transition-all group relative']">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 flex-shrink-0 text-purple-500"><path stroke-linecap="round" stroke-linejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" /></svg>
                         <span class="text-xs lg:text-[11px] uppercase tracking-wider">Adidaya Manager</span>
                     </Link>
+
+                    <Link :href="route('admin.membership-setting.index')" :class="[route().current('admin.membership-setting.*') ? 'bg-rose-50 text-rose-600 active-link shadow-sm' : 'text-slate-500 hover:bg-rose-50', 'flex items-center gap-3 lg:gap-2 py-2.5 lg:py-2 px-4 rounded-xl font-medium transition-all group relative']">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 flex-shrink-0 text-amber-500"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+    <span class="text-xs lg:text-[11px] uppercase tracking-wider">Harga Member</span>
+</Link>
 
                     <Link :href="route('admin.tryout-akbar.index')" :class="[route().current('admin.tryout-akbar.*') ? 'bg-rose-50 text-rose-600 active-link shadow-sm' : 'text-slate-500 hover:bg-rose-50', 'flex items-center gap-3 lg:gap-2 py-2.5 lg:py-2 px-4 rounded-xl font-medium transition-all group relative']">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 flex-shrink-0 text-orange-500"><path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.563.563 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.563.563 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" /></svg>
@@ -195,7 +200,7 @@ const activeTryoutType = computed(() => page.props.tryout?.type || 'general');
                         <span class="text-xs lg:text-[11px] uppercase tracking-wider">Riwayat Tryout</span>
                     </Link>
 
-                    <Link :href="route('wallet.index')" :class="[(route().current('wallet.index') || route().current('wallet.*')) ? 'bg-slate-990 bg-slate-900 text-white shadow-xl active-link' : 'text-slate-500 hover:bg-slate-50', 'flex items-center gap-3 lg:gap-2 py-2.5 lg:py-2 px-4 rounded-xl font-medium transition-all group relative']">
+                    <Link :href="route('wallet.index')" :class="[(route().current('wallet.index') || route().current('wallet.*')) ? 'bg-slate-900 text-white shadow-xl active-link' : 'text-slate-500 hover:bg-slate-50', 'flex items-center gap-3 lg:gap-2 py-2.5 lg:py-2 px-4 rounded-xl font-medium transition-all group relative']">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 flex-shrink-0 text-emerald-500 group-[.active-link]:text-white"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a2.25 2.25 0 0 0-2.25-2.25H15a3 3 0 1 1-6 0H5.25A2.25 2.25 0 0 0 3 12m18 0v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 9m18 0V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v3" /></svg>
                         <span class="text-xs lg:text-[11px] uppercase tracking-wider">Dompet Saya</span>
                     </Link>

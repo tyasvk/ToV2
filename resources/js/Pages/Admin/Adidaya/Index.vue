@@ -65,6 +65,7 @@ const openEditModal = (tryout) => {
     form.end_date = tryout.end_date ? tryout.end_date.substring(0, 16) : '';
     form.is_paid = !!tryout.is_paid;
     form.price = tryout.price;
+    form.end_date = tryout.end_date; // <--- Pastikan di-bind agar nilainya masuk ke form
     showModal.value = true;
 };
 

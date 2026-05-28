@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\Transaction;
 use Illuminate\Support\Str;
+use App\Models\ExamAttempt; // <--- Tambahkan baris ini
 
 class TryoutAkbarController extends Controller
 {
@@ -105,7 +106,7 @@ class TryoutAkbarController extends Controller
         return redirect()->route('tryout-akbar.wait', $tryout->id);
     }
 
-    public function waitingRoom(Tryout $tryout)
+public function waitingRoom(Tryout $tryout)
     {
         $user = auth()->user();
         $transaction = Transaction::where('user_id', $user->id)
@@ -117,9 +118,18 @@ class TryoutAkbarController extends Controller
             return redirect()->route('tryout-akbar.register', $tryout->id);
         }
 
+        // --- TAMBAHAN: Cek apakah user sudah mengerjakan tryout ini ---
+        $attempt = ExamAttempt::where('user_id', $user->id)
+            ->where('tryout_id', $tryout->id)
+            ->first();
+
         return Inertia::render('User/TryoutAkbar/Wait', [
             'tryout' => $tryout,
             'transaction' => $transaction,
+            
+            // Kirim status pengerjaan dan ID pengerjaannya ke Vue
+            'has_attempted' => $attempt ? true : false,
+            'attempt_id' => $attempt ? $attempt->id : null,
         ]);
     }
 

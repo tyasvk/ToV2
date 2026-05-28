@@ -1,12 +1,14 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
 
 const props = defineProps({ 
     tryouts: Object,
     filters: Object 
 });
+
+const page = usePage();
 
 // --- FITUR PENCARIAN ---
 const search = ref(props.filters?.search || '');
@@ -27,10 +29,25 @@ watch(search, (value) => {
     }, 500);
 });
 
-// --- FUNGSI HAPUS ---
+// --- FUNGSI HAPUS DENGAN PELACAK ERROR ---
+// --- FUNGSI HAPUS YANG BENAR ---
 const deleteEvent = (id) => {
-    if(confirm('Yakin ingin menghapus event Tryout Akbar ini?')) {
-        router.delete(route('admin.tryout-akbar.destroy', id), { preserveScroll: true });
+    if(confirm('PERINGATAN: Yakin ingin menghapus event ini? Semua data soal dan peserta di dalamnya juga akan ikut terhapus permanen!')) {
+        router.delete(route('admin.tryout-akbar.destroy', id), { 
+            preserveScroll: true,
+            onSuccess: (response) => {
+                // Menangkap pesan sukses langsung dari response Inertia
+                if (response.props.flash && response.props.flash.success) {
+                    alert('BERHASIL: ' + response.props.flash.success);
+                } else {
+                    alert('Data berhasil dihapus!');
+                }
+            },
+            onError: (errors) => {
+                console.error(errors);
+                alert('Terjadi kesalahan sistem saat menghapus data.');
+            }
+        });
     }
 };
 
@@ -141,11 +158,13 @@ const formatCurrency = (price) => {
                                     <div class="flex flex-col text-xs text-slate-600 gap-1 font-medium">
                                         <div class="flex items-center gap-1.5">
                                             <span class="text-slate-400 w-10">Mulai</span>
-                                            <span class="text-slate-700">: {{ formatDate(tryout.started_at) }}</span>
+                                            <!-- Perbaikan nama variabel tanggal mulai -->
+                                            <span class="text-slate-700">: {{ formatDate(tryout.started_at || tryout.start_date) }}</span>
                                         </div>
                                         <div class="flex items-center gap-1.5">
                                             <span class="text-slate-400 w-10">Akhir</span>
-                                            <span class="text-slate-700">: {{ formatDate(tryout.end_date) }}</span>
+                                            <!-- Perbaikan nama variabel tanggal akhir -->
+                                            <span class="text-slate-700">: {{ formatDate(tryout.ended_at || tryout.end_date) }}</span>
                                         </div>
                                     </div>
                                 </td>
