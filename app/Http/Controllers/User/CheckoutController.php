@@ -12,6 +12,7 @@ use Midtrans\Snap;
 use Midtrans\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon; // <--- TAMBAHKAN BARIS INI
 
 class CheckoutController extends Controller
 {
@@ -84,28 +85,57 @@ public function show(Transaction $transaction)
     ]);
 }
 
-    public function process(Request $request, Transaction $transaction)
-    {
-        $request->validate(['payment_method' => 'required|in:wallet,midtrans']);
-        
-        if ($request->payment_method === 'wallet') {
-            $user = User::find(auth()->id());
-            if ($user->balance < $transaction->amount) {
-                return back()->withErrors(['message' => 'Saldo tidak cukup.']);
-            }
-
-            DB::transaction(function () use ($user, $transaction) {
-                $user->decrement('balance', $transaction->amount);
-                $transaction->update(['status' => 'paid', 'payment_method' => 'wallet']);
-                WalletTransaction::create([
-                    'user_id' => $user->id, 'type' => 'debit', 'amount' => $transaction->amount,
-                    'description' => 'Pembayaran ' . $this->resolveItemName($transaction), 'status' => 'success'
-                ]);
-            });
-            return redirect()->route('dashboard')->with('success', 'Akses Aktif!');
+public function process(Request $request, Transaction $transaction)
+{
+    $request->validate(['payment_method' => 'required|in:wallet,midtrans']);
+    
+    if ($request->payment_method === 'wallet') {
+        $user = User::find(auth()->id());
+        if ($user->balance < $transaction->amount) {
+            return back()->withErrors(['message' => 'Saldo tidak cukup.']);
         }
-        return back();
+
+        DB::transaction(function () use ($user, $transaction) {
+            // 1. Potong Saldo User
+            $user->decrement('balance', $transaction->amount);
+            
+            // 2. Update Status Transaksi Utama
+            $transaction->update(['status' => 'paid', 'payment_method' => 'wallet']);
+            
+            // 3. Catat ke Riwayat Mutasi Dompet
+            WalletTransaction::create([
+                'user_id' => $user->id, 
+                'type' => 'debit', 
+                'amount' => $transaction->amount,
+                'description' => 'Pembayaran ' . $this->resolveItemName($transaction), 
+                'status' => 'success'
+            ]);
+
+            // PENTING: Tambahkan Logika Aktivasi Masa Aktif Membership di sini
+            // Jika transaksi tidak memiliki tryout_id, berarti ini adalah paket membership
+            if (!$transaction->tryout_id || (isset($transaction->metadata['type']) && $transaction->metadata['type'] === 'membership')) {
+                
+                // Ambil jumlah hari dari metadata paket yang dibeli
+                $daysToAdd = $transaction->metadata['days'] ?? $transaction->metadata['duration_days'] ?? 30; 
+
+                // Tentukan tanggal mulai penambahan
+                // Jika user masih punya paket aktif (isFuture), akumulasikan dari tanggal expired lama.
+                // Jika sudah hangus atau member gratis, mulai dari hari ini (now).
+                $currentExpiry = ($user->membership_expires_at && Carbon::parse($user->membership_expires_at)->isFuture()) 
+                    ? Carbon::parse($user->membership_expires_at) 
+                    : Carbon::now();
+
+                // Perbarui data user di database
+                $user->update([
+                    'membership_expires_at' => $currentExpiry->addDays((int)$daysToAdd)
+                ]);
+            }
+        });
+        
+        return redirect()->route('dashboard')->with('success', 'Akses Premium Aktif!');
     }
+    return back();
+}
 
     private function initMidtrans() {
         Config::$serverKey = config('services.midtrans.server_key');

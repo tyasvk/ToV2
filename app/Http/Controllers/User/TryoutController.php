@@ -24,51 +24,52 @@ class TryoutController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
+        $userId = $user->id; // Definisikan $userId agar bisa dipakai di dalam query
         $isPremiumMember = $user->membership_expires_at && now()->lt($user->membership_expires_at);
 
-        // --- 1. DATA KATALOG ---
+        // --- 1. DATA KATALOG (Belum Dibeli) ---
         $catalogTryouts = Tryout::query()
             ->where('is_published', true)
             ->where(function ($query) {
                 $query->whereNotIn('type', ['akbar', 'adidaya'])->orWhereNull('type');
             })
-            ->when(!$isPremiumMember, function($query) use ($user) {
-                $query->whereDoesntHave('transactions', function($q) use ($user) {
-                    $q->whereIn('status', ['paid', 'success'])
-                      ->where(function($subQuery) use ($user) {
-                          $subQuery->where('user_id', $user->id)
-                                   ->orWhereJsonContains('participants_data', $user->email);
-                      });
-                });
+            ->whereDoesntHave('transactions', function($q) use ($user) {
+                $q->whereIn('status', ['paid', 'success'])
+                  ->where(function($subQuery) use ($user) {
+                      $subQuery->where('user_id', $user->id)
+                               ->orWhereJsonContains('participants_data', $user->email);
+                  });
             })
             ->when($request->search, fn($q, $s) => $q->where('title', 'like', "%{$s}%"))
             ->latest()
             ->get();
 
-        // --- 2. DATA TRYOUT SAYA ---
-        $myTryouts = Tryout::query()
+        // --- 2. DATA TRYOUT SAYA (Sudah Dibeli/Akses Premium) ---
+        $myTryoutsQuery = Tryout::query()
             ->where('is_published', true)
             ->where(function ($query) {
                 $query->whereNotIn('type', ['akbar', 'adidaya'])->orWhereNull('type');
-            })
-            ->where(function($query) use ($user, $isPremiumMember) {
-                $query->whereHas('transactions', function($q) use ($user) {
-                    $q->whereIn('status', ['paid', 'success'])
-                      ->where(function($sq) use ($user) {
-                          $sq->where('user_id', $user->id)
-                            ->orWhereJsonContains('participants_data', $user->email);
-                      });
-                });
+            });
 
-                if ($isPremiumMember) {
-                    $query->orWhere(function($q) {
-                        $q->whereNotIn('type', ['akbar', 'adidaya'])->orWhereNull('type');
-                    });
-                }
-            })
-            ->withCount(['examAttempts' => function($q) use ($user) {
-                $q->where('user_id', $user->id);
-            }])
+        if ($isPremiumMember) {
+            // Jika premium, tampilkan semua tanpa harus cek transaksi
+            $myTryoutsQuery->withCount(['examAttempts as attempts_count' => function($q) use ($userId) {
+                $q->where('user_id', $userId);
+            }]);
+        } else {
+            // Jika reguler, filter hanya yang sudah ditransaksikan
+            $myTryoutsQuery->whereHas('transactions', function($q) use ($user) {
+                $q->whereIn('status', ['paid', 'success'])
+                  ->where(function($sq) use ($user) {
+                      $sq->where('user_id', $user->id)
+                        ->orWhereJsonContains('participants_data', $user->email);
+                  });
+            })->withCount(['examAttempts as attempts_count' => function($q) use ($userId) {
+                $q->where('user_id', $userId);
+            }]);
+        }
+
+        $myTryouts = $myTryoutsQuery
             ->when($request->search, fn($q, $s) => $q->where('title', 'like', "%{$s}%"))
             ->latest()
             ->get();
@@ -176,11 +177,11 @@ class TryoutController extends Controller
         return redirect()->route('checkout.show', $transaction->id);
     }
 
-public function adidaya()
+    public function adidaya()
     {
         // Mengambil semua paket tryout bertipe 'adidaya' yang sudah di-publish
         $tryouts = Tryout::where('type', 'adidaya')
-            ->where('is_published', true) // Opsional: hapus baris ini jika ingin yang belum dipublish tetap tampil
+            ->where('is_published', true)
             ->latest()
             ->get();
 
@@ -188,6 +189,7 @@ public function adidaya()
             'tryouts' => $tryouts
         ]);
     }
+
     public function myTryouts(Request $request)
     {
         $user = auth()->user();
@@ -217,7 +219,7 @@ public function adidaya()
                     });
                 }
             })
-            ->withCount(['examAttempts' => function($q) use ($userId) {
+            ->withCount(['examAttempts as attempts_count' => function($q) use ($userId) {
                 $q->where('user_id', $userId);
             }])
             ->when($request->search, fn($q, $s) => $q->where('title', 'like', "%{$s}%"))
@@ -231,30 +233,13 @@ public function adidaya()
         ]);
     }
 
-public function result(ExamAttempt $attempt)
+    public function result(ExamAttempt $attempt)
     {
         if ($attempt->user_id !== auth()->id()) abort(403);
         
         $attempt->load('tryout');
         $tryout = $attempt->tryout;
 
-        // --- UBAH LOGIKA BACK URL DI SINI ---
-        // Jika tryout akbar, arahkan ke waiting room. 
-        // Jika tryout biasa, arahkan ke history detail (sesuai tombol bawaan sebelumnya)
-        $backUrl = ($tryout->type === 'akbar') 
-            ? route('tryout-akbar.wait', $tryout->id) 
-            : route('tryout.history.detail', $tryout->id); 
-
-        $rank = ExamAttempt::where('tryout_id', $tryout->id)
-            ->where('total_score', '>', $attempt->total_score)
-            ->count() + 1;if ($attempt->user_id !== auth()->id()) abort(403);
-        
-        $attempt->load('tryout');
-        $tryout = $attempt->tryout;
-
-        // --- UBAH LOGIKA BACK URL DI SINI ---
-        // Jika tryout akbar, arahkan ke waiting room. 
-        // Jika tryout biasa, arahkan ke history detail (sesuai tombol bawaan sebelumnya)
         $backUrl = ($tryout->type === 'akbar') 
             ? route('tryout-akbar.wait', $tryout->id) 
             : route('tryout.history.detail', $tryout->id); 
@@ -279,7 +264,6 @@ public function result(ExamAttempt $attempt)
 
         $attempt->status = $attempt->is_passed ? 'lulus' : 'tidak_lulus';
 
-        // --- TAMBAHAN KALKULASI STATISTIK WAKTU ---
         $durationSeconds = 0;
         if ($attempt->created_at && $attempt->completed_at) {
             $durationSeconds = \Carbon\Carbon::parse($attempt->created_at)->diffInSeconds($attempt->completed_at);
@@ -300,7 +284,6 @@ public function result(ExamAttempt $attempt)
             'scoreDetails' => $scoreDetails,
             'ranking' => ['rank' => $rank, 'total_participants' => $totalParticipants],
             'timeStats' => $timeStats,
-            // --- 2. KIRIMKAN VARIABEL KE VUE ---
             'backUrl' => $backUrl 
         ]);
     }
@@ -413,10 +396,10 @@ public function result(ExamAttempt $attempt)
         return Inertia::render('User/Tryout/ExamSheet', ['tryout' => $tryout, 'questions' => $tryout->questions()->orderBy('order', 'asc')->get(), 'user' => auth()->user()]);
     }
 
-public function finish(Request $request, Tryout $tryout)
+    public function finish(Request $request, Tryout $tryout)
     {
         $answers = $request->answers ?? [];
-        $timeLeft = $request->time_left ?? 0; // Ambil sisa waktu dari frontend
+        $timeLeft = $request->time_left ?? 0; 
         
         $questions = $tryout->questions;
         $twk = 0; $tiu = 0; $tkp = 0;
@@ -434,7 +417,6 @@ public function finish(Request $request, Tryout $tryout)
             }
         }
 
-        // PASTIKAN COMPLETED_AT DISIMPAN
         $attempt = ExamAttempt::create([
             'user_id' => auth()->id(), 
             'tryout_id' => $tryout->id, 
@@ -446,14 +428,11 @@ public function finish(Request $request, Tryout $tryout)
             'completed_at' => now() 
         ]);
         
-        // --- PERBAIKAN WAKTU ---
-        // Hitung waktu riil yang dihabiskan berdasarkan durasi tryout dan sisa waktu
         $tryoutDurationSeconds = ($tryout->duration ?? 110) * 60;
         $timeTaken = $tryoutDurationSeconds - $timeLeft;
-        $timeTaken = max(0, $timeTaken); // Memastikan tidak negatif
+        $timeTaken = max(0, $timeTaken); 
         
-        // Memundurkan created_at agar rentang durasi terhitung benar (juga berpengaruh pada Leaderboard)
-        $attempt->timestamps = false; // Matikan auto-update waktu Laravel
+        $attempt->timestamps = false; 
         $attempt->created_at = now()->subSeconds($timeTaken);
         $attempt->save();
         
@@ -481,7 +460,7 @@ public function finish(Request $request, Tryout $tryout)
         return Inertia::render('User/Tryout/Review', ['attempt' => $attempt, 'questions' => $questions, 'tryout' => $attempt->tryout]);
     }
 
-public function leaderboard(Request $request, Tryout $tryout)
+    public function leaderboard(Request $request, Tryout $tryout)
     {
         $user = auth()->user();
         $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65; 
@@ -501,22 +480,18 @@ public function leaderboard(Request $request, Tryout $tryout)
                 'id' => $a->id,
                 'rank' => $i + 1, 
                 
-                // DATA USER & INSTANSI
                 'name' => $a->user ? $a->user->name : 'User', 
                 'avatar' => $a->user ? $a->user->avatar : null,
                 'agency_name' => $a->user ? $a->user->agency_name : null, 
                 'province_code' => $a->user ? $a->user->province_code : null,
                 'gender' => $a->user ? $a->user->gender : null, 
                 
-                // SKOR & STATUS
                 'score' => $a->total_score, 
                 'twk' => $a->twk_score, 
                 'tiu' => $a->tiu_score, 
                 'tkp' => $a->tkp_score, 
                 'is_passed' => ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp), 
                 
-                // DURASI WAKTU PENGERJAAN (DIPERBAIKI: Tanpa Error Syntax)
-                // Jika selisihnya 0 (karena waktu mulai & selesai sama), paksa jadi minimal 1 detik dengan fungsi max()
                 'duration' => $a->created_at 
                     ? max(1, \Carbon\Carbon::parse($a->created_at)->diffInSeconds($a->completed_at ?? $a->updated_at ?? $a->created_at))
                     : 0,
@@ -530,13 +505,38 @@ public function leaderboard(Request $request, Tryout $tryout)
             'my_rank' => $rankings->firstWhere('is_me', true)
         ]);
     }
+public function certificate(ExamAttempt $attempt)
+{
+    // 1. Pastikan yang mengunduh adalah user yang bersangkutan
+    if ($attempt->user_id !== auth()->id()) abort(403);
+    
+    // 2. Load relasi tabel
+    $attempt->load(['user', 'tryout']);
 
-    public function certificate(ExamAttempt $attempt)
-    {
-        if ($attempt->user_id !== auth()->id()) abort(403);
-        $pdf = Pdf::loadView('pdf.certificate', ['attempt' => $attempt->load(['user', 'tryout']), 'isPassed' => $attempt->is_passed])->setPaper('a4', 'landscape');
-        return $pdf->stream('Sertifikat_' . $attempt->user->name . '.pdf');
-    }
+    // 3. KALKULASI ULANG KELULUSAN (Karena is_passed tidak ada di database)
+    $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65; 
+    $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80; 
+    $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
+    
+    $isPassed = (
+        $attempt->twk_score >= $pgTwk && 
+        $attempt->tiu_score >= $pgTiu && 
+        $attempt->tkp_score >= $pgTkp
+    );
+
+    // 4. Mencegah PHP kehabisan memori atau timeout saat memproses PDF
+    ini_set('memory_limit', '256M');
+    set_time_limit(60);
+
+    // 5. Generate PDF
+    $pdf = Pdf::loadView('pdf.certificate', [
+        'attempt' => $attempt, 
+        'isPassed' => $isPassed
+    ])->setPaper('a5', 'landscape');
+    
+    // 6. Langsung jadikan unduhan
+    return $pdf->download('Sertifikat_' . \Illuminate\Support\Str::slug($attempt->user->name) . '.pdf');
+}
 
     public function collectiveRegister(Tryout $tryout)
     {

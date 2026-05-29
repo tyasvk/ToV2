@@ -8,6 +8,20 @@ const props = defineProps({
     attempts: Array,
 });
 
+// LOGIKA RUTE KEMBALI DINAMIS BERDASARKAN TIPE TRYOUT
+const dynamicBackUrl = computed(() => {
+    const type = props.tryout?.type || 'general';
+    
+    if (type === 'adidaya') {
+        return route('tryout.adidaya');
+    } else if (type === 'akbar') {
+        return route('tryout-akbar.index');
+    }
+    
+    // Default kembali ke daftar tryout biasa
+    return route('tryout.index');
+});
+
 // Format Tanggal (Contoh: 28 Jan 2026, 10:30)
 const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('id-ID', {
@@ -45,7 +59,7 @@ const highestScore = computed(() => {
     <AuthenticatedLayout>
         <template #header>
             <div class="flex items-center gap-3">
-                <Link :href="route('tryout.my')" class="group p-2 rounded-full hover:bg-slate-100 transition-colors">
+                <Link :href="dynamicBackUrl" class="group p-2 rounded-full hover:bg-slate-100 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-500 group-hover:text-[#004a87]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
@@ -61,13 +75,15 @@ const highestScore = computed(() => {
             <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
                 
                 <div class="mb-6">
-                    <Link :href="tryout.type === 'akbar' ? route('tryout-akbar.index') : route('tryout.index')" 
+                    <Link :href="dynamicBackUrl" 
                         class="inline-flex items-center gap-2 text-slate-500 hover:text-[#004a87] transition-colors font-bold text-sm group"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transition-transform group-hover:-translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                         </svg>
-                        Kembali ke Daftar {{ tryout.type === 'akbar' ? 'Event Akbar' : 'Tryout' }}
+                        <span>
+                            Kembali ke Daftar {{ tryout.type === 'akbar' ? 'Event Akbar' : (tryout.type === 'adidaya' ? 'Nusantara Adidaya' : 'Tryout') }}
+                        </span>
                     </Link>
                 </div>
 
@@ -127,9 +143,8 @@ const highestScore = computed(() => {
                     <div v-for="(attempt, index) in attempts" :key="attempt.id" 
                         class="group bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-300 flex flex-col md:flex-row items-start md:items-center gap-6"
                     >
-                        
                         <div class="flex items-start md:items-center gap-4 md:w-1/3">
-                            <div class="bg-blue-50 text-[#004a87] font-black text-xl w-12 h-12 shrink-0 flex items-center justify-center rounded-xl border border-blue-100">
+                            <div class="bg-blue-50 text-blue-900 font-black text-xl w-12 h-12 shrink-0 flex items-center justify-center rounded-xl border border-blue-100">
                                 #{{ attempts.length - index }}
                             </div>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 w-full">
@@ -148,7 +163,7 @@ const highestScore = computed(() => {
                             <div class="flex flex-wrap items-center gap-y-2 gap-x-6">
                                 <div class="flex items-center gap-3 mr-4">
                                     <span class="text-xs font-bold text-slate-400 uppercase">Total SKD</span>
-                                    <span class="text-2xl font-black text-[#004a87]">{{ attempt.total_score }}</span>
+                                    <span class="text-2xl font-black text-blue-900">{{ attempt.total_score }}</span>
                                 </div>
 
                                 <div class="flex gap-2">
@@ -192,3 +207,6 @@ const highestScore = computed(() => {
         </div>
     </AuthenticatedLayout>
 </template>
+
+<style scoped>
+</style>

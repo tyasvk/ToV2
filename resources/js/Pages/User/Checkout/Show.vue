@@ -22,8 +22,23 @@ const setAutoMethod = () => {
     }
 };
 
+// --- PERBAIKAN 1: Fungsi untuk memuat script Midtrans JS secara dinamis ---
+const loadMidtransScript = () => {
+    // Mengambil Client Key dari environment (pastikan VITE_MIDTRANS_CLIENT_KEY ada di .env)
+    const clientKey = import.meta.env.VITE_MIDTRANS_CLIENT_KEY || 'SB-Mid-client-XXXXX'; // Ganti XXXX dengan Client Key Sandbox Anda jika tidak pakai .env
+    
+    if (document.getElementById('midtrans-script')) return; 
+
+    const script = document.createElement('script');
+    script.src = 'https://app.sandbox.midtrans.com/snap/snap.js';
+    script.setAttribute('data-client-key', clientKey);
+    script.id = 'midtrans-script';
+    document.head.appendChild(script);
+};
+
 onMounted(() => {
     setAutoMethod();
+    loadMidtransScript(); // Panggil script Midtrans saat halaman pertama kali dibuka
 });
 
 watch(() => props.transaction, setAutoMethod, { immediate: true });
@@ -83,8 +98,23 @@ const handleWalletPayment = () => {
 };
 
 const handleMidtransPayment = () => {
+    // --- PERBAIKAN 2: Cegah error blank jika snap_token dari server kosong/gagal dibuat ---
+    if (!props.transaction?.snap_token) {
+        Swal.fire({ 
+            title: 'Sistem Error', 
+            text: 'Gagal mendapatkan token Midtrans. Pastikan Konfigurasi Server Key Anda benar.', 
+            icon: 'error' 
+        });
+        return;
+    }
+
+    // --- PERBAIKAN 3: Jika script snap belum selesai dimuat oleh browser ---
     if (typeof window.snap === 'undefined') {
-        Swal.fire({ title: 'Sistem', text: 'Gagal memuat metode pembayaran.', icon: 'error' });
+        Swal.fire({ 
+            title: 'Menghubungkan...', 
+            text: 'Sistem sedang menyiapkan pop-up pembayaran, silakan klik tombol bayar sekali lagi.', 
+            icon: 'info' 
+        });
         return;
     }
 

@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Sertifikat - {{ $attempt->id }}</title>
+    <title>Sertifikat - <?php echo e($attempt->id); ?></title>
     <style>
         @page { margin: 0; size: A5 landscape; }
         
@@ -68,7 +68,7 @@
 </head>
 <body>
 
-    @php
+    <?php
         // ENGINE KONVERSI GAMBAR KE BASE64 AGAR PDF TIDAK HANG!
         $logoBase64 = '';
         $logoPath = public_path('images/logo.png');
@@ -76,34 +76,35 @@
             $logoData = file_get_contents($logoPath);
             $logoBase64 = 'data:image/png;base64,' . base64_encode($logoData);
         }
-    @endphp
+    ?>
 
     <div class="cert-border-outer">
         <div class="cert-border-inner">
-            @if($logoBase64)
-                <img src="{{ $logoBase64 }}" class="watermark">
-            @endif
+            <?php if($logoBase64): ?>
+                <img src="<?php echo e($logoBase64); ?>" class="watermark">
+            <?php endif; ?>
         </div>
     </div>
 
     <div class="master-container">
         <div class="content-wrapper">
             
-            @if($logoBase64)
-                <img src="{{ $logoBase64 }}" class="logo-img">
-            @endif
+            <?php if($logoBase64): ?>
+                <img src="<?php echo e($logoBase64); ?>" class="logo-img">
+            <?php endif; ?>
             <div class="org-name">CPNS NUSANTARA LEARNING CENTER</div>
 
             <div class="cert-title">
-                {{ $isPassed ? 'SERTIFIKAT KOMPETENSI' : 'SERTIFIKAT PARTISIPASI' }}
+                <?php echo e($isPassed ? 'SERTIFIKAT KOMPETENSI' : 'SERTIFIKAT PARTISIPASI'); ?>
+
             </div>
 
             <div class="presented-to">Diberikan kepada:</div>
-            <div class="candidate-name">{{ $attempt->user->name ?? 'Peserta' }}</div>
+            <div class="candidate-name"><?php echo e($attempt->user->name ?? 'Peserta'); ?></div>
             
             <div class="description">
-                Atas partisipasi dan pencapaiannya dalam simulasi <strong>{{ $attempt->tryout->title ?? 'Tryout CAT' }}</strong>.<br>
-                Dilaksanakan pada tanggal {{ $attempt->created_at ? $attempt->created_at->translatedFormat('d F Y') : now()->translatedFormat('d F Y') }} dengan rincian nilai resmi:
+                Atas partisipasi dan pencapaiannya dalam simulasi <strong><?php echo e($attempt->tryout->title ?? 'Tryout CAT'); ?></strong>.<br>
+                Dilaksanakan pada tanggal <?php echo e($attempt->created_at ? $attempt->created_at->translatedFormat('d F Y') : now()->translatedFormat('d F Y')); ?> dengan rincian nilai resmi:
             </div>
 
             <table class="stats-table">
@@ -117,10 +118,10 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td>{{ $attempt->twk_score ?? 0 }}</td>
-                        <td>{{ $attempt->tiu_score ?? 0 }}</td>
-                        <td>{{ $attempt->tkp_score ?? 0 }}</td>
-                        <td style="background-color: #fffbeb;">{{ $attempt->total_score ?? 0 }}</td>
+                        <td><?php echo e($attempt->twk_score ?? 0); ?></td>
+                        <td><?php echo e($attempt->tiu_score ?? 0); ?></td>
+                        <td><?php echo e($attempt->tkp_score ?? 0); ?></td>
+                        <td style="background-color: #fffbeb;"><?php echo e($attempt->total_score ?? 0); ?></td>
                     </tr>
                 </tbody>
             </table>
@@ -128,7 +129,7 @@
             <table class="footer-table">
                 <tr>
                     <td class="footer-left">
-                        <span class="cert-id">ID: CERT-{{ $attempt->id ?? '00' }}-{{ date('Y') }}</span><br><br>
+                        <span class="cert-id">ID: CERT-<?php echo e($attempt->id ?? '00'); ?>-<?php echo e(date('Y')); ?></span><br><br>
                         Dokumen digital sah.<br>Terautentikasi sistem.
                     </td>
                     <td class="footer-center">
@@ -136,7 +137,7 @@
                     </td>
                     <td class="footer-right">
                         <div style="font-size: 9px; margin-bottom: 35px;">
-                            Palembang, {{ now()->translatedFormat('d F Y') }}<br>
+                            Palembang, <?php echo e(now()->translatedFormat('d F Y')); ?><br>
                             <strong>Direktur Akademik</strong>
                         </div>
                         <div class="signature-line"></div>
@@ -149,4 +150,4 @@
     </div>
 
 </body>
-</html>
+</html><?php /**PATH /home/tyasvara/ToV2/resources/views/pdf/certificate.blade.php ENDPATH**/ ?>

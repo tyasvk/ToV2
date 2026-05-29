@@ -1,6 +1,7 @@
 <script setup>
 import { Head, Link } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import { computed } from 'vue';
 
 const props = defineProps({
     attempt: Object,
@@ -8,11 +9,25 @@ const props = defineProps({
     totalScore: Number,
     scoreDetails: Array,
     ranking: Object,
-    timeStats: Object, // Data waktu dari backend
-    backUrl: String, // <--- Tangkap di sini
+    timeStats: Object, 
+    backUrl: String,
 });
 
-// Helper untuk format detik menjadi "Xm Ys" atau "Xj Ym Zs"
+// LOGIKA RUTE KEMBALI DINAMIS BERDASARKAN TIPE TRYOUT
+const dynamicBackUrl = computed(() => {
+    const type = props.tryout?.type || 'general';
+    
+    if (type === 'adidaya') {
+        return route('tryout.adidaya');
+    } else if (type === 'akbar') {
+        return route('tryout-akbar.index');
+    }
+    
+    // Default kembali ke tryout biasa (general)
+    return route('tryout.index');
+});
+
+// Helper untuk format detik
 const formatTime = (seconds) => {
     if (!seconds || seconds <= 0) return '0d';
     const h = Math.floor(seconds / 3600);
@@ -46,9 +61,9 @@ const formatTime = (seconds) => {
                     </div>
                 </div>
                 
-               <Link :href="backUrl" class="text-[11px] font-medium text-slate-600 hover:text-blue-600 transition-colors uppercase tracking-wide flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-blue-200 hover:bg-blue-50 rounded-md shadow-sm">
-    Kembali
-</Link>
+                <Link :href="dynamicBackUrl" class="text-[11px] font-medium text-slate-600 hover:text-blue-600 transition-colors uppercase tracking-wide flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-blue-200 hover:bg-blue-50 rounded-md shadow-sm">
+                    Kembali
+                </Link>
             </div>
         </nav>
 
@@ -130,13 +145,25 @@ const formatTime = (seconds) => {
                 </div>
             </div>
 
-            <div class="flex flex-col sm:flex-row gap-3">
+            <div class="flex flex-col sm:flex-row gap-3 mt-6">
                 <Link :href="route('tryout.review', attempt.id)" class="flex-1 flex justify-center items-center px-6 py-3.5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors uppercase tracking-wider">
                     Lihat Pembahasan Soal
                 </Link>
+                
                 <Link :href="route('tryout.leaderboard', tryout.id)" class="flex-1 flex justify-center items-center px-6 py-3.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-sm font-semibold rounded-xl shadow-sm transition-colors uppercase tracking-wider">
                     Lihat Papan Peringkat
                 </Link>
+
+<a 
+    :href="route('tryout.certificate', attempt.id)" 
+    target="_blank"
+    class="flex-1 flex justify-center items-center px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors uppercase tracking-wider"
+>
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+    Unduh Sertifikat
+</a>
             </div>
 
         </main>

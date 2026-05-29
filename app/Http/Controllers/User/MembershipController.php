@@ -5,6 +5,7 @@ namespace App\Http\Controllers\User;
 use App\Http\Controllers\Controller;
 use App\Models\Transaction;
 use App\Models\WalletTransaction;
+use App\Models\MembershipPackage; // Tambahkan import model
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Str;
@@ -13,53 +14,44 @@ use Carbon\Carbon;
 
 class MembershipController extends Controller
 {
-    /**
-     * Daftar Paket Premium Nusantara Adidaya
-     * Harga diatur untuk menjaga brand image "High Quality"
-     */
-    private $plans = [
-        ['id' => '7_days', 'name' => 'Sprint Flash', 'days' => 7, 'price' => 49000],
-        ['id' => '30_days', 'name' => 'Standard Pro', 'days' => 30, 'price' => 99000],
-        ['id' => '90_days', 'name' => 'Mastery Plan', 'days' => 90, 'price' => 199000],
-        ['id' => '1_year', 'name' => 'Ultimate Pass', 'days' => 365, 'price' => 299000], // Menarik di kisaran 200rb++
-    ];
-
-public function index() {
-    $packages = \App\Models\MembershipPackage::where('is_active', true)->get();
-    return Inertia::render('User/Membership/Index', ['packages' => $packages]);
-}
+    public function index() {
+        // Mengambil semua paket aktif dari database
+        $packages = MembershipPackage::where('is_active', true)->get();
+        return Inertia::render('User/Membership/Index', ['packages' => $packages]);
+    }
 
     public function buy(Request $request)
     {
-        $plan = collect($this->plans)->firstWhere('id', $request->plan_id);
-        if (!$plan) return back()->with('error', 'Paket tidak valid');
+        // Cari paket berdasarkan ID di database (bukan dari array $this->plans lagi)
+        $package = MembershipPackage::where('is_active', true)->find($request->plan_id);
+        if (!$package) return back()->with('error', 'Paket tidak valid');
 
         $user = auth()->user();
 
         // LOGIKA PEMBAYARAN VIA WALLET
         if ($request->payment_method === 'wallet') {
-            if ($user->balance < $plan['price']) {
+            if ($user->balance < $package->price) {
                 return back()->with('error', 'Saldo dompet tidak mencukupi.');
             }
 
-            DB::transaction(function () use ($user, $plan) {
-                $user->decrement('balance', $plan['price']);
+            DB::transaction(function () use ($user, $package) {
+                $user->decrement('balance', $package->price);
                 
                 WalletTransaction::create([
                     'user_id' => $user->id,
                     'type' => 'debit',
-                    'amount' => $plan['price'],
-                    'description' => 'Aktivasi Premium: ' . $plan['name'],
+                    'amount' => $package->price,
+                    'description' => 'Aktivasi Premium: ' . $package->name,
                     'status' => 'success'
                 ]);
 
                 $currentExpiry = $user->isMember() ? Carbon::parse($user->membership_expires_at) : now();
                 $user->update([
-                    'membership_expires_at' => $currentExpiry->addDays($plan['days'])
+                    'membership_expires_at' => $currentExpiry->addDays($package->duration_days)
                 ]);
             });
 
-            return redirect()->route('dashboard')->with('success', 'Akses ' . $plan['name'] . ' berhasil diaktifkan!');
+            return redirect()->route('dashboard')->with('success', 'Akses ' . $package->name . ' berhasil diaktifkan!');
         }
 
         // LOGIKA PEMBAYARAN VIA GATEWAY
@@ -69,15 +61,15 @@ public function index() {
             'user_id' => $user->id,
             'tryout_id' => null,
             'invoice_code' => $invoice,
-            'amount' => $plan['price'],
-            'unit_price' => $plan['price'],
+            'amount' => $package->price,
+            'unit_price' => $package->price,
             'qty' => 1,
-            'description' => 'Investasi Belajar: ' . $plan['name'],
+            'description' => 'Investasi Belajar: ' . $package->name,
             'status' => 'pending',
             'metadata' => [
                 'type' => 'membership',
-                'days' => $plan['days'],
-                'plan_name' => $plan['name']
+                'days' => $package->duration_days,
+                'plan_name' => $package->name
             ]
         ]);
 

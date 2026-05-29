@@ -1,22 +1,41 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, router, usePage } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import Swal from 'sweetalert2';
 
 const page = usePage();
 const user = computed(() => page.props.auth.user);
 
-// Pilihan Paket Membership
-const membershipPlans = [
-    { id: 'premium_7', duration: 7, label: '7 Hari', price: 19000, priceFormatted: 'Rp 19.000' },
-    { id: 'premium_30', duration: 30, label: '30 Hari', price: 49000, priceFormatted: 'Rp 49.000' },
-    { id: 'premium_90', duration: 90, label: '90 Hari', price: 99000, priceFormatted: 'Rp 99.000' },
-    { id: 'premium_365', duration: 365, label: '1 Tahun', price: 149000, priceFormatted: 'Rp 149.000' }
-];
+// 1. Ambil data packages secara dinamis dari database (Inertia Props)
+const props = defineProps({
+    packages: Array
+});
 
-// Default pilihan jatuh pada 1 Tahun
-const selectedPlan = ref(membershipPlans[3]);
+// 2. Format data packages agar sesuai dengan kebutuhan tampilan UI
+const membershipPlans = computed(() => {
+    if (!props.packages) return [];
+    return props.packages.map(pkg => ({
+        id: pkg.id, // Menggunakan ID asli dari database (integer)
+        duration: pkg.duration_days,
+        label: pkg.duration_days >= 365 ? '1 Tahun' : `${pkg.duration_days} Hari`,
+        name: pkg.name,
+        price: pkg.price,
+        priceFormatted: new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR',
+            minimumFractionDigits: 0
+        }).format(pkg.price)
+    }));
+});
+
+// 3. Pasang default pilihan pada paket dengan durasi terlama (atau indeks terakhir)
+const selectedPlan = ref(null);
+watch(membershipPlans, (newPlans) => {
+    if (newPlans.length > 0 && !selectedPlan.value) {
+        selectedPlan.value = newPlans[newPlans.length - 1]; // Mengambil paket terlama (misal 1 tahun)
+    }
+}, { immediate: true });
 
 // Logika status membership
 const isAdidayaActive = computed(() => {
@@ -34,6 +53,8 @@ const formatDate = (dateString) => {
 };
 
 const buyMembership = () => {
+    if (!selectedPlan.value) return;
+
     Swal.fire({
         title: 'Konfirmasi Langganan',
         text: `Anda memilih paket Adidaya ${selectedPlan.value.label}. Lanjutkan ke pembayaran?`,
@@ -42,7 +63,7 @@ const buyMembership = () => {
         confirmButtonColor: '#4f46e5',
         cancelButtonColor: '#94a3b8',
         confirmButtonText: 'Ya, Lanjutkan',
-        cancelButtonText: 'Batal',
+        cancelButtonText: 'Batal', 
         reverseButtons: true,
         customClass: {
             popup: 'rounded-[2rem] border-none shadow-2xl p-6 md:p-10',
@@ -53,7 +74,11 @@ const buyMembership = () => {
         }
     }).then((result) => {
         if (result.isConfirmed) {
-            router.get(route('checkout.show', { type: 'membership', id: selectedPlan.value.id }));
+            // PERBAIKAN: Gunakan POST ke membership.buy untuk membuat transaksi terlebih dahulu
+            router.post(route('membership.buy'), { 
+                plan_id: selectedPlan.value.id,
+                payment_method: 'gateway' 
+            });
         }
     });
 };
@@ -75,7 +100,6 @@ const features = [
         <div class="max-w-4xl mx-auto px-4 py-8 md:py-10 space-y-6 animate-in fade-in duration-700">
             
             <div class="relative overflow-hidden rounded-[2rem] bg-white border border-slate-200 shadow-sm p-6 md:p-8 flex flex-col sm:flex-row items-center justify-between gap-6 transition-all hover:shadow-md">
-                
                 <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-left w-full">
                     <div class="w-20 h-20 rounded-[1.5rem] flex items-center justify-center shrink-0 transition-colors"
                          :class="isAdidayaActive ? 'bg-indigo-50 border border-indigo-100' : 'bg-slate-50 border border-slate-100'">
@@ -104,51 +128,14 @@ const features = [
                 </div>
             </div>
 
-            <div class="bg-white border border-slate-100 rounded-[2rem] p-6 md:p-8 shadow-sm transition-all hover:shadow-md flex flex-col md:flex-row gap-8 items-center md:items-start justify-between">
-                
-                <div class="flex-1 w-full">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-[10px] font-medium text-slate-400 uppercase tracking-[0.3em]">Paket Basic</h3>
-                    </div>
-                    
-                    <div class="flex items-baseline gap-2 mb-6">
-                        <span class="text-4xl font-medium text-slate-800 tracking-tighter">Rp 0</span>
-                        <span class="text-[10px] text-slate-400 font-medium uppercase tracking-widest">/ Selamanya</span>
-                    </div>
-
-                    <div class="space-y-4">
-                        <div class="flex items-center gap-4">
-                            <div class="shrink-0 w-5 h-5 rounded-full bg-slate-50 flex items-center justify-center">
-                                <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
-                            </div>
-                            <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Akses Terbatas Tryout Gratis</span>
-                        </div>
-                        <div class="flex items-center gap-4 opacity-40">
-                            <div class="shrink-0 w-5 h-5 rounded-full bg-slate-50 flex items-center justify-center">
-                                <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                            </div>
-                            <span class="text-xs font-medium text-slate-400 uppercase tracking-wide line-through">Materi Premium & Analisis Lengkap</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="w-full md:w-64 shrink-0">
-                    <button disabled class="w-full py-4 rounded-xl bg-slate-50 text-[9px] font-medium text-slate-400 uppercase tracking-[0.2em] cursor-not-allowed border border-slate-100">
-                        Status Saat Ini
-                    </button>
-                </div>
-            </div>
-
-            <div class="relative bg-white border border-indigo-100 rounded-[2rem] p-6 md:p-8 shadow-lg shadow-indigo-900/5 transition-all overflow-hidden flex flex-col md:flex-row gap-8 items-start justify-between group">
-                
+            <div v-if="selectedPlan" class="relative bg-white border border-indigo-100 rounded-[2rem] p-6 md:p-8 shadow-lg shadow-indigo-900/5 transition-all overflow-hidden flex flex-col md:flex-row gap-8 items-start justify-between group">
                 <div class="absolute -right-20 -top-20 w-64 h-64 bg-indigo-50 rounded-full blur-[60px] opacity-60 pointer-events-none group-hover:bg-indigo-100 transition-colors duration-700"></div>
                 
                 <div class="flex-1 w-full relative z-10">
                     <div class="flex items-center gap-3 mb-4">
                         <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
                         <h3 class="text-[10px] font-medium text-indigo-600 uppercase tracking-[0.3em]">Nusantara Adidaya</h3>
-                        
-                        <span v-if="selectedPlan.duration === 365" class="ml-2 px-2 py-1 bg-amber-50 border border-amber-100 rounded-md text-[8px] font-medium text-amber-600 uppercase tracking-widest hidden sm:block">
+                        <span v-if="selectedPlan.duration >= 365" class="ml-2 px-2 py-1 bg-amber-50 border border-amber-100 rounded-md text-[8px] font-medium text-amber-600 uppercase tracking-widest hidden sm:block">
                             Paling Hemat
                         </span>
                     </div>
@@ -169,7 +156,6 @@ const features = [
                 </div>
 
                 <div class="w-full md:w-72 shrink-0 flex flex-col gap-4 relative z-10">
-                    
                     <div v-if="!isAdidayaActive" class="w-full">
                         <p class="text-[10px] font-medium text-slate-500 uppercase tracking-[0.2em] mb-2 text-center md:text-left">Pilih Durasi Paket</p>
                         <div class="grid grid-cols-2 gap-2">
@@ -194,7 +180,7 @@ const features = [
 
                     <button 
                         @click="buyMembership"
-                        :disabled="isAdidayaActive"
+                        :disabled="isAdidayaActive || !selectedPlan"
                         :class="isAdidayaActive 
                             ? 'bg-slate-50 text-slate-400 border border-slate-100 cursor-not-allowed' 
                             : 'bg-slate-900 text-white hover:bg-indigo-600 hover:shadow-lg hover:shadow-indigo-500/20 active:scale-[0.98]'"
@@ -217,23 +203,3 @@ const features = [
         </div>
     </AuthenticatedLayout>
 </template>
-
-<style scoped>
-.animate-in {
-    animation-duration: 0.8s;
-    animation-fill-mode: both;
-}
-
-@keyframes slideUpFade {
-    from { opacity: 0; transform: translateY(15px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.space-y-6 > div {
-    animation: slideUpFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-.space-y-6 > div:nth-child(1) { animation-delay: 0s; }
-.space-y-6 > div:nth-child(2) { animation-delay: 0.1s; }
-.space-y-6 > div:nth-child(3) { animation-delay: 0.2s; }
-</style>

@@ -17,10 +17,14 @@ class MembershipPackageController extends Controller
 
     public function update(Request $request, $id) {
         $package = MembershipPackage::findOrFail($id);
+        
+        // PEMBARUAN: Tambahkan 'name' ke dalam kriteria validasi request
         $package->update($request->validate([
-            'price' => 'required|numeric',
+            'name'          => 'required|string|max:255',
+            'price'         => 'required|numeric',
             'duration_days' => 'required|integer'
         ]));
+        
         return back()->with('message', 'Paket berhasil diperbarui!');
     }
 }
