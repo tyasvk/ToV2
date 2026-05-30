@@ -1,7 +1,7 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, useForm, usePage, Link } from '@inertiajs/vue3';
-import { ref, computed } from 'vue';
+import { Head, useForm, usePage, Link, router } from '@inertiajs/vue3';
+import { ref, computed, watch } from 'vue';
 import axios from 'axios';
 
 const props = defineProps({
@@ -17,11 +17,18 @@ const form = useForm({
     voucher_code: '',
 });
 
-// State Visual
+// State Visual & Validasi
 const validationStatus = ref([]); 
 const isLoading = ref([]);
 const errorMessage = ref([]);
 const abortControllers = ref([]);
+
+// State Pop-up & Voucher
+const showConfirmModal = ref(false);
+const showSuccessModal = ref(false);
+const voucherErrorMessage = ref('');
+const isCheckingVoucher = ref(false);
+const isVoucherValid = ref(false);
 
 // Format Rupiah
 const formatRupiah = (num) => new Intl.NumberFormat('id-ID', { 
@@ -30,7 +37,6 @@ const formatRupiah = (num) => new Intl.NumberFormat('id-ID', {
     minimumFractionDigits: 0 
 }).format(num);
 
-// Tambah Peserta
 const addParticipant = () => {
     if (form.emails.length < 4) {
         form.emails.push('');
@@ -41,7 +47,6 @@ const addParticipant = () => {
     }
 };
 
-// Hapus Peserta
 const removeParticipant = (index) => {
     form.emails.splice(index, 1);
     validationStatus.value.splice(index, 1);
@@ -50,7 +55,6 @@ const removeParticipant = (index) => {
     errorMessage.value.splice(index, 1);
 };
 
-// Cek Email Realtime
 const checkEmail = async (index, emailValue) => {
     validationStatus.value.splice(index, 1, null);
     errorMessage.value.splice(index, 1, null);
@@ -93,22 +97,95 @@ const checkEmail = async (index, emailValue) => {
     }
 };
 
-const submit = () => {
+// Modifikasi agar Pop-Up muncul bebas hambatan
+const handleOpenConfirm = () => {
+    // Cegah jika ada email teman yang masih salah/loading
+    if (validationStatus.value.includes('invalid') || isCheckingVoucher.value) {
+        return;
+    }
+    form.clearErrors();
+    showConfirmModal.value = true;
+};
+
+const executeSubmit = () => {
+    showConfirmModal.value = false;
+    
     form.post(route('tryout.processRegistration', props.tryout.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            showSuccessModal.value = true;
+        },
         onError: (errors) => {
+            // Error dari backend akan muncul langsung tanpa blokir frontend
             console.error(errors);
         }
     });
 };
 
-// Logika Total Bayar (Dinamis dengan Diskon Voucher)
-const totalAmount = computed(() => {
-    const baseAmount = props.tryout.price * (form.emails.length + 1);
-    // Jika voucher diisi (minimal 3 karakter), beri potongan simulasi Rp 3.000
-    if (form.voucher_code && form.voucher_code.length >= 3) {
-        return Math.max(0, baseAmount - 3000);
+const goToMyTryouts = () => {
+    showSuccessModal.value = false;
+    router.visit(route('tryout.myTryouts'));
+};
+
+// ==========================================
+// PENGECEKAN KODE VOUCHER STRICT (ANTI ASAL KETIK)
+// ==========================================
+let voucherTimeout = null;
+watch(() => form.voucher_code, (newCode) => {
+    clearTimeout(voucherTimeout);
+    voucherErrorMessage.value = '';
+    isVoucherValid.value = false; 
+    form.clearErrors('voucher_code');
+
+    const cleanCode = newCode ? newCode.trim() : '';
+    if (cleanCode.length === 0) {
+        return; // Jika dikosongkan (Tanpa Kode), proses berhenti di sini dan user bebas bayar
     }
-    return baseAmount;
+
+    voucherTimeout = setTimeout(async () => {
+        isCheckingVoucher.value = true;
+        try {
+            const response = await axios.post(route('voucher.check'), { voucher_code: cleanCode });
+            if (response.data.valid) {
+                isVoucherValid.value = true; // KODE ASLI! Diskon boleh diterapkan
+            } else {
+                isVoucherValid.value = false;
+                voucherErrorMessage.value = response.data.message; // KODE PALSU!
+            }
+        } catch (error) {
+            isVoucherValid.value = false;
+            voucherErrorMessage.value = 'Gagal memvalidasi kode. Sistem sibuk.';
+        } finally {
+            isCheckingVoucher.value = false;
+        }
+    }, 600);
+});
+
+// Perhitungan Diskon Kelompok Nominal Tetap
+const groupDiscountAmount = computed(() => {
+    const qty = form.emails.length + 1;
+    let discount = 0;
+    
+    if (qty === 2) discount = 2000;
+    else if (qty === 3) discount = 6000;
+    else if (qty === 4) discount = 16000;
+    else if (qty >= 5) discount = 25000;
+
+    return discount;
+});
+
+// Total Akhir (Potongan voucher hanya aktif jika Valid dari server)
+const totalAmount = computed(() => {
+    const qty = form.emails.length + 1;
+    const baseAmount = props.tryout.price * qty;
+    const priceAfterGroupDiscount = baseAmount - groupDiscountAmount.value;
+
+    let voucherDiscount = 0;
+    if (form.voucher_code && form.voucher_code.trim().length > 0 && isVoucherValid.value) {
+        voucherDiscount = 2000;
+    }
+
+    return Math.max(0, priceAfterGroupDiscount - voucherDiscount);
 });
 </script>
 
@@ -139,7 +216,7 @@ const totalAmount = computed(() => {
                 </div>
             </div>
 
-            <form @submit.prevent="submit" class="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-5 items-start mt-4">
+            <form @submit.prevent="handleOpenConfirm" class="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-5 items-start mt-4">
                 
                 <div class="lg:col-span-2 space-y-4 md:space-y-5">
                     
@@ -227,7 +304,7 @@ const totalAmount = computed(() => {
                             </transition-group>
 
                             <div v-if="form.emails.length === 0" class="text-center py-6 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
-                                <p class="text-xs text-slate-500 font-normal">Anda dapat menambahkan maksimal 4 teman untuk didaftarkan bersama.</p>
+                                <p class="text-xs text-slate-500 font-normal">Anda dapat menambahkan maksimal 4 teman untuk didaftarkan bersama dan mendapat diskon khusus hingga Rp 25.000.</p>
                             </div>
 
                             <button v-if="form.emails.length < 4" type="button" @click="addParticipant" class="w-full py-3 border border-dashed border-slate-300 rounded-xl text-slate-500 text-xs font-medium hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50/50 transition-all flex items-center justify-center gap-2 group">
@@ -254,9 +331,15 @@ const totalAmount = computed(() => {
                                     <span class="font-normal">Total Peserta</span>
                                     <span class="font-medium text-slate-800">{{ form.emails.length + 1 }} Orang</span>
                                 </div>
-                                <div v-if="form.voucher_code && form.voucher_code.length >= 3" class="flex justify-between text-xs text-emerald-600 font-medium border-t border-emerald-100/50 pt-2.5">
-                                    <span>Voucher Diterapkan</span>
-                                    <span>- {{ formatRupiah(3000) }}</span>
+                                
+                                <div v-if="groupDiscountAmount > 0" class="flex justify-between text-[11px] text-blue-600 font-medium border-t border-blue-100/50 pt-2.5">
+                                    <span>Diskon Pembelian Tim</span>
+                                    <span>- {{ formatRupiah(groupDiscountAmount) }}</span>
+                                </div>
+
+                                <div v-if="form.voucher_code && isVoucherValid" class="flex justify-between text-[11px] text-emerald-600 font-medium border-t border-emerald-100/50 pt-2.5">
+                                    <span>Potongan Afiliasi</span>
+                                    <span>- {{ formatRupiah(2000) }}</span>
                                 </div>
                             </div>
                         </div>
@@ -267,15 +350,26 @@ const totalAmount = computed(() => {
                                 <input 
                                     v-model="form.voucher_code"
                                     type="text" 
-                                    placeholder="Opsional..."
-                                    class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:bg-white uppercase tracking-wider transition-all"
+                                    placeholder="Opsional"
+                                    class="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:bg-white uppercase tracking-wider transition-all"
+                                    :class="{
+                                        'border-rose-400 focus:border-rose-500 focus:ring-rose-500': voucherErrorMessage || form.errors.voucher_code,
+                                        'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-500': isVoucherValid
+                                    }"
                                 />
                                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 6v.75m0 3v.75m0 3v.75m0 3V18m-9-5.25h5.25M7.5 15h3M3.375 5.25c-.621 0-1.125.504-1.125 1.125v3.026a2.999 2.999 0 0 1 0 5.198v3.026c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125v-3.026a2.999 2.999 0 0 1 0-5.198V6.375c0-.621-.504-1.125-1.125-1.125H3.375Z" /></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4" :class="{'text-emerald-500': isVoucherValid, 'text-rose-500': voucherErrorMessage}"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 6v.75m0 3v.75m0 3v.75m0 3V18m-9-5.25h5.25M7.5 15h3M3.375 5.25c-.621 0-1.125.504-1.125 1.125v3.026a2.999 2.999 0 0 1 0 5.198v3.026c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125v-3.026a2.999 2.999 0 0 1 0-5.198V6.375c0-.621-.504-1.125-1.125-1.125H3.375Z" /></svg>
+                                </span>
+                                <span v-if="isCheckingVoucher" class="absolute right-3 top-1/2 -translate-y-1/2">
+                                    <svg class="animate-spin h-3.5 w-3.5 text-slate-400" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                                 </span>
                             </div>
-                            <p v-if="form.voucher_code" class="text-[9px] text-emerald-600 font-normal mt-1.5 uppercase tracking-wide">
-                                *Sistem memvalidasi potongan Rp 3.000 otomatis.
+                            
+                            <p v-if="voucherErrorMessage || form.errors.voucher_code" class="text-[9px] text-rose-500 font-medium mt-1.5 uppercase tracking-wide">
+                                {{ voucherErrorMessage || form.errors.voucher_code }}
+                            </p>
+                            <p v-else-if="isVoucherValid" class="text-[9px] text-emerald-600 font-medium mt-1.5 uppercase tracking-wide">
+                                Voucher valid! Potongan Rp 2.000 diterapkan.
                             </p>
                         </div>
 
@@ -291,14 +385,12 @@ const totalAmount = computed(() => {
                                 <label class="group relative block cursor-pointer">
                                     <input type="radio" v-model="form.payment_method" value="wallet" class="peer sr-only">
                                     <div class="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-all duration-200 peer-checked:border-blue-600 peer-checked:ring-1 peer-checked:ring-blue-600 peer-checked:bg-blue-50/20">
-                                        
                                         <div class="flex items-center justify-between mb-1.5">
                                             <span class="font-medium text-xs uppercase tracking-wide text-slate-800">Saldo Dompet</span>
                                             <div class="w-4 h-4 rounded-full border border-slate-300 bg-white flex items-center justify-center peer-checked:border-blue-600">
                                                 <div v-if="form.payment_method === 'wallet'" class="w-2 h-2 rounded-full bg-blue-600"></div>
                                             </div>
                                         </div>
-                                        
                                         <div class="text-[10px] flex justify-between items-center text-slate-500">
                                             <span class="font-normal">Sisa Saldo:</span>
                                             <span class="font-medium bg-emerald-50 text-emerald-600 border border-emerald-100 px-1.5 py-0.5 rounded">
@@ -311,14 +403,12 @@ const totalAmount = computed(() => {
                                 <label class="group relative block cursor-pointer">
                                     <input type="radio" v-model="form.payment_method" value="midtrans" class="peer sr-only">
                                     <div class="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-all duration-200 peer-checked:border-blue-600 peer-checked:ring-1 peer-checked:ring-blue-600 peer-checked:bg-blue-50/20">
-                                        
                                         <div class="flex items-center justify-between mb-1.5">
                                             <span class="font-medium text-xs uppercase tracking-wide text-slate-800">Transfer / QRIS</span>
                                             <div class="w-4 h-4 rounded-full border border-slate-300 bg-white flex items-center justify-center peer-checked:border-blue-600">
                                                 <div v-if="form.payment_method === 'midtrans'" class="w-2 h-2 rounded-full bg-blue-600"></div>
                                             </div>
                                         </div>
-                                        
                                         <p class="text-[10px] text-slate-500 font-normal leading-relaxed">
                                             Virtual Account (BCA, Mandiri, BRI) & E-Wallet
                                         </p>
@@ -335,15 +425,12 @@ const totalAmount = computed(() => {
                         <div class="pt-2">
                             <button 
                                 type="submit" 
-                                class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl text-xs font-medium uppercase tracking-widest transition-all shadow-sm active:scale-98 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                :disabled="form.processing || validationStatus.includes('invalid') || isLoading.includes(true)"
+                                class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl text-xs font-medium uppercase tracking-widest transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                :disabled="form.processing || validationStatus.includes('invalid') || isLoading.includes(true) || isCheckingVoucher"
                             >
-                                <svg v-if="form.processing" class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                <svg v-if="form.processing || isCheckingVoucher" class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                                 <span v-else>Selesaikan Pembayaran</span>
                             </button>
-                            <p class="text-[9px] text-slate-400 text-center mt-3 font-normal">
-                                Pastikan email kolektif valid sebelum memproses.
-                            </p>
                         </div>
 
                     </div>
@@ -351,11 +438,54 @@ const totalAmount = computed(() => {
 
             </form>
         </div>
+
+        <div v-if="showConfirmModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div class="bg-white border border-slate-100 rounded-2xl max-w-md w-full p-5 md:p-6 shadow-xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                <h3 class="text-sm font-medium text-slate-800 uppercase tracking-widest">Konfirmasi Pembayaran</h3>
+                <p class="text-xs text-slate-500 leading-relaxed font-medium">
+                    Apakah Anda yakin ingin melanjutkan pembelian akses <span class="text-slate-800 font-medium">"{{ tryout.title }}"</span> dengan total tagihan sebesar <span class="text-blue-600 font-medium">{{ formatRupiah(totalAmount) }}</span>? Data yang dikirim akan langsung diproses.
+                </p>
+                <div class="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
+                    <button @click="showConfirmModal = false" type="button" class="px-4 py-2 rounded-xl text-[10px] uppercase font-medium tracking-wider text-slate-500 bg-slate-50 hover:bg-slate-100 transition-colors">
+                        Batal
+                    </button>
+                    <button @click="executeSubmit" type="button" class="px-4 py-2 rounded-xl text-[10px] uppercase font-medium tracking-wider text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm shadow-blue-100">
+                        Ya, Selesaikan
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="showSuccessModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div class="bg-white border border-slate-100 rounded-2xl max-w-sm w-full p-6 shadow-xl text-center space-y-4 animate-in fade-in zoom-in-95 duration-300">
+                <div class="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-500 flex items-center justify-center mx-auto shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-5 h-5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-sm font-medium text-slate-800 uppercase tracking-widest">Pembayaran Berhasil!</h3>
+                    <p class="text-xs text-slate-500 leading-relaxed font-medium mt-1">
+                        Pendaftaran simulasi Anda sukses tercatat. Silakan buka lembar kerja Anda di menu tryout saya.
+                    </p>
+                </div>
+                <div class="pt-2">
+                    <button @click="goToMyTryouts" type="button" class="w-full py-3 rounded-xl text-[10px] uppercase font-medium tracking-widest text-white bg-slate-900 hover:bg-slate-800 transition-colors shadow-md">
+                        Cek Tryout Saya
+                    </button>
+                </div>
+            </div>
+        </div>
+
     </AuthenticatedLayout>
 </template>
 
 <style scoped>
-/* Transisi untuk slot anggota */
+.custom-scrollbar::-webkit-scrollbar { height: 2px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.animate-in { animation-duration: 0.5s; animation-fill-mode: both; }
+
 .v-enter-active,
 .v-leave-active {
   transition: all 0.3s ease;

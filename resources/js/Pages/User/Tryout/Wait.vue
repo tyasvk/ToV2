@@ -47,7 +47,7 @@ const formatNum = (num) => new Intl.NumberFormat('id-ID').format(num || 0);
                                 <h1 class="text-lg sm:text-xl font-medium text-slate-800 leading-tight mb-1">
                                     {{ tryout.title }}
                                 </h1>
-                                <p class="text-slate-500 text-[11px] sm:text-xs">Simulasi Computer Assisted Test (CAT) BKN</p>
+                                <p class="text-slate-500 text-[11px] sm:text-xs">Ujian Simulasi (Responsive Mode)</p>
                             </div>
 
                             <div class="grid grid-cols-2 gap-3">
@@ -87,46 +87,27 @@ const formatNum = (num) => new Intl.NumberFormat('id-ID').format(num || 0);
                         <div>
                             <h3 class="text-xs font-medium text-amber-900 uppercase tracking-wider mb-0.5">Perhatian Sebelum Memulai</h3>
                             <p class="text-[11px] text-amber-800/80 leading-relaxed">
-                                Waktu ujian akan otomatis berjalan mundur segera setelah Anda memilih mode. Pastikan koneksi stabil dan Anda sudah siap.
+                                Waktu ujian akan otomatis berjalan mundur segera setelah Anda menekan tombol mulai di bawah ini. Pastikan koneksi internet Anda stabil.
                             </p>
                         </div>
                     </div>
 
                     <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6">
-                        <div class="text-center mb-4">
-                            <h2 class="text-base font-medium text-slate-800">Pilih Mode Ujian</h2>
-                            <p class="text-[11px] sm:text-xs text-slate-500 mt-0.5">Pilih sesuai dengan perangkat yang sedang Anda gunakan</p>
+                        <div class="text-center mb-5">
+                            <h2 class="text-base font-medium text-slate-800">Mulai Pengerjaan</h2>
+                            <p class="text-[11px] sm:text-xs text-slate-500 mt-0.5">Sistem akan menyesuaikan secara otomatis dengan perangkat yang Anda gunakan.</p>
                         </div>
 
-                        <div class="space-y-3">
-                            <Link :href="route('tryout.exam.bkn', tryout.id)"
-                                class="group relative w-full flex items-center p-3 border border-slate-800 bg-slate-900 hover:bg-slate-800 rounded-lg transition-all active:scale-[0.98] overflow-hidden"
-                            >
-                                <div class="bg-white/10 p-2 rounded-md mr-3 shrink-0">
-                                    <span class="text-lg">🖥️</span>
-                                </div>
-                                <div class="text-left flex-1">
-                                    <h3 class="text-white text-sm font-medium tracking-wide">Mode CAT BKN</h3>
-                                    <p class="text-slate-400 text-[10px] sm:text-[11px] mt-0.5">Rekomendasi untuk Laptop / PC</p>
-                                </div>
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                                </svg>
-                            </Link>
-
+                        <div>
                             <Link :href="route('tryout.exam', tryout.id)"
-                                class="group w-full flex items-center p-3 bg-white border border-slate-200 hover:border-blue-600 hover:bg-blue-50/50 rounded-lg transition-all active:scale-[0.98]"
+                                class="group w-full flex items-center justify-center p-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all active:scale-[0.98] shadow-sm shadow-blue-200"
                             >
-                                <div class="bg-slate-100 group-hover:bg-blue-100 p-2 rounded-md mr-3 shrink-0 transition-colors">
-                                    <span class="text-lg">📱</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="font-medium tracking-wide uppercase text-xs">Mulai Simulasi Sekarang</span>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                    </svg>
                                 </div>
-                                <div class="text-left flex-1">
-                                    <h3 class="text-slate-800 group-hover:text-blue-700 text-sm font-medium tracking-wide transition-colors">Mode Modern (Lite)</h3>
-                                    <p class="text-slate-500 text-[10px] sm:text-[11px] mt-0.5">Lebih ringan, cocok untuk HP / Tablet</p>
-                                </div>
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400 group-hover:text-blue-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                                </svg>
                             </Link>
                         </div>
                     </div>

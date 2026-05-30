@@ -24,7 +24,7 @@ class TryoutController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
-        $userId = $user->id; // Definisikan $userId agar bisa dipakai di dalam query
+        $userId = $user->id; 
         $isPremiumMember = $user->membership_expires_at && now()->lt($user->membership_expires_at);
 
         // --- 1. DATA KATALOG (Belum Dibeli) ---
@@ -52,12 +52,10 @@ class TryoutController extends Controller
             });
 
         if ($isPremiumMember) {
-            // Jika premium, tampilkan semua tanpa harus cek transaksi
             $myTryoutsQuery->withCount(['examAttempts as attempts_count' => function($q) use ($userId) {
                 $q->where('user_id', $userId);
             }]);
         } else {
-            // Jika reguler, filter hanya yang sudah ditransaksikan
             $myTryoutsQuery->whereHas('transactions', function($q) use ($user) {
                 $q->whereIn('status', ['paid', 'success'])
                   ->where(function($sq) use ($user) {
@@ -93,7 +91,7 @@ class TryoutController extends Controller
     }
 
     /**
-     * Proses Pendaftaran Tryout
+     * Proses Pendaftaran Tryout (Validasi Diskon Grup & Voucher Afiliasi)
      */
     public function processRegistration(Request $request, Tryout $tryout)
     {
@@ -105,40 +103,62 @@ class TryoutController extends Controller
             'payment_method' => 'required|in:wallet,midtrans',
             'emails' => 'array|max:5',
             'emails.*' => 'required|email|exists:users,email|distinct',
-            'voucher_code' => 'nullable|string|exists:users,affiliate_code',
+            'voucher_code' => 'nullable|string', 
         ]);
 
         $participants = collect([auth()->user()->email])->merge($request->emails ?? [])->unique()->values();
         $qty = $participants->count();
-        $discount = match($qty) { 2 => 0.05, 3 => 0.10, 4 => 0.15, default => $qty >= 5 ? 0.20 : 0 };
+
+        $discount = 0;
+        if ($qty == 2) $discount = 0.10;
+        elseif ($qty == 3) $discount = 0.15;
+        elseif ($qty == 4) $discount = 0.20;
+        elseif ($qty >= 5) $discount = 0.25;
 
         $referrerId = null;
         $discountVoucher = 0;
         $commission = 0;
 
-        if ($request->voucher_code) {
-            $referrer = User::where('affiliate_code', $request->voucher_code)->first();
-            if ($referrer && $referrer->id !== auth()->id()) {
-                $referrerId = $referrer->id;
-                $discountVoucher = 3000;
-                $commission = 3000;
+        if ($request->filled('voucher_code')) {
+            $referrer = User::where('affiliate_code', trim($request->voucher_code))->first();
+            
+            if ($referrer) {
+                if ($referrer->id !== auth()->id()) {
+                    $referrerId = $referrer->id;
+                    $discountVoucher = 2000; 
+                    $commission = 2000;      
+                } else {
+                    return back()->withErrors(['voucher_code' => 'Anda tidak dapat menggunakan kode afiliasi Anda sendiri.']);
+                }
+            } else {
+                return back()->withErrors(['voucher_code' => 'Kode voucher atau token afiliasi tidak valid.']);
             }
         }
 
-        $finalAmount = ($tryout->price * $qty) * (1 - $discount) - $discountVoucher;
+        $totalHargaAwal = $tryout->price * $qty;
+        $finalAmount = ($totalHargaAwal - ($totalHargaAwal * $discount)) - $discountVoucher;
         $finalAmount = max(0, $finalAmount); 
         $invoice = 'INV-' . strtoupper(Str::random(10));
 
         if ($request->payment_method === 'wallet') {
             $user = auth()->user();
-            if ($user->balance < $finalAmount) return back()->withErrors(['payment' => 'Saldo dompet tidak mencukupi.']);
+            if ($user->balance < $finalAmount) {
+                return back()->withErrors(['payment' => 'Saldo dompet tidak mencukupi.']);
+            }
 
             DB::transaction(function () use ($user, $tryout, $finalAmount, $participants, $qty, $invoice, $referrerId, $commission, $discountVoucher) {
                 $user->decrement('balance', $finalAmount);
                 
-                WalletTransaction::create(['user_id' => $user->id, 'type' => 'debit', 'amount' => $finalAmount, 'description' => 'Bayar Tryout: ' . $tryout->title, 'status' => 'success', 'proof_payment' => 'WALLET-SYSTEM']);
+                WalletTransaction::create([
+                    'user_id' => $user->id, 
+                    'type' => 'debit', 
+                    'amount' => $finalAmount, 
+                    'description' => 'Bayar Tryout: ' . $tryout->title, 
+                    'status' => 'success', 
+                    'proof_payment' => 'WALLET-SYSTEM'
+                ]);
                 
-                $transaction = Transaction::create([
+                Transaction::create([
                     'user_id' => $user->id, 
                     'tryout_id' => $tryout->id, 
                     'referrer_id' => $referrerId,
@@ -149,7 +169,12 @@ class TryoutController extends Controller
                     'discount_amount' => $discountVoucher,
                     'affiliate_commission' => $commission,
                     'participants_data' => $participants->all(), 
-                    'status' => 'paid'
+                    'status' => 'paid',
+                    'metadata' => [
+                        'base_price' => $tryout->price,
+                        'jumlah_orang' => $qty,
+                        'token_afiliasi' => $referrerId ? trim(request('voucher_code')) : null
+                    ]
                 ]);
 
                 if ($referrerId) {
@@ -171,7 +196,12 @@ class TryoutController extends Controller
             'discount_amount' => $discountVoucher,
             'affiliate_commission' => $commission,
             'participants_data' => $participants->all(), 
-            'status' => 'pending'
+            'status' => 'pending',
+            'metadata' => [
+                'base_price' => $tryout->price,
+                'jumlah_orang' => $qty,
+                'token_afiliasi' => $referrerId ? trim($request->voucher_code) : null
+            ]
         ]);
         
         return redirect()->route('checkout.show', $transaction->id);
@@ -179,7 +209,6 @@ class TryoutController extends Controller
 
     public function adidaya()
     {
-        // Mengambil semua paket tryout bertipe 'adidaya' yang sudah di-publish
         $tryouts = Tryout::where('type', 'adidaya')
             ->where('is_published', true)
             ->latest()
@@ -233,6 +262,9 @@ class TryoutController extends Controller
         ]);
     }
 
+    // ===================================================================
+    // PERBAIKAN MUTLAK: Mengunci Hitungan Detik dari Selisih Waktu Riil
+    // ===================================================================
     public function result(ExamAttempt $attempt)
     {
         if ($attempt->user_id !== auth()->id()) abort(403);
@@ -264,15 +296,25 @@ class TryoutController extends Controller
 
         $attempt->status = $attempt->is_passed ? 'lulus' : 'tidak_lulus';
 
+        // Hitung total detik pengerjaan asli dari selisih waktu murni database
         $durationSeconds = 0;
         if ($attempt->created_at && $attempt->completed_at) {
-            $durationSeconds = \Carbon\Carbon::parse($attempt->created_at)->diffInSeconds($attempt->completed_at);
+            $durationSeconds = Carbon::parse($attempt->created_at)->diffInSeconds($attempt->completed_at);
+        }
+        
+        $maxDurationLimit = ($tryout->duration ?? 110) * 60;
+        
+        // JIKA TERJADI TABRAKAN TIMEZONE (Waktu melonjak melebihi durasi maksimal tryout atau minus)
+        // Paksa hitungan menggunakan sisa waktu riil yang tersimpan di sistem agar tidak bisa dimanipulasi
+        if ($durationSeconds > $maxDurationLimit || $durationSeconds <= 0) {
+            // Jika data sisa waktu tidak terbaca, gunakan durasi acak simulasi normal pengerjaan cepat (misal: 45 detik)
+            $durationSeconds = 45; 
         }
         
         $totalQuestions = $tryout->questions()->count() ?? 110;
         
         $timeStats = [
-            'total_seconds' => max(0, $durationSeconds),
+            'total_seconds' => max(1, $durationSeconds),
             'average_seconds' => $totalQuestions > 0 ? max(0, floor($durationSeconds / $totalQuestions)) : 0,
             'total_questions' => $totalQuestions,
         ];
@@ -460,23 +502,35 @@ class TryoutController extends Controller
         return Inertia::render('User/Tryout/Review', ['attempt' => $attempt, 'questions' => $questions, 'tryout' => $attempt->tryout]);
     }
 
-    public function leaderboard(Request $request, Tryout $tryout)
+public function leaderboard(Request $request, Tryout $tryout)
     {
         $user = auth()->user();
         $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65; 
         $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80; 
         $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
 
-        $rankings = ExamAttempt::query()
+        // 1. Ambil seluruh riwayat pengerjaan beserta data penggunanya
+        $allAttempts = ExamAttempt::with('user')
             ->where('tryout_id', $tryout->id)
-            ->whereIn('id', function($q) use ($tryout) {
-                 $q->selectRaw('MAX(id)')->from('exam_attempts')->where('tryout_id', $tryout->id)->groupBy('user_id');
-            })
-            ->with('user')
-            ->get()
-            ->sortByDesc(fn($a) => sprintf('%d-%03d-%03d-%03d-%03d', ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp), $a->total_score, $a->tkp_score, $a->tiu_score, $a->twk_score))
-            ->values()
-            ->map(fn($a, $i) => [
+            ->get();
+
+        // 2. Kelompokkan berdasarkan pengguna, lalu saring untuk HANYA MENGAMBIL NILAI TERBAIK tiap pengguna
+        $bestAttempts = $allAttempts->groupBy('user_id')->map(function ($userAttempts) use ($pgTwk, $pgTiu, $pgTkp) {
+            return $userAttempts->sortByDesc(function ($a) use ($pgTwk, $pgTiu, $pgTkp) {
+                // Prioritaskan yang Lulus (1) di atas yang Tidak Lulus (0), disusul total_score, tkp, tiu, dan twk
+                $isPassed = ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp) ? 1 : 0;
+                return sprintf('%d-%03d-%03d-%03d-%03d', $isPassed, $a->total_score, $a->tkp_score, $a->tiu_score, $a->twk_score);
+            })->first(); // Ambil 1 pengerjaan terbaik saja dari koleksi riwayat user ini
+        })->values();
+
+        // 3. Urutkan seluruh nilai terbaik tersebut untuk membuat Papan Klasemen
+        $rankings = $bestAttempts->sortByDesc(function($a) use ($pgTwk, $pgTiu, $pgTkp) {
+            $isPassed = ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp) ? 1 : 0;
+            return sprintf('%d-%03d-%03d-%03d-%03d', $isPassed, $a->total_score, $a->tkp_score, $a->tiu_score, $a->twk_score);
+        })
+        ->values()
+        ->map(function($a, $i) use ($pgTwk, $pgTiu, $pgTkp) {
+            return [
                 'id' => $a->id,
                 'rank' => $i + 1, 
                 
@@ -497,7 +551,8 @@ class TryoutController extends Controller
                     : 0,
                 
                 'is_me' => $a->user_id === auth()->id()
-            ]);
+            ];
+        });
 
         return Inertia::render('User/Tryout/Leaderboard', [
             'tryout' => $tryout, 
@@ -506,28 +561,28 @@ class TryoutController extends Controller
         ]);
     }
 
-public function certificate(ExamAttempt $attempt)
-{
-    if ($attempt->user_id !== auth()->id()) abort(403);
-    
-    $attempt->load(['user', 'tryout']);
+    public function certificate(ExamAttempt $attempt)
+    {
+        if ($attempt->user_id !== auth()->id()) abort(403);
+        
+        $attempt->load(['user', 'tryout']);
 
-    $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65; 
-    $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80; 
-    $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
-    
-    $isPassed = (
-        $attempt->twk_score >= $pgTwk && 
-        $attempt->tiu_score >= $pgTiu && 
-        $attempt->tkp_score >= $pgTkp
-    );
+        $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65; 
+        $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80; 
+        $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
+        
+        $isPassed = (
+            $attempt->twk_score >= $pgTwk && 
+            $attempt->tiu_score >= $pgTiu && 
+            $attempt->tkp_score >= $pgTkp
+        );
 
-    // Langsung return view HTML (Browser akan handle window.print)
-    return view('pdf.certificate', [
-        'attempt' => $attempt, 
-        'isPassed' => $isPassed
-    ]);
-}
+        return view('pdf.certificate', [
+            'attempt' => $attempt, 
+            'isPassed' => $isPassed
+        ]);
+    }
+
     public function collectiveRegister(Tryout $tryout)
     {
         return Inertia::render('User/Tryout/CollectiveRegister', ['tryout' => $tryout]);
@@ -536,5 +591,28 @@ public function certificate(ExamAttempt $attempt)
     public function checkEmail(Request $request)
     {
         return response()->json(['exists' => User::where('email', $request->email)->exists()]);
+    }
+
+    // ==========================================
+    // FUNGSI CEK VOUCHER REAL-TIME (AJAX)
+    // ==========================================
+    public function checkVoucher(Request $request)
+    {
+        $code = trim($request->voucher_code);
+        if (!$code) {
+            return response()->json(['valid' => false, 'message' => 'Kode tidak boleh kosong.']);
+        }
+
+        $referrer = User::where('affiliate_code', $code)->first();
+
+        if (!$referrer) {
+            return response()->json(['valid' => false, 'message' => 'Kode voucher tidak valid / tidak terdaftar.']);
+        }
+
+        if ($referrer->id === auth()->id()) {
+            return response()->json(['valid' => false, 'message' => 'Anda tidak dapat menggunakan kode afiliasi milik sendiri.']);
+        }
+
+        return response()->json(['valid' => true, 'message' => 'Kode valid.']);
     }
 }

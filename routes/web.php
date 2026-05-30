@@ -71,6 +71,8 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     // --- PENDAFTARAN TRYOUT ---
     Route::get('/tryout/{tryout}/register', [UserTryoutController::class, 'registerForm'])->name('tryout.register');
     Route::post('/tryout/{tryout}/register', [TryoutController::class, 'processRegistration'])->name('tryout.processRegistration');
+    // Tambahkan baris ini di dalam middleware auth
+    Route::post('/check-voucher-validity', [App\Http\Controllers\User\TryoutController::class, 'checkVoucher'])->name('voucher.check');
     
     // --- API & MEMBERSHIP ---
     Route::post('/check-email-availability', [UserTryoutController::class, 'checkEmail'])->name('api.check.email');
