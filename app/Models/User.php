@@ -28,6 +28,7 @@ class User extends Authenticatable
         'district',
         'participant_number',
         'avatar',
+        'bank_info', // <-- TAMBAHKAN BARIS INI
         
         // --- SESUAIKAN DENGAN VUE & DATABASE ANDA ---
         'province_code',  // Menggantikan 'provinsi' / 'province'
@@ -57,6 +58,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'membership_expires_at' => 'datetime', // Tambahkan ini untuk pengolahan tanggal otomatis
+            'bank_info' => 'array', // <-- TAMBAHKAN BARIS INI
         ];
     }
 

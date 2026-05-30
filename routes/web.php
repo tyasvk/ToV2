@@ -102,6 +102,7 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     Route::get('/history', [UserTryoutController::class, 'history'])->name('tryout.history');
     Route::get('/history/{tryout}', [UserTryoutController::class, 'historyDetail'])->name('tryout.history.detail');
     Route::get('/certificate/{attempt}', [UserTryoutController::class, 'certificate'])->name('tryout.certificate');
+    Route::get('/tryout/certificate/{attempt}', [App\Http\Controllers\User\TryoutController::class, 'certificate'])->name('tryout.certificate');
 
     // --- TRYOUT AKBAR ---
     Route::prefix('tryout-akbar')->name('tryout-akbar.')->group(function() {
@@ -111,6 +112,18 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
         Route::post('/{tryout}/register', [UserTryoutAkbarController::class, 'storeRegistration'])->name('store-registration');
         Route::get('/{tryout}/waiting-room', [UserTryoutAkbarController::class, 'waitingRoom'])->name('wait');
     });
+
+    Route::post('/affiliate/register', [App\Http\Controllers\User\AffiliateController::class, 'register'])->name('affiliate.register');
+    Route::get('/affiliate', [App\Http\Controllers\User\AffiliateController::class, 'index'])->name('affiliate.index');
+
+// Ini adalah route untuk memproses pendaftaran kode referral
+Route::post('/affiliate/register', [App\Http\Controllers\User\AffiliateController::class, 'register'])->name('affiliate.register');
+
+// Ini adalah route untuk memproses formulir penarikan dana
+Route::post('/affiliate/withdraw', [App\Http\Controllers\User\AffiliateController::class, 'withdraw'])->name('affiliate.withdraw');
+
+// TAMBAHKAN RUTE INI UNTUK UPDATE BANK:
+    Route::put('/affiliate/bank-update', [App\Http\Controllers\User\AffiliateController::class, 'updateBankInfo'])->name('affiliate.bank.update');
 });
 
 // ==========================================
@@ -162,6 +175,14 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     // Management Paket Membership (Sudah otomatis terproteksi auth & role admin)
     Route::get('/membership-packages', [App\Http\Controllers\Admin\MembershipPackageController::class, 'index'])->name('membership-packages.index');
     Route::post('/membership-packages/{id}', [App\Http\Controllers\Admin\MembershipPackageController::class, 'update'])->name('membership-packages.update');
+
+    // Halaman utama kelola afiliasi
+    Route::get('/affiliate', [App\Http\Controllers\Admin\AdminAffiliateController::class, 'index'])->name('affiliate.index');
+
+    Route::post('/affiliate/user/{user}/reward', [App\Http\Controllers\Admin\AdminAffiliateController::class, 'giveReward'])->name('affiliate.reward');
+    
+    // Aksi untuk menyetujui atau menolak penarikan komisi
+    Route::post('/affiliate/withdraw/{withdrawal}/status', [App\Http\Controllers\Admin\AdminAffiliateController::class, 'updateWithdrawStatus'])->name('affiliate.withdraw.status');
 });
 
 require __DIR__.'/auth.php';

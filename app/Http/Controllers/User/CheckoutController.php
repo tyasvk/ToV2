@@ -12,7 +12,7 @@ use Midtrans\Snap;
 use Midtrans\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Carbon\Carbon; // <--- TAMBAHKAN BARIS INI
+use Carbon\Carbon;
 
 class CheckoutController extends Controller
 {
@@ -29,8 +29,6 @@ class CheckoutController extends Controller
         return $transaction->tryout?->title ?? $nusantaraName ?? $transaction->description ?? 'Paket Belajar';
     }
 
-// app/Http/Controllers/User/CheckoutController.php
-
 public function show(Transaction $transaction)
 {
     if ($transaction->user_id !== auth()->id()) abort(403);
@@ -38,29 +36,76 @@ public function show(Transaction $transaction)
     $user = User::find(auth()->id());
     $itemName = $this->resolveItemName($transaction);
 
-    // Redirect jika sudah lunas
     if (in_array($transaction->status, ['paid', 'success'])) {
         return redirect()->route('dashboard')->with('success', "Akses $itemName Aktif!");
     }
 
     $transaction->load(['tryout']); 
 
-    // Hitung Biaya Admin Midtrans (Agar Terima Bersih)
-    $fee = ceil($transaction->amount * 0.007 * 1.11); // QRIS Fee 0.7% + PPN 11%
-    $totalToPay = (int) ($transaction->amount + $fee);
+    $jumlahOrang = $transaction->metadata['jumlah_orang'] ?? 1;
+    $tokenAfiliasi = $transaction->metadata['token_afiliasi'] ?? null;
     
-    // Simpan total_amount ke DB agar sinkron
+    $hargaDasar = $transaction->metadata['base_price'] ?? $transaction->amount;
+    $totalHarga = $hargaDasar * $jumlahOrang;
+    $persenDiskon = 0;
+
+    // 1. Hitung Diskon Group Buy (10% - 25coding%)
+    if ($jumlahOrang == 2) $persenDiskon = 0.10;
+    elseif ($jumlahOrang == 3) $persenDiskon = 0.15;
+    elseif ($jumlahOrang == 4) $persenDiskon = 0.20;
+    elseif ($jumlahOrang >= 5) $persenDiskon = 0.25;
+
+    $hargaSetelahGrup = $totalHarga - ($totalHarga * $persenDiskon);
+    $potonganToken = 0;
+
+    // ===================================================================
+    // PERBAIKAN VALIDASI: Hanya token afiliasi resmi yang memotong harga
+    // ===================================================================
+    if ($tokenAfiliasi) {
+        // Cari token secara spesifik di database
+        $pemilikToken = User::where('affiliate_code', trim($tokenAfiliasi))->first();
+        
+        if ($pemilikToken) {
+            // Proteksi: Pemilik token tidak boleh menggunakan kodenya sendiri
+            if ($pemilikToken->id !== $user->id) {
+                $potonganToken = 2000;
+                
+                if (!$transaction->referrer_id) {
+                    $transaction->update(['referrer_id' => $pemilikToken->id]);
+                }
+            } else {
+                // Opsional: Jika kodenya milik sendiri, batalkan potongan dan kirim pesan
+                session()->flash('error', 'Anda tidak dapat menggunakan kode afiliasi Anda sendiri.');
+                $tokenAfiliasi = null; 
+            }
+        } else {
+            // JIKA KODE ASAL/TIDAK DAFTAR: Batalkan potongan harga dan kirim notifikasi eror
+            session()->flash('error', 'Kode voucher atau token afiliasi tidak valid / tidak ditemukan.');
+            $tokenAfiliasi = null;
+        }
+    }
+    // ===================================================================
+
+    $finalTagihan = $hargaSetelahGrup - $potonganToken;
+    
+    if ($transaction->amount != $finalTagihan) {
+        $transaction->update(['amount' => $finalTagihan]);
+    }
+
+    $fee = ceil($finalTagihan * 0.007 * 1.11); 
+    $totalToPay = (int) ($finalTagihan + $fee);
+    
     $transaction->update(['total_amount' => $totalToPay]);
 
-    if (empty($transaction->snap_token)) {
+    if (empty($transaction->snap_token) || $tokenAfiliasi === null) {
         $this->initMidtrans();
         $params = [
             'transaction_details' => [
-                'order_id' => $transaction->invoice_code . '-' . time(), // Unik ID
+                'order_id' => $transaction->invoice_code . '-' . time(),
                 'gross_amount' => $totalToPay
             ],
             'item_details' => [
-                ['id' => $transaction->id, 'price' => (int) $transaction->amount, 'quantity' => 1, 'name' => substr($itemName, 0, 30)],
+                ['id' => $transaction->id, 'price' => (int) $finalTagihan, 'quantity' => 1, 'name' => substr($itemName, 0, 30)],
                 ['id' => 'FEE', 'price' => (int) $fee, 'quantity' => 1, 'name' => 'Biaya Layanan']
             ],
             'customer_details' => ['first_name' => $user->name, 'email' => $user->email],
@@ -75,7 +120,7 @@ public function show(Transaction $transaction)
         'transaction' => [
             'id' => $transaction->id, 
             'amount' => $transaction->amount, 
-            'total_amount' => $transaction->total_amount, // PERBAIKAN: Masukkan data ini
+            'total_amount' => $transaction->total_amount,
             'invoice_code' => $transaction->invoice_code,
             'snap_token' => $transaction->snap_token, 
             'description' => $itemName, 
@@ -85,57 +130,59 @@ public function show(Transaction $transaction)
     ]);
 }
 
-public function process(Request $request, Transaction $transaction)
-{
-    $request->validate(['payment_method' => 'required|in:wallet,midtrans']);
-    
-    if ($request->payment_method === 'wallet') {
-        $user = User::find(auth()->id());
-        if ($user->balance < $transaction->amount) {
-            return back()->withErrors(['message' => 'Saldo tidak cukup.']);
-        }
-
-        DB::transaction(function () use ($user, $transaction) {
-            // 1. Potong Saldo User
-            $user->decrement('balance', $transaction->amount);
-            
-            // 2. Update Status Transaksi Utama
-            $transaction->update(['status' => 'paid', 'payment_method' => 'wallet']);
-            
-            // 3. Catat ke Riwayat Mutasi Dompet
-            WalletTransaction::create([
-                'user_id' => $user->id, 
-                'type' => 'debit', 
-                'amount' => $transaction->amount,
-                'description' => 'Pembayaran ' . $this->resolveItemName($transaction), 
-                'status' => 'success'
-            ]);
-
-            // PENTING: Tambahkan Logika Aktivasi Masa Aktif Membership di sini
-            // Jika transaksi tidak memiliki tryout_id, berarti ini adalah paket membership
-            if (!$transaction->tryout_id || (isset($transaction->metadata['type']) && $transaction->metadata['type'] === 'membership')) {
-                
-                // Ambil jumlah hari dari metadata paket yang dibeli
-                $daysToAdd = $transaction->metadata['days'] ?? $transaction->metadata['duration_days'] ?? 30; 
-
-                // Tentukan tanggal mulai penambahan
-                // Jika user masih punya paket aktif (isFuture), akumulasikan dari tanggal expired lama.
-                // Jika sudah hangus atau member gratis, mulai dari hari ini (now).
-                $currentExpiry = ($user->membership_expires_at && Carbon::parse($user->membership_expires_at)->isFuture()) 
-                    ? Carbon::parse($user->membership_expires_at) 
-                    : Carbon::now();
-
-                // Perbarui data user di database
-                $user->update([
-                    'membership_expires_at' => $currentExpiry->addDays((int)$daysToAdd)
-                ]);
-            }
-        });
+    public function process(Request $request, Transaction $transaction)
+    {
+        $request->validate(['payment_method' => 'required|in:wallet,midtrans']);
         
-        return redirect()->route('dashboard')->with('success', 'Akses Premium Aktif!');
+        if ($request->payment_method === 'wallet') {
+            $user = User::find(auth()->id());
+            if ($user->balance < $transaction->amount) {
+                return back()->withErrors(['message' => 'Saldo tidak cukup.']);
+            }
+
+            DB::transaction(function () use ($user, $transaction) {
+                $user->decrement('balance', $transaction->amount);
+                
+                $transaction->update(['status' => 'paid', 'payment_method' => 'wallet']);
+                
+                WalletTransaction::create([
+                    'user_id' => $user->id, 
+                    'type' => 'debit', 
+                    'amount' => $transaction->amount,
+                    'description' => 'Pembayaran ' . $this->resolveItemName($transaction), 
+                    'status' => 'success'
+                ]);
+
+                // ==========================================
+                // LOGIKA BARU: KOMISI TOKEN AFILIASI SETELAH LUNAS
+                // ==========================================
+                // Cek apakah transaksi ini dibantu oleh token afiliasi (ada referrer_id)
+                if ($transaction->referrer_id) {
+                    $referrer = User::find($transaction->referrer_id);
+                    if ($referrer) {
+                        // Tambahkan komisi token 2.000 ke afiliator
+                        $referrer->increment('affiliate_balance', 2000);
+                    }
+                }
+                // ==========================================
+
+                if (!$transaction->tryout_id || (isset($transaction->metadata['type']) && $transaction->metadata['type'] === 'membership')) {
+                    $daysToAdd = $transaction->metadata['days'] ?? $transaction->metadata['duration_days'] ?? 30; 
+
+                    $currentExpiry = ($user->membership_expires_at && Carbon::parse($user->membership_expires_at)->isFuture()) 
+                        ? Carbon::parse($user->membership_expires_at) 
+                        : Carbon::now();
+
+                    $user->update([
+                        'membership_expires_at' => $currentExpiry->addDays((int)$daysToAdd)
+                    ]);
+                }
+            });
+            
+            return redirect()->route('dashboard')->with('success', 'Akses Premium Aktif!');
+        }
+        return back();
     }
-    return back();
-}
 
     private function initMidtrans() {
         Config::$serverKey = config('services.midtrans.server_key');

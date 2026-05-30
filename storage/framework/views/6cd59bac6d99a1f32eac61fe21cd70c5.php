@@ -2,152 +2,347 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Sertifikat - <?php echo e($attempt->id); ?></title>
+    <title>Sertifikat Resmi - <?php echo e($attempt->user->name); ?></title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Montserrat:wght@400;500;700&family=Great+Vibes&display=swap" rel="stylesheet">
+    
     <style>
-        @page { margin: 0; size: A5 landscape; }
+        /* Konfigurasi Ukuran Halaman A4 Landscape */
+        @page { 
+            size: A4 landscape; 
+            margin: 0; 
+        }
         
         html, body {
-            height: 100%;
             margin: 0;
             padding: 0;
-            font-family: 'Helvetica', 'Arial', sans-serif;
-            background-color: #fff;
-            color: #333;
+            width: 297mm;
+            height: 209mm;
+            background-color: #ffffff;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
         }
 
-        .cert-border-outer {
-            position: fixed; top: 10px; left: 10px; right: 10px; bottom: 10px;
-            border: 10px solid #0f172a; padding: 15px; z-index: -2;
+        /* Pembungkus Utama Sertifikat */
+        .certificate-wrapper {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            box-sizing: border-box;
+            overflow: hidden;
+            
+            /* Tekstur latar belakang kertas piagam linen premium yang sangat halus */
+            background-color: #fcfaf2;
+            background-image: 
+                radial-gradient(rgba(212, 175, 55, 0.03) 1px, transparent 0), 
+                linear-gradient(to right, rgba(244, 240, 230, 0.4) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(244, 240, 230, 0.4) 1px, transparent 1px);
+            background-size: 16px 16px, 20mm 20mm, 20mm 20mm;
+            background-position: 0 0, center center, center center;
         }
 
-        .cert-border-inner {
-            position: fixed; top: 22px; left: 22px; right: 22px; bottom: 22px;
-            border: 4px double #d4af37; background-color: #fffcf5; z-index: -1;
+        /* --- ORNAMEN BINGKAI PREMIUM MULTI-LAYER --- */
+        /* Bingkai Luar Tebal Navy */
+        .border-outer {
+            position: absolute;
+            top: 12mm; left: 12mm; right: 12mm; bottom: 12mm;
+            border: 4px solid #0f172a;
+            pointer-events: none;
+            z-index: 5;
         }
+        /* Garis Tipis Gold Tengah */
+        .border-middle {
+            position: absolute;
+            top: 14.5mm; left: 14.5mm; right: 14.5mm; bottom: 14.5mm;
+            border: 1px solid #d4af37;
+            pointer-events: none;
+            z-index: 5;
+        }
+        /* Bingkai Dalam Bermotif Sudut Klasik */
+        .border-inner {
+            position: absolute;
+            top: 17mm; left: 17mm; right: 17mm; bottom: 17mm;
+            border: 2px dashed #0f172a;
+            pointer-events: none;
+            z-index: 5;
+        }
+        /* Ornamen Aksen di Empat Sudut Bingkai */
+        .corner-pattern {
+            position: absolute;
+            width: 25px;
+            height: 25px;
+            border: 3px solid #d4af37;
+            z-index: 6;
+        }
+        .top-left  { top: 18mm; left: 18mm; border-right: none; border-bottom: none; }
+        .top-right { top: 18mm; right: 18mm; border-left: none; border-bottom: none; }
+        .bottom-left  { bottom: 18mm; left: 18mm; border-right: none; border-top: none; }
+        .bottom-right { bottom: 18mm; right: 18mm; border-left: none; border-top: none; }
 
+        /* --- WATERMARK BACKGROUND --- */
         .watermark {
-            position: absolute; top: 50%; left: 50%;
+            position: absolute;
+            top: 50%; 
+            left: 50%;
             transform: translate(-50%, -50%);
-            width: 300px; opacity: 0.03; z-index: -1;
+            width: 440px; 
+            opacity: 0.05; /* Tetap terkunci lembut di 5% */
+            z-index: 2;
+            pointer-events: none;
+            filter: grayscale(100%) contrast(110%);
         }
 
-        .master-container {
-            display: table; width: 100%; height: 100%; position: relative; z-index: 10;
+        /* --- ZONA AMAN KONTEN (Anti Menabrak Garis) --- */
+        .safe-zone {
+            position: absolute;
+            top: 26mm; left: 26mm; right: 26mm; bottom: 26mm;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between; 
+            align-items: center;
+            box-sizing: border-box;
         }
 
-        .content-wrapper {
-            display: table-cell; vertical-align: middle; text-align: center; padding: 30px 50px;
+        /* --- 1. BAGIAN ATAS (Header) --- */
+        .header-section {
+            text-align: center;
+            width: 100%;
+        }
+        .logo-img {
+            height: 95px; 
+            width: auto;
+            margin-bottom: 12px;
+        }
+        .org-name {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 6px;
+            color: #475569;
+            text-transform: uppercase;
+            margin: 0;
         }
 
-        .logo-img { height: 55px; width: auto; margin-bottom: 8px; display: block; margin: 0 auto; }
-        .org-name { font-size: 10px; text-transform: uppercase; letter-spacing: 4px; color: #64748b; margin-bottom: 12px; font-weight: bold; }
+        /* --- 2. BAGIAN TENGAH (Isi Utama) --- */
+        .body-section {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+        }
+        .cert-label {
+            font-family: 'Cinzel', serif;
+            font-size: 40px;
+            font-weight: 700;
+            color: #0f172a;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+        }
+        .cert-sub-label {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            color: #d4af37;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            margin-top: 5px;
+        }
+        .divider-premium {
+            width: 150px;
+            height: 1px;
+            background: linear-gradient(to right, transparent, #d4af37, #0f172a, #d4af37, transparent);
+            margin: 12px 0;
+        }
+        .presented-text {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 13px;
+            color: #64748b;
+            margin: 0 0 6px 0;
+            letter-spacing: 1px;
+        }
+        .candidate-name {
+            font-family: 'Cinzel', serif;
+            font-size: 44px;
+            font-weight: 900;
+            color: #0f172a;
+            margin: 5px 0 12px 0;
+            display: inline-block;
+            letter-spacing: 2px;
+            text-shadow: 0.5px 0.5px 0px rgba(212,175,55,0.4);
+        }
+        .name-underline {
+            width: 450px;
+            height: 1px;
+            background: linear-gradient(to right, transparent, #cbd5e1, transparent);
+            margin-top: -8px;
+            margin-bottom: 12px;
+        }
+        .description {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 13px;
+            color: #334155;
+            line-height: 1.6;
+            margin: 0 0 15px 0;
+            max-width: 720px;
+        }
+
+        /* Desain Tabel Nilai Premium dengan Jarak Aman di Bawahnya */
+        .stats-table {
+            width: 460px;
+            border-collapse: collapse;
+            font-family: 'Montserrat', sans-serif;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03);
+            /* PERBAIKAN: Ditambahkan margin bottom 30px agar QR Code di bawah tidak menempel */
+            margin: 0 auto 30px auto; 
+        }
+        .stats-table th { 
+            background-color: #0f172a; 
+            color: #d4af37; 
+            font-size: 11px; 
+            font-weight: 700;
+            padding: 10px; 
+            border: 1px solid #0f172a; 
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .stats-table td { 
+            border: 1px solid #e2e8f0; 
+            padding: 9px; 
+            font-weight: 700; 
+            font-size: 15px; 
+            color: #0f172a;
+            background-color: #ffffff; 
+        }
+        .total-cell {
+            background-color: #fffbeb !important;
+            color: #b45309 !important;
+        }
+
+        /* --- 3. BAGIAN BAWAH (Footer) --- */
+        .footer-section {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            box-sizing: border-box;
+        }
+
+        .footer-item { width: 33.33%; }
+
+        /* Sisi Kiri: Serial ID */
+        .footer-left { text-align: left; padding-bottom: 5px; }
+        .footer-title-small { font-family: 'Montserrat', sans-serif; font-size: 9px; font-weight: 700; color: #94a3b8; letter-spacing: 2px; margin-bottom: 25px; }
+        .cert-id { font-size: 11px; font-family: monospace; font-weight: 700; background: #f1f5f9; color: #475569; padding: 6px 12px; border-radius: 4px; border: 1px solid #e2e8f0; display: inline-block; }
         
-        .cert-title {
-            font-size: 22px; color: #d4af37; text-transform: uppercase; letter-spacing: 2px;
-            font-weight: bold; margin-bottom: 12px; border-bottom: 2px solid #d4af37;
-            display: inline-block; padding-bottom: 4px;
+        /* Sisi Tengah: QR Code Authenticator */
+        .footer-center { display: flex; justify-content: center; align-items: flex-end; }
+        .qr-code-wrapper { background: #ffffff; border: 1px solid #e2e8f0; padding: 6px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-bottom: 2px; }
+        .qr-code-wrapper img { width: 80px; height: 80px; display: block; }
+
+        /* Sisi Kanan: Tanda Tangan */
+        .footer-right { text-align: right; font-family: 'Montserrat', sans-serif; font-size: 13px; color: #1e293b; padding-bottom: 5px; }
+        .signature-line { border-bottom: 1.5px solid #0f172a; width: 190px; margin: 20px 0 6px auto; }
+        .signee-title { font-size: 11px; color: #64748b; font-weight: 500; }
+
+        @media print {
+            .certificate-wrapper { background-color: #fcfaf2 !important; }
+            .no-print { display: none; }
         }
-
-        .presented-to { font-size: 11px; color: #475569; margin-bottom: 4px; }
-        .candidate-name { font-size: 26px; color: #0f172a; font-weight: bold; text-transform: uppercase; margin: 4px 0 12px 0; letter-spacing: 1px; }
-        .description { font-size: 10px; color: #334155; line-height: 1.5; margin-bottom: 12px; padding: 0 40px; }
-
-        .stats-table { margin: 0 auto 12px auto; width: 75%; border-collapse: collapse; }
-        .stats-table th { background-color: #0f172a; color: #d4af37; font-size: 9px; padding: 6px; border: 1px solid #0f172a; }
-        .stats-table td { background-color: #fff; border: 1px solid #cbd5e1; padding: 6px; font-weight: bold; font-size: 11px; }
-
-        .footer-table { width: 100%; margin-top: 15px; }
-        .footer-left { text-align: left; width: 33%; font-size: 8px; color: #94a3b8; vertical-align: bottom; }
-        .footer-center { text-align: center; width: 33%; vertical-align: bottom; }
-        .footer-right { text-align: right; width: 33%; vertical-align: bottom; padding-right: 10px;}
-
-        .qr-placeholder { width: 45px; height: 45px; border: 1px dashed #cbd5e1; margin: 0 auto; font-size: 7px; color: #94a3b8; line-height: 45px; background-color: #fff; }
-        .signature-line { border-bottom: 1.5px solid #0f172a; width: 120px; margin-left: auto; margin-bottom: 3px; }
-        .cert-id { font-family: monospace; background: #f1f5f9; padding: 2px 5px; font-size: 8px; color: #475569; }
     </style>
 </head>
 <body>
 
-    <?php
-        // ENGINE KONVERSI GAMBAR KE BASE64 AGAR PDF TIDAK HANG!
-        $logoBase64 = '';
-        $logoPath = public_path('images/logo.png');
-        if(file_exists($logoPath)) {
-            $logoData = file_get_contents($logoPath);
-            $logoBase64 = 'data:image/png;base64,' . base64_encode($logoData);
-        }
-    ?>
+    <div class="certificate-wrapper">
+        
+        <div class="border-outer"></div>
+        <div class="border-middle"></div>
+        <div class="border-inner"></div>
+        
+        <div class="corner-pattern top-left"></div>
+        <div class="corner-pattern top-right"></div>
+        <div class="corner-pattern bottom-left"></div>
+        <div class="corner-pattern bottom-right"></div>
 
-    <div class="cert-border-outer">
-        <div class="cert-border-inner">
-            <?php if($logoBase64): ?>
-                <img src="<?php echo e($logoBase64); ?>" class="watermark">
-            <?php endif; ?>
-        </div>
-    </div>
+        <img src="<?php echo e(asset('images/logo.png')); ?>" class="watermark" onerror="this.style.display='none'">
 
-    <div class="master-container">
-        <div class="content-wrapper">
+        <div class="safe-zone">
             
-            <?php if($logoBase64): ?>
-                <img src="<?php echo e($logoBase64); ?>" class="logo-img">
-            <?php endif; ?>
-            <div class="org-name">CPNS NUSANTARA LEARNING CENTER</div>
+            <div class="header-section">
+                <img src="<?php echo e(asset('images/logo.png')); ?>" class="logo-img" onerror="this.style.display='none'">
+                <div class="org-name">CPNS Nusantara Academy</div>
+            </div>
 
-            <div class="cert-title">
-                <?php echo e($isPassed ? 'SERTIFIKAT KOMPETENSI' : 'SERTIFIKAT PARTISIPASI'); ?>
+            <div class="body-section">
+                <h1 class="cert-label">Sertifikat</h1>
+                <div class="cert-sub-label"><?php echo e($isPassed ? 'Pencapaian Kompetensi' : 'Partisipasi Resmi'); ?></div>
+                <div class="divider-premium"></div>
+                
+                <p class="presented-text">Sertifikat penghargaan ini dengan bangga diberikan kepada:</p>
+                <h2 class="candidate-name"><?php echo e($attempt->user->name); ?></h2>
+                <div class="name-underline"></div>
+
+                <p class="description">
+                    Telah menyelesaikan evaluasi pengerjaan simulasi Computer Assisted Test (CAT) instansi pemerintah pada sistem paket materi <strong><?php echo e($attempt->tryout->title); ?></strong> dengan pencapaian akumulasi nilai resmi:
+                </p>
+
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>Tes Wawasan Kebangsaan (TWK)</th>
+                            <th>Tes Inteligensia Umum (TIU)</th>
+                            <th>Tes Karakteristik Pribadi (TKP)</th>
+                            <th style="background-color: #d4af37; color: #0f172a;">Total Skor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><?php echo e($attempt->twk_score); ?></td>
+                            <td><?php echo e($attempt->tiu_score); ?></td>
+                            <td><?php echo e($attempt->tkp_score); ?></td>
+                            <td class="total-cell"><?php echo e($attempt->total_score); ?></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="footer-section">
+                
+                <div class="footer-item footer-left">
+                    <div class="footer-title-small">VERIFIKASI SISTEM DIGITAL</div>
+                    <span class="cert-id">SERI ID: <?php echo e(strtoupper(substr(md5($attempt->id), 0, 12))); ?></span>
+                </div>
+
+                <div class="footer-item footer-center">
+                    <div class="qr-code-wrapper">
+                        <?php
+                            $url = route('tryout.leaderboard', $attempt->tryout_id);
+                            $qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=" . urlencode($url);
+                        ?>
+                        <img src="<?php echo e($qrUrl); ?>" alt="QR Verification">
+                    </div>
+                </div>
+
+                <div class="footer-item footer-right">
+                    Jakarta, <?php echo e(now()->translatedFormat('d F Y')); ?><br>
+                    <strong>Direktur Akademik Pusat</strong>
+                    <div class="signature-line"></div>
+                    <strong>Admin Utama Pusat</strong>
+                    <div class="signee-title">CPNS Nusantara Academy</div>
+                </div>
 
             </div>
 
-            <div class="presented-to">Diberikan kepada:</div>
-            <div class="candidate-name"><?php echo e($attempt->user->name ?? 'Peserta'); ?></div>
-            
-            <div class="description">
-                Atas partisipasi dan pencapaiannya dalam simulasi <strong><?php echo e($attempt->tryout->title ?? 'Tryout CAT'); ?></strong>.<br>
-                Dilaksanakan pada tanggal <?php echo e($attempt->created_at ? $attempt->created_at->translatedFormat('d F Y') : now()->translatedFormat('d F Y')); ?> dengan rincian nilai resmi:
-            </div>
+        </div> </div>
 
-            <table class="stats-table">
-                <thead>
-                    <tr>
-                        <th>TWK</th>
-                        <th>TIU</th>
-                        <th>TKP</th>
-                        <th style="background-color: #d4af37; color: #0f172a;">TOTAL</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><?php echo e($attempt->twk_score ?? 0); ?></td>
-                        <td><?php echo e($attempt->tiu_score ?? 0); ?></td>
-                        <td><?php echo e($attempt->tkp_score ?? 0); ?></td>
-                        <td style="background-color: #fffbeb;"><?php echo e($attempt->total_score ?? 0); ?></td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <table class="footer-table">
-                <tr>
-                    <td class="footer-left">
-                        <span class="cert-id">ID: CERT-<?php echo e($attempt->id ?? '00'); ?>-<?php echo e(date('Y')); ?></span><br><br>
-                        Dokumen digital sah.<br>Terautentikasi sistem.
-                    </td>
-                    <td class="footer-center">
-                        <div class="qr-placeholder">QR CODE</div>
-                    </td>
-                    <td class="footer-right">
-                        <div style="font-size: 9px; margin-bottom: 35px;">
-                            Palembang, <?php echo e(now()->translatedFormat('d F Y')); ?><br>
-                            <strong>Direktur Akademik</strong>
-                        </div>
-                        <div class="signature-line"></div>
-                        <div style="font-weight: bold; font-size: 10px;">Admin Pusat</div>
-                    </td>
-                </tr>
-            </table>
-
-        </div>
-    </div>
-
+    <script>
+        window.onload = function() {
+            setTimeout(function() {
+                window.print();
+            }, 1200); 
+        };
+    </script>
 </body>
 </html><?php /**PATH /home/tyasvara/ToV2/resources/views/pdf/certificate.blade.php ENDPATH**/ ?>

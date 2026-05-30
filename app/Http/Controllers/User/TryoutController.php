@@ -505,15 +505,13 @@ class TryoutController extends Controller
             'my_rank' => $rankings->firstWhere('is_me', true)
         ]);
     }
+
 public function certificate(ExamAttempt $attempt)
 {
-    // 1. Pastikan yang mengunduh adalah user yang bersangkutan
     if ($attempt->user_id !== auth()->id()) abort(403);
     
-    // 2. Load relasi tabel
     $attempt->load(['user', 'tryout']);
 
-    // 3. KALKULASI ULANG KELULUSAN (Karena is_passed tidak ada di database)
     $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65; 
     $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80; 
     $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
@@ -524,20 +522,12 @@ public function certificate(ExamAttempt $attempt)
         $attempt->tkp_score >= $pgTkp
     );
 
-    // 4. Mencegah PHP kehabisan memori atau timeout saat memproses PDF
-    ini_set('memory_limit', '256M');
-    set_time_limit(60);
-
-    // 5. Generate PDF
-    $pdf = Pdf::loadView('pdf.certificate', [
+    // Langsung return view HTML (Browser akan handle window.print)
+    return view('pdf.certificate', [
         'attempt' => $attempt, 
         'isPassed' => $isPassed
-    ])->setPaper('a5', 'landscape');
-    
-    // 6. Langsung jadikan unduhan
-    return $pdf->download('Sertifikat_' . \Illuminate\Support\Str::slug($attempt->user->name) . '.pdf');
+    ]);
 }
-
     public function collectiveRegister(Tryout $tryout)
     {
         return Inertia::render('User/Tryout/CollectiveRegister', ['tryout' => $tryout]);

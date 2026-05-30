@@ -15,33 +15,23 @@ use Inertia\Response;
 
 class RegisteredUserController extends Controller
 {
-    /**
-     * Display the registration view.
-     */
     public function create(): Response
     {
         return Inertia::render('Auth/Register');
     }
 
-    /**
-     * Handle an incoming registration request.
-     *
-     * @throws \Illuminate\Validation\ValidationException
-     */
     public function store(Request $request): RedirectResponse
     {
-        // 1. Validasi Input
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|lowercase|email|max:255|unique:'.User::class,
-            'instance_type' => 'required|in:1,2', // 1=Pusat, 2=Daerah
+            'instance_type' => 'required|in:1,2',
             'agency_name' => 'required|string|max:255',
             'province_code' => 'required|string|size:2',
-            'gender' => 'required|in:1,2', // 1=Laki, 2=Perempuan
+            'gender' => 'required|in:1,2',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
-        // 2. Buat User (Simpan dulu untuk mendapatkan ID Auto Increment)
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
@@ -50,31 +40,35 @@ class RegisteredUserController extends Controller
             'agency_name' => $request->agency_name,
             'province_code' => $request->province_code,
             'gender' => $request->gender,
+            'balance' => 0, // Pastikan ada agar tidak terjadi error saat penambahan saldo
         ]);
 
-        // 3. GENERATE NOMOR PESERTA (9 DIGIT)
-        // Format: Instansi(1) + Provinsi(2) + Gender(1) + Urutan(5)
-        // Contoh: 1 (Pusat) + 11 (Aceh) + 1 (Laki) + 00005 (Urutan) = 111100005
-        
         $prefix = $request->instance_type . $request->province_code . $request->gender;
-        
-        // Pad ID user menjadi 5 digit angka (misal ID 5 jadi 00005)
-        // Jika ID > 99999, string akan memanjang otomatis
         $sequence = str_pad($user->id, 5, '0', STR_PAD_LEFT);
-        
         $finalCode = $prefix . $sequence; 
 
-        // Update user dengan nomor peserta yang digenerate
         $user->participant_number = $finalCode;
+
+        // ==========================================
+        // LOGIKA BARU: BONUS SALDO PENDAFTARAN AFILIASI
+        // ==========================================
+        if ($request->filled('ref')) {
+            $referrer = User::where('affiliate_code', $request->ref)->first();
+            
+            if ($referrer) {
+                // 1. Pendaftar dapat 2500 di Dompet
+                $user->balance += 2500;
+                
+                // 2. Pemilik referal dapat 2500 di Saldo Komisi Afiliasi
+                $referrer->increment('affiliate_balance', 2500);
+            }
+        }
+        // ==========================================
+
         $user->save();
 
-        // 4. Assign Role & Trigger Event
-        // Pastikan Spatie Permission sudah terinstall dan dikonfigurasi
         $user->assignRole('user'); 
-
         event(new Registered($user));
-
-        // 5. Login & Redirect
         Auth::login($user);
 
         return redirect(route('dashboard', absolute: false));

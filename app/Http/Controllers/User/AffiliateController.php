@@ -6,68 +6,150 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Transaction;
 use App\Models\WithdrawalRequest;
+use App\Models\WalletTransaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
-use App\Models\WalletTransaction; // TAMBAHKAN INI
 
 class AffiliateController extends Controller
 {
-public function index()
-{
-    $user = auth()->user();
-    
-    // Ambil data pengumuman pemenang terbaru (Top 10)
-    $announcements = WalletTransaction::whereIn('proof_payment', ['REWARD-WEEKLY', 'REWARD-MONTHLY'])
-        ->with('user:id,name')
-        ->latest()
-        ->take(10)
-        ->get();
-
-    $monthlyReferralCount = Transaction::where('referrer_id', $user->id)
-        ->whereIn('status', ['paid', 'success'])
-        ->whereMonth('created_at', now()->month)
-        ->whereYear('created_at', now()->year)
-        ->count();
-
-    $referrals = Transaction::where('referrer_id', $user->id)
-        ->whereIn('status', ['paid', 'success'])
-        ->with('user')
-        ->latest()
-        ->paginate(5)
-        ->withQueryString();
-
-    $withdrawals = WithdrawalRequest::where('user_id', $user->id)
-        ->latest()
-        ->get();
-
-    return Inertia::render('User/Affiliate/Index', [
-        'user' => $user,
-        'referrals' => $referrals,
-        'withdrawals' => $withdrawals,
-        'announcements' => $announcements, // Data pengumuman
-        'monthly_count' => $monthlyReferralCount,
-        'target_limit' => 100,
-        'special_bonus' => 100000,
-        'min_withdrawal' => 30000
-    ]);
-}
-
-    public function join()
+    public function index()
     {
         $user = auth()->user();
-        
+
+        // Konfigurasi Nominal Aturan Sistem Afiliasi Terbaru
+        $systemInfo = [
+            'min_withdrawal' => 30000,
+            'commission_per_referral' => 2500,   // Komisi pendaftar masuk ke saldo afiliasi
+            'wallet_bonus_for_referral' => 2500, // Bonus pendaftar masuk ke dompet pendaftar
+            'token_discount' => 2000,            // Diskon checkout pakai token
+            'token_commission' => 2000,          // Komisi pemilik token
+            'target_limit' => 100,
+            'special_bonus' => 100000,
+        ];
+
+        // 1. JIKA USER BELUM DAFTAR PROGRAM AFILIASI
+        if (!$user->affiliate_code) {
+            return Inertia::render('User/Affiliate/Index', array_merge([
+                'user' => $user, 
+                'affiliate_code' => null,
+                'affiliate_url' => '',
+                'stats' => [
+                    'clicks' => 0, 
+                    'registrations' => 0, 
+                    'conversions' => 0, 
+                    'total_earnings' => 0, 
+                    'current_balance' => 0
+                ],
+                'referred_users' => [],
+                'withdrawals' => [],
+                'announcements' => [],
+                'monthly_count' => 0,
+                'weekly_leaderboard' => [],
+                'monthly_leaderboard' => [],
+            ], $systemInfo));
+        }
+
+        // 2. JIKA USER SUDAH DAFTAR PROGRAM AFILIASI
+        $affiliateUrl = url('/register?ref=' . $user->affiliate_code);
+
+        $announcements = WalletTransaction::whereIn('proof_payment', ['REWARD-WEEKLY', 'REWARD-MONTHLY'])
+            ->with('user:id,name')
+            ->latest()
+            ->take(10)
+            ->get();
+
+        $monthlyReferralCount = Transaction::where('referrer_id', $user->id)
+            ->whereIn('status', ['paid', 'success'])
+            ->whereMonth('created_at', now()->month)
+            ->whereYear('created_at', now()->year)
+            ->count();
+
+        $referralTransactions = Transaction::where('referrer_id', $user->id)
+            ->whereIn('status', ['paid', 'success'])
+            ->with('user')
+            ->get();
+
+        $stats = [
+            'clicks' => 0,
+            'registrations' => $referralTransactions->count(), 
+            'conversions' => $referralTransactions->count(),
+            'total_earnings' => WithdrawalRequest::where('user_id', $user->id)->where('status', 'approved')->sum('amount') + ($user->affiliate_balance ?? 0),
+            'current_balance' => $user->affiliate_balance ?? 0,
+        ];
+
+        $referredUsers = $referralTransactions->map(function ($trx) {
+            return [
+                'id' => $trx->id,
+                'name' => $trx->user->name ?? 'Pengguna',
+                'created_at' => $trx->created_at,
+                'has_purchased' => true, 
+            ];
+        });
+
+        $withdrawals = WithdrawalRequest::where('user_id', $user->id)
+            ->latest()
+            ->get()
+            ->map(function ($wd) {
+                $bankName = is_array($wd->bank_details) ? ($wd->bank_details['bank_name'] ?? 'Transfer Bank') : 'Transfer Bank';
+                return [
+                    'id' => $wd->id,
+                    'created_at' => $wd->created_at,
+                    'status' => $wd->status,
+                    'bank_name' => $bankName,
+                    'amount' => $wd->amount,
+                ];
+            });
+
+        // KLASEMEN KOMPETISI
+        $weeklyLeaderboard = DB::table('transactions')
+            ->join('users', 'transactions.referrer_id', '=', 'users.id')
+            ->select('users.name', DB::raw('count(transactions.id) as total'))
+            ->whereIn('transactions.status', ['paid', 'success'])
+            ->whereBetween('transactions.created_at', [now()->startOfWeek(), now()->endOfWeek()])
+            ->groupBy('users.id', 'users.name')
+            ->orderByDesc('total')
+            ->limit(5)
+            ->get();
+
+        $monthlyLeaderboard = DB::table('transactions')
+            ->join('users', 'transactions.referrer_id', '=', 'users.id')
+            ->select('users.name', DB::raw('count(transactions.id) as total'))
+            ->whereIn('transactions.status', ['paid', 'success'])
+            ->whereMonth('transactions.created_at', now()->month)
+            ->whereYear('transactions.created_at', now()->year)
+            ->groupBy('users.id', 'users.name')
+            ->orderByDesc('total')
+            ->limit(5)
+            ->get();
+
+        return Inertia::render('User/Affiliate/Index', array_merge([
+            'user' => $user,
+            'affiliate_code' => $user->affiliate_code,
+            'affiliate_url' => $affiliateUrl,
+            'stats' => $stats,
+            'referred_users' => $referredUsers,
+            'withdrawals' => $withdrawals,
+            'announcements' => $announcements,
+            'monthly_count' => $monthlyReferralCount,
+            'weekly_leaderboard' => $weeklyLeaderboard,
+            'monthly_leaderboard' => $monthlyLeaderboard,
+        ], $systemInfo));
+    }
+
+    public function register()
+    {
+        $user = auth()->user();
         if (!$user->affiliate_code) {
             $user->update([
                 'affiliate_code' => strtoupper(Str::random(6)) . $user->id
             ]);
         }
-
-        return back()->with('success', 'Selamat! Program afiliasi Anda telah aktif.');
+        return back()->with('success', 'Selamat! Program kemitraan afiliasi Anda kini telah aktif.');
     }
 
-public function updateBankInfo(Request $request)
+    public function updateBankInfo(Request $request)
     {
         $request->validate([
             'bank_name' => 'required|string',
@@ -75,40 +157,53 @@ public function updateBankInfo(Request $request)
             'account_name' => 'required|string',
         ]);
 
-        auth()->user()->update([
-            'bank_info' => $request->only(['bank_name', 'account_number', 'account_name'])
-        ]);
-
-        return back()->with('success', 'Data bank berhasil disimpan.');
-    }
-
-public function withdraw()
-{
-    $user = auth()->user();
-    
-    if (!$user->bank_info) {
-        return back()->with('error', 'Lengkapi data bank.');
-    }
-
-    if ($user->affiliate_balance < 3000) {
-        return back()->with('error', 'Minimal Rp 30.000.');
-    }
-
-    \Illuminate\Support\Facades\DB::transaction(function () use ($user) {
-        $amount = $user->affiliate_balance;
+        $user = auth()->user();
         
-        // Buat record baru
-        \App\Models\WithdrawalRequest::create([
-            'user_id' => $user->id,
-            'amount' => $amount,
-            'bank_details' => $user->bank_info,
-            'status' => 'pending'
+        $user->update([
+            'bank_info' => [
+                'bank_name' => $request->bank_name,
+                'account_number' => $request->account_number,
+                'account_name' => $request->account_name,
+            ]
         ]);
 
-        // Reset saldo user
-        $user->update(['affiliate_balance' => 0]);
-    });
+        return back()->with('success', 'Informasi rekening bank berhasil disimpan.');
+    }
 
-    return back()->with('success', 'Berhasil diajukan.');
-}
+    public function withdraw(Request $request)
+    {
+        $request->validate([
+            'amount' => 'required|numeric|min:30000',
+        ], [
+            'amount.min' => 'Minimal batas penarikan saldo adalah Rp 30.000',
+            'amount.required' => 'Jumlah penarikan wajib diisi.',
+        ]);
+
+        $user = auth()->user();
+
+        if (!$user->bank_info) {
+            return back()->withErrors(['amount' => 'Harap simpan data rekening bank di atas terlebih dahulu.']);
+        }
+
+        if (($user->affiliate_balance ?? 0) < $request->amount) {
+            return back()->withErrors(['amount' => 'Saldo komisi Anda saat ini tidak mencukupi.']);
+        }
+
+        DB::transaction(function () use ($user, $request) {
+            $amount = $request->amount;
+
+            WithdrawalRequest::create([
+                'user_id' => $user->id,
+                'amount' => $amount,
+                'bank_details' => $user->bank_info, 
+                'status' => 'pending'
+            ]);
+
+            $user->update([
+                'affiliate_balance' => $user->affiliate_balance - $amount
+            ]);
+        });
+
+        return back()->with('success', 'Pengajuan penarikan saldo berhasil! Silakan cek riwayat Anda.');
+    }
 }
