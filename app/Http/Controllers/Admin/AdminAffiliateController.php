@@ -226,6 +226,10 @@ class AdminAffiliateController extends Controller
 
     public function giveReward(Request $request, User $user)
     {
+        // Tambahkan 1 baris ini di bagian paling atas:
+    if ($request->type === 'REWARD-WEEKLY' && !now()->isMonday()) {
+        return back()->with('error', 'Hadiah mingguan hanya dapat diberikan pada hari Senin.');
+    }
         $request->validate([
             'amount' => 'required|numeric|min:1000',
             'type' => 'required|string|in:REWARD-WEEKLY,REWARD-MONTHLY'

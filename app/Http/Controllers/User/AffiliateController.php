@@ -65,11 +65,72 @@ class AffiliateController extends Controller
 
         $affiliateUrl = url('/register?ref=' . $user->affiliate_code);
 
-        $announcements = WalletTransaction::whereIn('proof_payment', ['REWARD-WEEKLY', 'REWARD-MONTHLY'])
+// Ambil data mentah riwayat pemenang (ambil 20 data terakhir untuk diproses)
+        $rawAnnouncements = WalletTransaction::whereIn('proof_payment', ['REWARD-WEEKLY', 'REWARD-MONTHLY'])
             ->with('user:id,name')
             ->latest()
-            ->take(10)
+            ->take(20)
             ->get();
+
+        // Kelompokkan berdasarkan Tipe Reward & Tanggal Pembagian (Y-m-d)
+        // Agar pembagian hadiah di hari yang sama terhitung dalam 1 grup kompetisi
+        $grouped = $rawAnnouncements->groupBy(function($item) {
+            $date = \Carbon\Carbon::parse($item->created_at);
+            return $item->proof_payment . '-' . $date->format('Y-m-d'); 
+        });
+
+        $announcements = collect();
+        $indoMonths = [1=>'Januari', 2=>'Februari', 3=>'Maret', 4=>'April', 5=>'Mei', 6=>'Juni', 7=>'Juli', 8=>'Agustus', 9=>'September', 10=>'Oktober', 11=>'November', 12=>'Desember'];
+
+        foreach ($grouped as $groupKey => $group) {
+            // Urutkan anggota grup berdasarkan nominal (amount) tertinggi ke terendah untuk penentuan Juara
+            $sortedGroup = $group->sortByDesc('amount')->values();
+            
+            foreach ($sortedGroup as $index => $ann) {
+                $date = \Carbon\Carbon::parse($ann->created_at);
+                
+                // Format Periode Teks & Estimasi Hitungan Token yang Diraih Pemenang
+                if ($ann->proof_payment === 'REWARD-WEEKLY') {
+                    $periodLabel = "Minggu ke-" . $date->weekOfMonth . " (" . $indoMonths[$date->month] . " " . $date->year . ")";
+                    
+                    // Hitung jumlah token rujukan dalam 7 hari sebelum admin memberikan hadiah
+                    $tokens = Transaction::where('referrer_id', $ann->user_id)
+                        ->whereIn('status', ['paid', 'success'])
+                        ->whereBetween('created_at', [$date->copy()->subDays(7), $date])
+                        ->count();
+                } else {
+                    $periodLabel = $indoMonths[$date->month] . " " . $date->year;
+                    
+                    // Hitung jumlah token rujukan dalam 30 hari sebelum admin memberikan hadiah
+                    $tokens = Transaction::where('referrer_id', $ann->user_id)
+                        ->whereIn('status', ['paid', 'success'])
+                        ->whereBetween('created_at', [$date->copy()->subDays(30), $date])
+                        ->count();
+                }
+
+                $announcements->push([
+                    'id' => $ann->id,
+                    'user' => $ann->user,
+                    'created_at' => $ann->created_at,
+                    'proof_payment' => $ann->proof_payment,
+                    'period' => $periodLabel,
+                    'amount' => $ann->amount,
+                    'tokens' => $tokens, // Data total token yang berhasil ditambahkan
+                    'rank' => $index + 1, // 1 = Emas, 2 = Perak, 3 = Perunggu
+                    'group_date' => $date->format('Y-m-d')
+                ]);
+            }
+        }
+
+        // PENGURUTAN FINAL: 
+        // 1. Urutkan berdasarkan Periode/Tanggal terbaru (paling atas)
+        // 2. Jika di periode yang sama, urutkan berdasarkan Peringkat/Rank 1 (Emas paling atas)
+        $announcements = $announcements->sort(function ($a, $b) {
+            if ($a['group_date'] === $b['group_date']) {
+                return $a['rank'] <=> $b['rank']; 
+            }
+            return $b['group_date'] <=> $a['group_date']; 
+        })->take(10)->values()->all();
 
         $monthlyReferralCount = Transaction::where('referrer_id', $user->id)
             ->whereIn('status', ['paid', 'success'])

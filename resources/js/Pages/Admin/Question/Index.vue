@@ -1,7 +1,7 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, useForm, Link, router } from '@inertiajs/vue3';
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import draggable from 'vuedraggable';
 
 const props = defineProps({
@@ -17,6 +17,19 @@ const fileInput = ref(null);
 watch(() => props.questions, (newVal) => {
     localQuestions.value = [...newVal];
 }, { deep: true });
+
+// ==========================================
+// LOGIKA DINAMIS UNTUK URL TOMBOL KEMBALI
+// ==========================================
+const backUrl = computed(() => {
+    if (props.tryout?.type === 'akbar') {
+        return '/admin/tryout-akbar';
+    } else if (props.tryout?.type === 'adidaya') {
+        return '/admin/adidaya-manage';
+    } else {
+        return '/admin/tryouts'; // Default ke tryout biasa
+    }
+});
 
 const triggerImport = () => { fileInput.value.click(); };
 
@@ -100,7 +113,8 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                 <div class="absolute right-0 top-0 w-64 h-64 bg-indigo-50 rounded-full blur-[60px] pointer-events-none -mr-20 -mt-20"></div>
                 
                 <div class="relative z-10">
-                    <Link :href="route('admin.tryout-akbar.index')" class="text-xs font-semibold text-slate-500 hover:text-indigo-600 mb-2 block">&larr; Kembali ke List</Link>
+                    <Link :href="backUrl" class="text-xs font-semibold text-slate-500 hover:text-indigo-600 mb-2 block">&larr; Kembali ke List</Link>
+                    
                     <h1 class="text-2xl md:text-3xl font-medium text-slate-900 tracking-tight">{{ tryout.title }}</h1>
                     <p class="text-sm text-slate-500 font-medium mt-1">Mengelola {{ questions.length }} butir soal</p>
                 </div>

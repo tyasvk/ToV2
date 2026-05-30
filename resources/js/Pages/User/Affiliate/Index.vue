@@ -460,22 +460,57 @@ const formatDate = (dateString) => {
                     </div>
 
                     <div class="bg-white border border-slate-100 rounded-[1.5rem] p-5 md:p-6 shadow-sm space-y-4 mt-2">
-                        <h3 class="text-xs font-medium text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-2.5">Riwayat Pemenang Kompetisi</h3>
-                        <div v-if="announcements && announcements.length > 0" class="divide-y divide-slate-100">
-                            <div v-for="ann in announcements" :key="ann.id" class="py-3 flex justify-between items-center text-xs transition-colors hover:bg-slate-50/50 rounded-lg px-2">
-                                <div>
-                                    <span class="font-medium text-slate-700 truncate pr-2 block">{{ ann.user?.name }}</span>
-                                    <span class="text-[9px] text-slate-400 block mt-0.5">{{ formatDate(ann.created_at) }}</span>
-                                </div>
-                                <span class="font-medium text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded text-[9px] uppercase shrink-0 border border-indigo-100">
-                                    {{ ann.proof_payment === 'REWARD-WEEKLY' ? 'Juara Mingguan' : 'Juara Bulanan' }}
-                                </span>
-                            </div>
-                        </div>
-                        <div v-else class="text-center py-6 text-xs text-slate-400 font-normal">
-                            Belum ada pemenang kompetisi di periode ini. Jadilah yang pertama mencapai target!
-                        </div>
-                    </div>
+    <h3 class="text-xs font-medium text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-2.5">Riwayat Pemenang Kompetisi</h3>
+    
+    <div v-if="announcements && announcements.length > 0" class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-xs">
+            <thead>
+                <tr class="text-[10px] text-slate-400 uppercase tracking-wider bg-slate-50/70">
+                    <th class="p-2.5 font-medium text-center w-16 rounded-l-lg">Peringkat</th>
+                    <th class="p-2.5 font-medium">Nama Mitra</th>
+                    <th class="p-2.5 font-medium">Periode Kompetisi</th>
+                    <th class="p-2.5 font-medium text-center">Total Token</th>
+                    <th class="p-2.5 font-medium text-right rounded-r-lg">Kategori</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-slate-700">
+                <tr v-for="ann in announcements" :key="ann.id" class="hover:bg-slate-50/40 transition-colors">
+                    
+                    <td class="p-3 text-center font-bold text-sm">
+                        <span v-if="ann.rank === 1" class="text-yellow-500 drop-shadow-sm">🥇 1</span>
+                        <span v-else-if="ann.rank === 2" class="text-slate-400 drop-shadow-sm">🥈 2</span>
+                        <span v-else-if="ann.rank === 3" class="text-amber-600 drop-shadow-sm">🥉 3</span>
+                        <span v-else class="text-slate-500 font-medium text-xs">{{ ann.rank }}</span>
+                    </td>
+
+                    <td class="p-3">
+                        <div class="font-medium text-slate-900">{{ ann.user?.name || 'Mitra Afiliasi' }}</div>
+                        <div class="text-[9px] text-slate-400 font-normal mt-0.5">{{ formatDate(ann.created_at) }}</div>
+                    </td>
+
+                    <td class="p-3 font-medium text-slate-600 whitespace-nowrap">
+                        {{ ann.period }}
+                    </td>
+
+                    <td class="p-3 text-center">
+                        <span class="bg-slate-100 text-slate-700 px-2 py-1 rounded font-bold text-[10px] tracking-wide">
+                            {{ ann.tokens }} Token
+                        </span>
+                    </td>
+
+                    <td class="p-3 text-right whitespace-nowrap">
+                        <span :class="ann.proof_payment === 'REWARD-WEEKLY' ? 'text-indigo-600 bg-indigo-50 border-indigo-100' : 'text-emerald-600 bg-emerald-50 border-emerald-100'" class="font-medium px-2 py-0.5 rounded text-[9px] uppercase border">
+                            {{ ann.proof_payment === 'REWARD-WEEKLY' ? 'Mingguan' : 'Bulanan' }}
+                        </span>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div v-else class="text-center py-6 text-xs text-slate-400 font-normal">
+        Belum ada pemenang kompetisi di periode ini. Jadilah yang pertama mencapai target!
+    </div>
+</div>
                 </div>
 
             </div>
