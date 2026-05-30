@@ -13,6 +13,8 @@ const form = useForm({
     password: '',
     password_confirmation: '',
     referral_code: '', // Kolom opsional untuk referral
+    // Pastikan ini ada dan terisi saat user mendaftar melalui link!
+    referred_by: new URLSearchParams(window.location.search).get('ref') || '',
 });
 
 const isPasswordVisible = ref(false);

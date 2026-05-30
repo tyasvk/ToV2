@@ -46,6 +46,8 @@ class RegisteredUserController extends Controller
             'province_code' => $request->province_code,
             'gender' => $request->gender,
             'balance' => 0, 
+            // Tambahkan baris ini agar sistem menyimpan siapa upline-nya saat register!
+            'referred_by' => $request->referred_by ?? null,
         ]);
 
         // Generate Nomor Peserta

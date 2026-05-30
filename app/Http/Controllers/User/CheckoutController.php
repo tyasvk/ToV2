@@ -129,42 +129,25 @@ public function process(Request $request, Transaction $transaction)
         if ($request->payment_method === 'wallet') {
             $user = User::find(auth()->id());
             
-            // PENTING: Gunakan $transaction->amount (harga asli tanpa fee) agar tidak error
             if ($user->balance < $transaction->amount) {
                 return back()->withErrors(['message' => 'Saldo tidak cukup.']);
             }
 
-            // Pesan bantuan untuk melihat siapa saja yang dapat komisi (bisa dihapus nanti jika tidak butuh)
-            $pesanLayar = ""; 
-
-            DB::transaction(function () use ($user, $transaction, &$pesanLayar) {
-                // 1. Potong saldo dompet pembeli
+            DB::transaction(function () use ($user, $transaction) {
                 $user->decrement('balance', $transaction->amount);
-                
-                // 2. Ubah status transaksi saat ini menjadi paid
                 $transaction->update(['status' => 'paid', 'payment_method' => 'wallet']);
                 
-                // 3. Catat riwayat debit pembeli
-                WalletTransaction::create([
-                    'user_id' => $user->id, 
-                    'type' => 'debit', 
-                    'amount' => $transaction->amount,
-                    'description' => 'Pembayaran ' . $this->resolveItemName($transaction), 
-                    'status' => 'success'
-                ]);
+                // --- LOGGING ---
+                \Log::info("DEBUG KOMISI: Memproses transaksi {$transaction->id} untuk user {$user->id}");
 
-                // 4. Hitung total transaksi sukses (termasuk yang baru saja di-update di atas)
-                $totalPaidTransactions = Transaction::where('user_id', $user->id)
+                $totalProductPurchases = Transaction::where('user_id', $user->id)
                     ->whereIn('status', ['paid', 'success'])
+                    ->whereNotNull('tryout_id')
                     ->count();
 
-                // ==========================================================
-                // KOMISI 1: PENDAFTARAN AFILIASI (Rp 2.500)
-                // Hanya dieksekusi JIKA ini adalah pembelian pertama
-                // ==========================================================
-                if ($totalPaidTransactions === 1 && !empty($user->referred_by)) {
-                    
-                    // Cari upline pendaftaran
+                \Log::info("DEBUG KOMISI: Total Pembelian Produk = {$totalProductPurchases}");
+
+                if ($totalProductPurchases === 1 && !empty($user->referred_by)) {
                     $upline = User::where('id', $user->referred_by)
                                   ->orWhere('affiliate_code', $user->referred_by)
                                   ->first();
@@ -174,54 +157,20 @@ public function process(Request $request, Transaction $transaction)
                         WalletTransaction::create([
                             'user_id' => $upline->id,
                             'amount' => 2500,
-                            'type' => 'commission', 
-                            'description' => "Komisi Pendaftaran (User Aktif) dari: {$user->name}",
+                            'type' => 'credit',
+                            'description' => "Komisi pendaftaran dari: {$user->name}",
                             'status' => 'success'
                         ]);
-                        $pesanLayar .= "[SUKSES: Rp 2.500 ke Upline: {$upline->name}] ";
+                        \Log::info("DEBUG KOMISI: SUKSES transfer Rp2500 ke Upline ID {$upline->id}");
+                    } else {
+                        \Log::warning("DEBUG KOMISI: GAGAL, Upline dengan ID/Kode {$user->referred_by} tidak ditemukan!");
                     }
-                }
-
-                // ==========================================================
-                // KOMISI 2: PENGGUNAAN KODE VOUCHER / TOKEN (Rp 2.000)
-                // Mengeksekusi siapa pemilik voucher tanpa peduli pembelian ke-berapa
-                // ==========================================================
-                if (!empty($transaction->referrer_id)) {
-                    
-                    // Cari pemilik voucher
-                    $referrer = User::where('id', $transaction->referrer_id)
-                                    ->orWhere('affiliate_code', $transaction->referrer_id)
-                                    ->first();
-
-                    if ($referrer) {
-                        $referrer->increment('affiliate_balance', 2000);
-                        WalletTransaction::create([
-                            'user_id' => $referrer->id,
-                            'amount' => 2000,
-                            'type' => 'commission', 
-                            'description' => "Komisi penggunaan voucher dari: {$user->name}",
-                            'status' => 'success'
-                        ]);
-                        $pesanLayar .= "[SUKSES: Rp 2.000 ke Pemilik Voucher: {$referrer->name}]";
-                    }
-                }
-
-                // ==========================================================
-                // Perpanjang Masa Aktif Membership (Jika ada)
-                // ==========================================================
-                if (!$transaction->tryout_id || (isset($transaction->metadata['type']) && $transaction->metadata['type'] === 'membership')) {
-                    $daysToAdd = $transaction->metadata['days'] ?? $transaction->metadata['duration_days'] ?? 30; 
-                    $currentExpiry = ($user->membership_expires_at && Carbon::parse($user->membership_expires_at)->isFuture()) 
-                        ? Carbon::parse($user->membership_expires_at) 
-                        : Carbon::now();
-
-                    $user->update([
-                        'membership_expires_at' => $currentExpiry->addDays((int)$daysToAdd)
-                    ]);
+                } else {
+                     \Log::info("DEBUG KOMISI: Komisi dilewati (Pembelian ke-{$totalProductPurchases})");
                 }
             });
             
-            return redirect()->route('dashboard')->with('success', 'Akses Premium Aktif! ' . $pesanLayar);
+            return redirect()->route('dashboard')->with('success', 'Pembayaran Berhasil!');
         }
         return back();
     }

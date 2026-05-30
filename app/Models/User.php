@@ -29,6 +29,7 @@ class User extends Authenticatable
         'participant_number',
         'avatar',
         'bank_info', // <-- TAMBAHKAN BARIS INI
+        'referred_by', // <--- TAMBAHKAN BARIS INI (SANGAT PENTING!)
         
         // --- SESUAIKAN DENGAN VUE & DATABASE ANDA ---
         'province_code',  // Menggantikan 'provinsi' / 'province'
