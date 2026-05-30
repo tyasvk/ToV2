@@ -1,6 +1,6 @@
 <script setup>
-import { ref } from 'vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { ref, onMounted } from 'vue';
+import { Head, useForm, usePage } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import Modal from '@/Components/Modal.vue';
 import InputError from '@/Components/InputError.vue';
@@ -17,21 +17,40 @@ const props = defineProps({
     flash: {
         type: Object,
         default: () => ({})
+    },
+    midtrans_client_key: String, 
+    snapToken: String 
+});
+
+const page = usePage();
+const showTopUpModal = ref(false);
+const activeTopUpTab = ref('midtrans'); 
+
+onMounted(() => {
+    if (props.midtrans_client_key && !document.getElementById('midtrans-script')) {
+        const isSandbox = props.midtrans_client_key.includes('SB-');
+        const scriptUrl = isSandbox 
+            ? 'https://app.sandbox.midtrans.com/snap/snap.js' 
+            : 'https://app.midtrans.com/snap/snap.js';
+            
+        const script = document.createElement('script');
+        script.id = 'midtrans-script';
+        script.src = scriptUrl;
+        script.setAttribute('data-client-key', props.midtrans_client_key);
+        document.head.appendChild(script);
     }
 });
 
-const showTopUpModal = ref(false);
-const activeTopUpTab = ref('midtrans'); // 'midtrans' atau 'voucher'
-
-// Form untuk Top Up via Midtrans
 const formTopUp = useForm({
     amount: ''
 });
 
-// Form untuk Klaim Voucher
 const formVoucher = useForm({
     code: ''
 });
+
+// Form khusus untuk memproses ulang pembayaran pending
+const formPayPending = useForm({});
 
 const openTopUpModal = () => {
     showTopUpModal.value = true;
@@ -46,8 +65,45 @@ const closeTopUpModal = () => {
 const handleTopUpMidtrans = () => {
     formTopUp.post(route('wallet.topup'), {
         preserveScroll: true,
-        onSuccess: () => closeTopUpModal()
+        onSuccess: (pageContext) => {
+            closeTopUpModal();
+            triggerMidtransPopup(pageContext);
+        }
     });
+};
+
+const handlePayPending = (transactionId) => {
+    // Sesuaikan nama route ini dengan yang ada di web.php Anda (misal: 'wallet.payPending' atau 'wallet.pay-pending')
+    formPayPending.post(route('wallet.payPending', transactionId), {
+        preserveScroll: true,
+        onSuccess: (pageContext) => {
+            triggerMidtransPopup(pageContext);
+        }
+    });
+};
+
+// Fungsi reusable untuk memanggil popup Midtrans
+const triggerMidtransPopup = (pageContext) => {
+    const token = pageContext.props.snapToken || pageContext.props.flash?.snapToken;
+    
+    if (token && window.snap) {
+        window.snap.pay(token, {
+            onSuccess: function(result) {
+                window.location.reload(); 
+            },
+            onPending: function(result) {
+                console.log('Menunggu Pembayaran');
+            },
+            onError: function(result) {
+                alert('Pembayaran gagal atau dibatalkan.');
+            },
+            onClose: function() {
+                console.log('Popup ditutup sebelum pembayaran diselesaikan');
+            }
+        });
+    } else if (!pageContext.props.flash?.error) {
+        alert('Gagal mendapatkan token pembayaran dari server.');
+    }
 };
 
 const handleClaimVoucher = () => {
@@ -57,7 +113,28 @@ const handleClaimVoucher = () => {
     });
 };
 
-// Format mata uang Rupiah (IDR)
+const isIncome = (type) => {
+    return ['in', 'credit', 'deposit'].includes(type?.toLowerCase());
+};
+
+const getStatusText = (status) => {
+    if (!status) return 'SELESAI'; 
+    const s = status.toLowerCase();
+    if (['success', 'completed', 'settlement', 'capture'].includes(s)) return 'SELESAI';
+    if (['pending'].includes(s)) return 'PENDING';
+    if (['failed', 'cancel', 'expire', 'deny'].includes(s)) return 'GAGAL';
+    return s.toUpperCase();
+};
+
+const getStatusClass = (status) => {
+    if (!status) return 'bg-emerald-50 text-emerald-600 border-emerald-200';
+    const s = status.toLowerCase();
+    if (['success', 'completed', 'settlement', 'capture'].includes(s)) return 'bg-emerald-50 text-emerald-600 border-emerald-200';
+    if (['pending'].includes(s)) return 'bg-amber-50 text-amber-600 border-amber-200';
+    if (['failed', 'cancel', 'expire', 'deny'].includes(s)) return 'bg-rose-50 text-rose-600 border-rose-200';
+    return 'bg-slate-50 text-slate-600 border-slate-200';
+};
+
 const formatCurrency = (value) => {
     return new Intl.NumberFormat('id-ID', {
         style: 'currency',
@@ -67,13 +144,12 @@ const formatCurrency = (value) => {
     }).format(value);
 };
 
-// Format tanggal yang rapi
 const formatDate = (dateString) => {
     if (!dateString) return '-';
     const date = new Date(dateString);
     return date.toLocaleDateString('id-ID', {
         day: 'numeric',
-        month: 'long',
+        month: 'short',
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
@@ -85,12 +161,12 @@ const formatDate = (dateString) => {
     <Head title="Dompet Saya" />
 
     <AuthenticatedLayout>
-        <div class="max-w-4xl mx-auto space-y-6 md:space-y-8 animate-in fade-in duration-700">
+        <div class="max-w-4xl mx-auto space-y-6 md:space-y-8 animate-in fade-in duration-700 px-4 sm:px-0">
             
             <div class="flex flex-col gap-4">
                 <div>
                     <h1 class="text-xl md:text-2xl font-medium text-slate-900 tracking-tight">Dompet Saya</h1>
-                    <p class="text-[11px] text-slate-500 font-medium tracking-wide mt-1">
+                    <p class="text-[11px] text-slate-500 font-normal tracking-wide mt-1">
                         Kelola saldo dan pantau semua riwayat transaksi akun Anda.
                     </p>
                 </div>
@@ -128,7 +204,7 @@ const formatDate = (dateString) => {
                 </div>
             </div>
 
-            <div class="space-y-4">
+            <div class="space-y-4 pb-8">
                 <h3 class="text-sm font-medium text-slate-900 uppercase tracking-[0.1em] mb-2 px-1">Riwayat Transaksi</h3>
 
                 <div v-if="transactions.length === 0" class="bg-white border border-slate-100 rounded-[2rem] p-10 text-center shadow-sm">
@@ -138,21 +214,21 @@ const formatDate = (dateString) => {
                         </svg>
                     </div>
                     <h3 class="text-sm font-medium text-slate-900 uppercase tracking-widest mb-2">Belum Ada Transaksi</h3>
-                    <p class="text-xs text-slate-500 font-medium tracking-wide max-w-sm mx-auto">
+                    <p class="text-xs text-slate-500 font-normal tracking-wide max-w-sm mx-auto">
                         Riwayat penambahan atau pengurangan saldo akun akan muncul di sini.
                     </p>
                 </div>
 
                 <div v-else class="flex flex-col gap-3">
-                    <div v-for="trx in transactions" :key="trx.id" class="bg-white border border-slate-100 rounded-[1.25rem] p-4 md:p-5 flex flex-col md:flex-row justify-between gap-4 transition-all hover:shadow-md hover:border-slate-200 group relative overflow-hidden">
+                    <div v-for="trx in transactions" :key="trx.id" class="bg-white border border-slate-100 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row justify-between gap-4 transition-all hover:shadow-md hover:border-slate-200 group relative overflow-hidden">
                         
                         <div class="absolute left-0 top-0 bottom-0 w-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300" 
-                             :class="trx.type === 'in' ? 'bg-emerald-500' : 'bg-rose-500'"></div>
+                             :class="isIncome(trx.type) ? 'bg-emerald-500' : 'bg-rose-500'"></div>
                         
-                        <div class="flex items-start gap-4 min-w-0">
+                        <div class="flex items-start gap-3 sm:gap-4 min-w-0">
                             <div class="w-10 h-10 shrink-0 rounded-xl flex items-center justify-center transition-colors duration-300" 
-                                 :class="trx.type === 'in' ? 'bg-emerald-50 text-emerald-500 group-hover:bg-emerald-100' : 'bg-rose-50 text-rose-500 group-hover:bg-rose-100'">
-                                <svg v-if="trx.type === 'in'" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                 :class="isIncome(trx.type) ? 'bg-emerald-50 text-emerald-500 group-hover:bg-emerald-100' : 'bg-rose-50 text-rose-500 group-hover:bg-rose-100'">
+                                <svg v-if="isIncome(trx.type)" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 4.5l-15 15m0 0h11.25m-11.25 0V8.25" />
                                 </svg>
                                 <svg v-else class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
@@ -161,19 +237,35 @@ const formatDate = (dateString) => {
                             </div>
                             
                             <div class="flex flex-col min-w-0 pt-0.5">
-                                <span class="text-[10px] font-medium text-slate-400 uppercase tracking-widest mb-1">{{ formatDate(trx.created_at) }}</span>
+                                <!-- Tanggal dan Badge Status -->
+                                <div class="flex items-center gap-2 mb-1.5">
+                                    <span class="text-[9px] font-medium text-slate-400 uppercase tracking-widest">{{ formatDate(trx.created_at) }}</span>
+                                    <span :class="getStatusClass(trx.status)" class="text-[7px] font-medium uppercase tracking-widest px-1.5 py-0.5 rounded border">
+                                        {{ getStatusText(trx.status) }}
+                                    </span>
+                                </div>
                                 <h4 class="text-sm md:text-[15px] font-medium text-slate-900 truncate pr-4 tracking-tight leading-tight">
                                     {{ trx.description }}
                                 </h4>
                             </div>
                         </div>
 
-                        <div class="flex items-center justify-between md:justify-end border-t md:border-t-0 border-slate-50 pt-3 md:pt-0 pl-14 md:pl-0">
-                            <div class="text-left md:text-right">
+                        <div class="flex flex-col md:items-end justify-center border-t md:border-t-0 border-slate-50 pt-3 md:pt-0 pl-14 md:pl-0 gap-2">
+                            <div class="text-left md:text-right flex items-center md:block justify-between w-full md:w-auto">
                                 <p class="text-[9px] font-medium text-slate-400 uppercase tracking-[0.2em] mb-0.5">Nominal</p>
-                                <p class="text-base md:text-lg font-medium tracking-tight" :class="trx.type === 'in' ? 'text-emerald-500' : 'text-rose-500'">
-                                    {{ trx.type === 'in' ? '+' : '-' }}{{ formatCurrency(trx.amount) }}
+                                <p class="text-base md:text-lg font-medium tracking-tight" :class="isIncome(trx.type) ? 'text-emerald-500' : 'text-rose-500'">
+                                    {{ isIncome(trx.type) ? '+' : '-' }}{{ formatCurrency(trx.amount) }}
                                 </p>
+                            </div>
+                            <!-- Tombol Lanjutkan Pembayaran (Hanya jika pending & topup/credit) -->
+                            <div v-if="trx.status === 'pending' && trx.type === 'credit'" class="w-full md:w-auto mt-1 md:mt-0">
+                                <button 
+                                    @click="handlePayPending(trx.id)" 
+                                    :disabled="formPayPending.processing"
+                                    class="w-full md:w-auto px-4 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg text-[9px] uppercase font-medium tracking-wider transition-colors disabled:opacity-50 text-center"
+                                >
+                                    Lanjutkan Pembayaran
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -186,7 +278,7 @@ const formatDate = (dateString) => {
             <div class="p-6 md:p-8 bg-white rounded-2xl relative overflow-hidden">
                 <header>
                     <h2 class="text-lg font-medium text-slate-900 tracking-tight">Isi Saldo Dompet</h2>
-                    <p class="mt-1 text-[11px] text-slate-500 font-medium tracking-wide leading-relaxed">
+                    <p class="mt-1 text-[11px] text-slate-500 font-normal tracking-wide leading-relaxed">
                         Pilih metode pengisian saldo yang Anda inginkan di bawah ini.
                     </p>
                 </header>
@@ -218,7 +310,7 @@ const formatDate = (dateString) => {
                             autofocus
                         />
                         <InputError class="mt-2 text-[10px]" :message="formTopUp.errors.amount" />
-                        <p class="text-[9px] text-slate-400 font-medium tracking-wide mt-2 leading-relaxed">
+                        <p class="text-[9px] text-slate-400 font-normal tracking-wide mt-2 leading-relaxed">
                             Mendukung pembayaran via transfer bank (Virtual Account), QRIS, Gopay, OVO, ShopeePay, dsb.
                         </p>
                     </div>
@@ -247,7 +339,7 @@ const formatDate = (dateString) => {
                             autofocus
                         />
                         <InputError class="mt-2 text-[10px]" :message="formVoucher.errors.code" />
-                        <p class="text-[9px] text-slate-400 font-medium tracking-wide mt-2 leading-relaxed">
+                        <p class="text-[9px] text-slate-400 font-normal tracking-wide mt-2 leading-relaxed">
                             Kode voucher biasanya didapatkan dari event tertentu, giveaway, atau pembelian melalui agen resmi kami.
                         </p>
                     </div>

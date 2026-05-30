@@ -1,6 +1,6 @@
 <script setup>
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { provinces, agencies } from '@/Data/agencies'; 
 
 const form = useForm({
@@ -12,11 +12,26 @@ const form = useForm({
     gender: '',
     password: '',
     password_confirmation: '',
+    referral_code: '', // Kolom opsional untuk referral
 });
 
 const isPasswordVisible = ref(false);
 const searchAgency = ref('');
 const isDropdownOpen = ref(false);
+
+// Memaksa form untuk dikosongkan setiap kali halaman di-reload/dimuat, kecuali kode referral dari URL
+onMounted(() => {
+    form.reset();
+    searchAgency.value = '';
+    isPasswordVisible.value = false;
+
+    // OTOMATIS TANGKAP KODE DARI URL (?ref=KODE)
+    const urlParams = new URLSearchParams(window.location.search);
+    const refCode = urlParams.get('ref');
+    if (refCode) {
+        form.referral_code = refCode.toUpperCase();
+    }
+});
 
 const filteredAgencies = computed(() => {
     const query = searchAgency.value.toLowerCase().trim();
@@ -77,7 +92,7 @@ const submit = () => {
                 <div class="relative z-10 text-center">
                     <div class="w-8 h-1 bg-blue-600 rounded-full mb-6 mx-auto"></div>
                     <h2 class="text-sm lg:text-base font-light text-slate-500 leading-relaxed font-serif italic px-2">
-                        "Mulai perjalanan suksesmu di <span class="text-blue-600 font-bold not-italic">CPNS Nusantara</span>."
+                        "Mulai perjalanan suksesmu di <span class="text-blue-600 font-medium not-italic">CPNS Nusantara</span>."
                     </h2>
                     <p class="mt-6 text-[10px] text-slate-400 font-medium tracking-wide uppercase">
                         Platform Persiapan CPNS
@@ -89,52 +104,56 @@ const submit = () => {
                 
                 <div class="md:hidden flex flex-col items-center justify-center gap-2 mb-8">
                     <img src="/images/logo.png" alt="Logo" class="h-32 w-auto object-contain">
-                    <span class="text-sm font-bold text-slate-900 tracking-tight">CPNS <span class="text-blue-600">NUSANTARA</span></span>
+                    <span class="text-sm font-medium text-slate-900 tracking-tight">CPNS <span class="text-blue-600">NUSANTARA</span></span>
                 </div>
 
                 <div class="mb-8 text-center md:text-left">
-                    <h3 class="text-2xl font-bold text-slate-900 tracking-tight mb-1.5">Daftar Akun Baru</h3>
-                    <p class="text-sm text-slate-500">Lengkapi formulir pendaftaran di bawah ini untuk memulai.</p>
+                    <h3 class="text-2xl font-medium text-slate-900 tracking-tight mb-1.5">Daftar Akun Baru</h3>
+                    <p class="text-sm text-slate-500 font-normal">Lengkapi formulir pendaftaran di bawah ini untuk memulai.</p>
                 </div>
 
-                <form @submit.prevent="submit" class="space-y-4">
+                <form @submit.prevent="submit" class="space-y-4" autocomplete="off">
                     
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Lengkap</label>
-                            <input v-model="form.name" type="text" required placeholder="Sesuai KTP"
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Nama Lengkap</label>
+                            <input v-model="form.name" type="text" required placeholder="Sesuai KTP" autocomplete="off"
                                 class="w-full bg-slate-100 border border-transparent rounded-lg py-2.5 px-3.5 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none" />
+                            <div v-if="form.errors.name" class="text-[10px] text-rose-500 mt-1 font-medium">{{ form.errors.name }}</div>
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Alamat Email</label>
-                            <input v-model="form.email" type="email" required placeholder="nama@email.com"
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Alamat Email</label>
+                            <input v-model="form.email" type="email" required placeholder="nama@email.com" autocomplete="off"
                                 class="w-full bg-slate-100 border border-transparent rounded-lg py-2.5 px-3.5 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none" />
+                            <div v-if="form.errors.email" class="text-[10px] text-rose-500 mt-1 font-medium">{{ form.errors.email }}</div>
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Provinsi</label>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Provinsi</label>
                             <select v-model="form.province_code" required class="w-full bg-slate-100 border border-transparent rounded-lg py-2.5 px-3.5 text-sm font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none cursor-pointer">
                                 <option value="" disabled selected>Pilih Provinsi</option>
                                 <option v-for="prov in provinces" :key="prov.code" :value="prov.code">{{ prov.name }}</option>
                             </select>
+                            <div v-if="form.errors.province_code" class="text-[10px] text-rose-500 mt-1 font-medium">{{ form.errors.province_code }}</div>
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Gender</label>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Gender</label>
                             <select v-model="form.gender" required class="w-full bg-slate-100 border border-transparent rounded-lg py-2.5 px-3.5 text-sm font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none cursor-pointer">
                                 <option value="" disabled selected>Pilih</option>
                                 <option value="1">Laki-laki</option>
                                 <option value="2">Perempuan</option>
                             </select>
+                            <div v-if="form.errors.gender" class="text-[10px] text-rose-500 mt-1 font-medium">{{ form.errors.gender }}</div>
                         </div>
                     </div>
 
                     <div class="relative">
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Instansi Tujuan</label>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Instansi Tujuan</label>
                         <input v-model="searchAgency" type="text" required @input="onSearchInput" @focus="isDropdownOpen = true" @blur="closeDropdown"
-                            placeholder="Cari Instansi..."
-                            class="w-full bg-slate-100 border border-transparent rounded-lg py-2.5 px-3.5 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none" autocomplete="off" />
+                            placeholder="Cari Instansi..." autocomplete="off"
+                            class="w-full bg-slate-100 border border-transparent rounded-lg py-2.5 px-3.5 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none" />
                         
                         <div v-if="isDropdownOpen" class="absolute z-50 mt-1 w-full bg-white shadow-xl rounded-lg py-1 text-sm border border-slate-100 max-h-48 overflow-y-auto custom-scrollbar">
                             <ul v-if="filteredAgencies.length > 0">
@@ -145,17 +164,19 @@ const submit = () => {
                             </ul>
                             <div v-else class="py-3 px-4 text-slate-500 italic text-center text-xs">Instansi tidak ditemukan</div>
                         </div>
+                        <div v-if="form.errors.agency_name" class="text-[10px] text-rose-500 mt-1 font-medium">{{ form.errors.agency_name }}</div>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Kata Sandi</label>
-                            <input v-model="form.password" :type="isPasswordVisible ? 'text' : 'password'" required placeholder="••••••••"
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Kata Sandi</label>
+                            <input v-model="form.password" :type="isPasswordVisible ? 'text' : 'password'" required placeholder="••••••••" autocomplete="new-password"
                                 class="w-full bg-slate-100 border border-transparent rounded-lg py-2.5 px-3.5 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none" />
+                            <div v-if="form.errors.password" class="text-[10px] text-rose-500 mt-1 font-medium">{{ form.errors.password }}</div>
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Konfirmasi Sandi</label>
-                            <input v-model="form.password_confirmation" :type="isPasswordVisible ? 'text' : 'password'" required placeholder="••••••••"
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Konfirmasi Sandi</label>
+                            <input v-model="form.password_confirmation" :type="isPasswordVisible ? 'text' : 'password'" required placeholder="••••••••" autocomplete="new-password"
                                 class="w-full bg-slate-100 border border-transparent rounded-lg py-2.5 px-3.5 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none" />
                         </div>
                     </div>
@@ -167,6 +188,13 @@ const submit = () => {
                         </label>
                     </div>
 
+                    <div class="pt-2">
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Kode Referral (Opsional)</label>
+                        <input v-model="form.referral_code" type="text" placeholder="Masukkan kode referral jika ada" autocomplete="off"
+                            class="w-full bg-slate-100 border border-transparent rounded-lg py-2.5 px-3.5 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none uppercase placeholder:normal-case" />
+                        <div v-if="form.errors.referral_code" class="text-[10px] text-rose-500 mt-1 font-medium">{{ form.errors.referral_code }}</div>
+                    </div>
+
                     <div class="pt-3">
                         <button type="submit" :disabled="form.processing"
                             class="w-full bg-blue-600 text-white rounded-lg py-2.5 font-medium text-sm shadow-sm hover:bg-blue-700 hover:shadow-md active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -176,9 +204,9 @@ const submit = () => {
                 </form>
 
                 <div class="mt-8 text-center border-t border-slate-100 pt-6">
-                    <p class="text-xs text-slate-500">
+                    <p class="text-xs text-slate-500 font-normal">
                         Sudah punya akun pejuang NIP? 
-                        <Link :href="route('login')" class="text-blue-600 font-semibold hover:text-blue-700 transition ml-1">
+                        <Link :href="route('login')" class="text-blue-600 font-medium hover:text-blue-700 transition ml-1">
                             Masuk di Sini
                         </Link>
                     </p>

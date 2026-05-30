@@ -24,6 +24,7 @@ use App\Http\Controllers\Admin\TransactionController;
 use App\Http\Controllers\Admin\TryoutAkbarController as AdminTryoutAkbarController;
 use App\Http\Controllers\Admin\AffiliateManagerController;
 use App\Http\Controllers\Admin\MembershipSettingController;
+use App\Http\Controllers\Admin\SettingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -60,6 +61,7 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     // --- WALLET ---
     Route::get('/wallet', [WalletController::class, 'index'])->name('wallet.index');
     Route::post('/wallet/topup', [WalletController::class, 'topup'])->name('wallet.topup');
+    Route::post('/wallet/pay-pending/{transaction}', [\App\Http\Controllers\User\WalletController::class, 'payPending'])->name('wallet.payPending');
 
     // --- TRYOUT ADIDAYA ---
     Route::get('/tryout/adidaya', [TryoutController::class, 'adidaya'])->name('tryout.adidaya');
@@ -71,7 +73,6 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     // --- PENDAFTARAN TRYOUT ---
     Route::get('/tryout/{tryout}/register', [UserTryoutController::class, 'registerForm'])->name('tryout.register');
     Route::post('/tryout/{tryout}/register', [TryoutController::class, 'processRegistration'])->name('tryout.processRegistration');
-    // Tambahkan baris ini di dalam middleware auth
     Route::post('/check-voucher-validity', [App\Http\Controllers\User\TryoutController::class, 'checkVoucher'])->name('voucher.check');
     
     // --- API & MEMBERSHIP ---
@@ -117,14 +118,7 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
 
     Route::post('/affiliate/register', [App\Http\Controllers\User\AffiliateController::class, 'register'])->name('affiliate.register');
     Route::get('/affiliate', [App\Http\Controllers\User\AffiliateController::class, 'index'])->name('affiliate.index');
-
-// Ini adalah route untuk memproses pendaftaran kode referral
-Route::post('/affiliate/register', [App\Http\Controllers\User\AffiliateController::class, 'register'])->name('affiliate.register');
-
-// Ini adalah route untuk memproses formulir penarikan dana
-Route::post('/affiliate/withdraw', [App\Http\Controllers\User\AffiliateController::class, 'withdraw'])->name('affiliate.withdraw');
-
-// TAMBAHKAN RUTE INI UNTUK UPDATE BANK:
+    Route::post('/affiliate/withdraw', [App\Http\Controllers\User\AffiliateController::class, 'withdraw'])->name('affiliate.withdraw');
     Route::put('/affiliate/bank-update', [App\Http\Controllers\User\AffiliateController::class, 'updateBankInfo'])->name('affiliate.bank.update');
 });
 
@@ -139,7 +133,7 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::post('/users/{user}/add-balance', [UserManagerController::class, 'addBalance'])->name('users.add-balance');
     Route::post('/users/{user}/add-membership', [UserManagerController::class, 'addMembership'])->name('users.add-membership');
 
-    // Pastikan parameter rute adalah {withdrawal} agar sinkron dengan Controller
+    // Affiliate Management
     Route::get('/affiliate/withdrawals', [AffiliateManagerController::class, 'withdrawals'])->name('affiliate.withdrawals');
     Route::post('/affiliate/withdrawals/{withdrawal}/approve', [AffiliateManagerController::class, 'approveWithdrawal'])->name('affiliate.approve');
     Route::post('/affiliate/withdrawals/{withdrawal}/reject', [AffiliateManagerController::class, 'rejectWithdrawal'])->name('affiliate.reject');
@@ -151,8 +145,12 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
 
     // Tryout Management
     Route::resource('tryouts', TryoutManagerController::class);
+
+    // Pengaturan Sistem (Diperbarui)
+    Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
+    Route::put('/settings', [SettingController::class, 'update'])->name('settings.update');
     
-    // PERBAIKAN: Menambahkan ->names('adidaya') agar route terbaca sebagai 'admin.adidaya.store'
+    // Adidaya Management
     Route::resource('adidaya-manage', \App\Http\Controllers\Admin\AdidayaManagerController::class)->names('adidaya');
     
     // Question Management
@@ -170,20 +168,17 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::get('tryout-akbar/{tryout}/participants', [AdminTryoutAkbarController::class, 'participants'])->name('tryout-akbar.participants');
     Route::post('tryout-akbar/verify/{transaction}', [AdminTryoutAkbarController::class, 'verifyRegistration'])->name('tryout-akbar.verify');
 
-// Membership Settings
+    // Membership Settings
     Route::get('/membership-setting', [MembershipSettingController::class, 'index'])->name('membership-setting.index');
     Route::post('/membership-setting', [MembershipSettingController::class, 'update'])->name('membership-setting.update');
 
-    // Management Paket Membership (Sudah otomatis terproteksi auth & role admin)
+    // Management Paket Membership
     Route::get('/membership-packages', [App\Http\Controllers\Admin\MembershipPackageController::class, 'index'])->name('membership-packages.index');
     Route::post('/membership-packages/{id}', [App\Http\Controllers\Admin\MembershipPackageController::class, 'update'])->name('membership-packages.update');
 
     // Halaman utama kelola afiliasi
     Route::get('/affiliate', [App\Http\Controllers\Admin\AdminAffiliateController::class, 'index'])->name('affiliate.index');
-
     Route::post('/affiliate/user/{user}/reward', [App\Http\Controllers\Admin\AdminAffiliateController::class, 'giveReward'])->name('affiliate.reward');
-    
-    // Aksi untuk menyetujui atau menolak penarikan komisi
     Route::post('/affiliate/withdraw/{withdrawal}/status', [App\Http\Controllers\Admin\AdminAffiliateController::class, 'updateWithdrawStatus'])->name('affiliate.withdraw.status');
 });
 

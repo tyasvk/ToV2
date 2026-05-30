@@ -481,12 +481,40 @@ class TryoutController extends Controller
         return redirect()->route('tryout.result', $attempt->id);
     }
 
-    public function history()
-    {
-        return Inertia::render('User/Tryout/History', [
-            'attempts' => ExamAttempt::where('user_id', auth()->id())->with('tryout')->latest()->get()
-        ]);
-    }
+// Menjadi
+public function history()
+{
+    $attempts = ExamAttempt::where('user_id', auth()->id())
+        ->with('tryout')
+        ->latest()
+        ->get();
+
+    $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65; 
+    $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80; 
+    $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
+
+    $histories = $attempts->map(function ($attempt) use ($pgTwk, $pgTiu, $pgTkp) {
+        $attempt->is_passed = ($attempt->twk_score >= $pgTwk && $attempt->tiu_score >= $pgTiu && $attempt->tkp_score >= $pgTkp);
+        
+        // Menghitung peringkat secara dinamis (Pengecekan 'status' dihapus)
+        $attempt->rank = ExamAttempt::where('tryout_id', $attempt->tryout_id)
+            ->where('total_score', '>', $attempt->total_score)
+            ->count() + 1;
+
+        return $attempt;
+    });
+
+    $stats = [
+        'total' => $histories->count(),
+        'average_score' => $histories->count() > 0 ? round($histories->avg('total_score')) : 0,
+        'passed' => $histories->where('is_passed', true)->count(),
+    ];
+
+    return Inertia::render('User/Tryout/History', [
+        'histories' => $histories,
+        'stats' => $stats
+    ]);
+}
 
     public function review(ExamAttempt $attempt) 
     {

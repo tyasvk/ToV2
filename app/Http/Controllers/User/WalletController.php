@@ -11,13 +11,25 @@ use Midtrans\Snap;
 
 class WalletController extends Controller
 {
-    public function index()
+
+public function index()
     {
+        $userId = auth()->id();
+
+        // 1. Cek dan ubah transaksi pending yang usianya lebih dari 3 jam menjadi gagal (failed)
+        WalletTransaction::where('user_id', $userId)
+            ->where('status', 'pending')
+            ->where('created_at', '<', now()->subHours(3))
+            ->update(['status' => 'failed']);
+
+        // 2. Ambil data transaksi yang sudah ter-update
+        $transactions = WalletTransaction::where('user_id', $userId)->latest()->get();
+
         return Inertia::render('User/Wallet/Index', [
             'balance' => auth()->user()->balance,
-            'transactions' => WalletTransaction::where('user_id', auth()->id())->latest()->get(),
-            // Kirim Client Key untuk frontend
+            'transactions' => $transactions,
             'midtrans_client_key' => config('services.midtrans.client_key'), 
+            'snapToken' => session('snapToken'), 
         ]);
     }
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Tryout;
 use App\Models\User;
 use App\Models\ExamAttempt;
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Carbon;
@@ -12,6 +13,9 @@ use Illuminate\Support\Carbon;
 class DashboardController extends Controller
 {
     /**
+     * Dashboard Utama untuk Peserta (User)
+     */
+/**
      * Dashboard Utama untuk Peserta (User)
      */
     public function index()
@@ -23,27 +27,39 @@ class DashboardController extends Controller
             return redirect()->route('admin.dashboard');
         }
 
-        // 2. Ambil paket tryout terbaru yang aktif & sudah dipublikasikan
-        $availableTryouts = Tryout::withCount('questions')
+        // 2. Ambil Pengumuman Pusat dari tabel settings (jika ada)
+        $announcement = \App\Models\Setting::where('key', 'announcement')->value('value') 
+            ?? 'Selamat datang di CPNS Nusantara! Terus tingkatkan kemampuan Anda dan persiapkan diri untuk ujian sesungguhnya.';
+
+        // 3. Ambil Tryout terbaru yang BENAR-BENAR BELUM DIBELI & BELUM DIKERJAKAN
+        $unpurchasedTryouts = Tryout::withCount('questions')
+            ->whereNotIn('id', function($query) use ($user) {
+                $query->select('tryout_id')
+                      ->from('purchases')
+                      ->where('user_id', $user->id);
+            })
+            ->whereNotIn('id', function($query) use ($user) {
+                $query->select('tryout_id')
+                      ->from('exam_attempts')
+                      ->where('user_id', $user->id);
+            })
             ->where('is_active', true)
             ->where('published_at', '<=', Carbon::now())
             ->latest()
             ->take(3)
             ->get();
 
-        // 3. Hitung statistik personal peserta
+        // 4. Hitung statistik personal peserta
         $attempts = ExamAttempt::where('user_id', $user->id);
-        
-        // Hitung rata-rata skor menggunakan rumus sederhana
-        // $Average = \frac{\sum scores}{total attempts}$
         $averageScore = $attempts->count() > 0 ? round($attempts->avg('total_score')) : 0;
 
         return Inertia::render('Dashboard', [
-            'availableTryouts' => $availableTryouts,
+            'announcement' => $announcement,
+            'unpurchased_tryouts' => $unpurchasedTryouts,
+            'balance' => $user->balance, // <-- Tambahkan baris ini untuk mengirim saldo dompet
             'stats' => [
                 'completed_count' => $attempts->count(),
                 'average_score'   => $averageScore,
-                'last_activity'   => $attempts->latest('completed_at')->first()?->completed_at?->diffForHumans() ?? 'Belum ada',
             ]
         ]);
     }
@@ -53,7 +69,6 @@ class DashboardController extends Controller
      */
     public function adminIndex()
     {
-        // Keamanan tambahan: Pastikan hanya role admin yang bisa masuk
         if (!auth()->user()->hasRole('admin')) {
             abort(403, 'Unauthorized action.');
         }
@@ -65,7 +80,6 @@ class DashboardController extends Controller
                 'total_attempts' => ExamAttempt::count(),
                 'active_exams'   => Tryout::where('is_active', true)->count(),
             ],
-            // Ambil 5 aktivitas pengerjaan terbaru dari seluruh peserta
             'recent_activity' => ExamAttempt::with(['user', 'tryout'])
                 ->latest()
                 ->take(5)
@@ -81,6 +95,4 @@ class DashboardController extends Controller
                 })
         ]);
     }
-
-
 }

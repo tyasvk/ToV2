@@ -8,7 +8,7 @@ const props = defineProps({
     affiliate_code: String,
     affiliate_url: String,
     stats: Object,
-    referred_users: Array,
+    earning_history: Array, // <-- Menggunakan earning_history
     withdrawals: Array,
     announcements: Array,
     weekly_leaderboard: { type: Array, default: () => [] },
@@ -18,7 +18,7 @@ const props = defineProps({
     special_bonus: Number,
     min_withdrawal: Number,
     commission_per_referral: Number,
-    wallet_bonus_for_referral: Number, // <-- Variabel baru
+    wallet_bonus_for_referral: Number,
     token_discount: Number,
     token_commission: Number,
     flash: Object,
@@ -30,6 +30,11 @@ const copiedLink = ref(false);
 const copiedToken = ref(false);
 
 const isEditingBank = ref(!props.user?.bank_info);
+
+// Mengambil bulan saat ini untuk UI
+const currentMonthName = computed(() => {
+    return new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+});
 
 const joinForm = useForm({});
 const bankForm = useForm({
@@ -88,7 +93,7 @@ const formatCurrency = (value) => {
 const formatDate = (dateString) => {
     if (!dateString) return '-';
     const date = new Date(dateString);
-    return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+    return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute:'2-digit' }).replace('.', ':') + ' WIB';
 };
 </script>
 
@@ -137,7 +142,7 @@ const formatDate = (dateString) => {
                         <div class="text-indigo-600 font-medium text-base md:text-lg">2. Token & Diskon Grup</div>
                         <ul class="text-xs md:text-sm text-slate-600 space-y-1.5 list-disc pl-4 font-medium">
                             <li>Gunakan token saat checkout, pembeli dipotong <span class="text-indigo-600 font-medium">{{ formatCurrency(token_discount) }}</span>, Anda komisi <span class="text-emerald-600 font-medium">{{ formatCurrency(token_commission) }}</span>.</li>
-                            <li>Pembeli berkelompok (2-5 org) dapat ekstra diskon otomatis 10% s.d 25%.</li>
+                            <li>Pembeli berkelompok (2-5 org) dapat ekstra diskon otomatis hingga Rp 25.000.</li>
                         </ul>
                     </div>
                 </div>
@@ -158,8 +163,8 @@ const formatDate = (dateString) => {
                     <button @click="activeTab = 'withdraw'" :class="activeTab === 'withdraw' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'" class="px-4 py-2.5 text-[10px] md:text-xs uppercase font-medium tracking-widest border-b-2 transition-colors whitespace-nowrap">
                         Tarik Saldo
                     </button>
-                    <button @click="activeTab = 'referrals'" :class="activeTab === 'referrals' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'" class="px-4 py-2.5 text-[10px] md:text-xs uppercase font-medium tracking-widest border-b-2 transition-colors whitespace-nowrap">
-                        Daftar Rujukan
+                    <button @click="activeTab = 'earnings'" :class="activeTab === 'earnings' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'" class="px-4 py-2.5 text-[10px] md:text-xs uppercase font-medium tracking-widest border-b-2 transition-colors whitespace-nowrap">
+                        Riwayat Pendapatan
                     </button>
                     <button @click="activeTab = 'competition'" :class="activeTab === 'competition' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'" class="px-4 py-2.5 text-[10px] md:text-xs uppercase font-medium tracking-widest border-b-2 transition-colors whitespace-nowrap">
                         Kompetisi Reward
@@ -172,7 +177,7 @@ const formatDate = (dateString) => {
                         <div class="bg-white border border-slate-100 rounded-[1.5rem] p-4 sm:p-5 shadow-sm flex flex-col justify-between">
                             <div class="mb-4">
                                 <p class="text-[10px] text-slate-400 uppercase tracking-[0.2em] font-medium mb-1">Tautan Pendaftaran (Saldo Dompet)</p>
-                                <p class="text-xs text-slate-500 font-medium leading-relaxed">
+                                <p class="text-xs text-slate-500 font-normal leading-relaxed">
                                     Pendaftar via link ini langsung mendapat Saldo Dompet <span class="text-indigo-600 font-medium">{{ formatCurrency(wallet_bonus_for_referral) }}</span>. Anda langsung mendapat komisi <span class="text-emerald-600 font-medium">{{ formatCurrency(commission_per_referral) }}</span>.
                                 </p>
                             </div>
@@ -189,8 +194,8 @@ const formatDate = (dateString) => {
                         <div class="bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 rounded-[1.5rem] p-4 sm:p-5 shadow-sm flex flex-col justify-between">
                             <div class="mb-4">
                                 <p class="text-[10px] text-indigo-400 uppercase tracking-[0.2em] font-medium mb-1">Token Diskon & Group Buy</p>
-                                <p class="text-xs text-slate-600 font-medium leading-relaxed">
-                                    Dimasukkan saat checkout: Pembeli dipotong harga <span class="text-indigo-600 font-medium">{{ formatCurrency(token_discount) }}</span>, Anda komisi <span class="text-emerald-600 font-medium">{{ formatCurrency(token_commission) }}</span>. Ekstra diskon 10-25% untuk pembelian kelompok!
+                                <p class="text-xs text-slate-600 font-normal leading-relaxed">
+                                    Dimasukkan saat checkout: Pembeli dipotong harga <span class="text-indigo-600 font-medium">{{ formatCurrency(token_discount) }}</span>, Anda komisi <span class="text-emerald-600 font-medium">{{ formatCurrency(token_commission) }}</span>. Ekstra diskon hingga Rp 25.000 untuk pembelian kelompok!
                                 </p>
                             </div>
                             <div class="flex flex-col sm:flex-row gap-2">
@@ -206,12 +211,12 @@ const formatDate = (dateString) => {
 
                     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                         <div class="bg-white border border-slate-100 rounded-[1.25rem] p-3.5 md:p-4 shadow-sm flex flex-col justify-center">
-                            <p class="text-[9px] md:text-[10px] text-slate-400 uppercase tracking-wider font-medium mb-1">Rujukan Bulan Ini</p>
+                            <p class="text-[9px] md:text-[10px] text-slate-400 uppercase tracking-wider font-medium mb-1">Pemakai Token Bulan Ini</p>
                             <p class="text-lg md:text-xl font-medium text-slate-800 tracking-tighter">{{ monthly_count }} <span class="text-xs text-slate-400">/ {{ target_limit }}</span></p>
                         </div>
                         <div class="bg-white border border-slate-100 rounded-[1.25rem] p-3.5 md:p-4 shadow-sm flex flex-col justify-center">
-                            <p class="text-[9px] md:text-[10px] text-slate-400 uppercase tracking-wider font-medium mb-1">Total Pendaftaran</p>
-                            <p class="text-lg md:text-xl font-medium text-blue-500 tracking-tighter">{{ stats.registrations || 0 }}</p>
+                            <p class="text-[9px] md:text-[10px] text-slate-400 uppercase tracking-wider font-medium mb-1">Total Pemakai Token</p>
+                            <p class="text-lg md:text-xl font-medium text-blue-500 tracking-tighter">{{ stats.token_usages || 0 }}</p>
                         </div>
                         <div class="bg-white border border-slate-100 rounded-[1.25rem] p-3.5 md:p-4 shadow-sm flex flex-col justify-center">
                             <p class="text-[9px] md:text-[10px] text-slate-400 uppercase tracking-wider font-medium mb-1">Bonus Diperoleh</p>
@@ -228,7 +233,7 @@ const formatDate = (dateString) => {
                             <p class="text-[9px] md:text-[10px] text-slate-300 uppercase tracking-[0.2em] font-medium mb-1">Saldo Komisi Saat Ini</p>
                             <div class="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
                                 <p class="text-2xl md:text-3xl font-medium tracking-tight text-emerald-400">{{ formatCurrency(user?.affiliate_balance || 0) }}</p>
-                                <p class="text-[10px] text-slate-400 font-medium">(Min. penarikan {{ formatCurrency(min_withdrawal) }})</p>
+                                <p class="text-[10px] text-slate-400 font-normal">(Min. penarikan {{ formatCurrency(min_withdrawal) }})</p>
                             </div>
                         </div>
                         <button @click="activeTab = 'withdraw'" class="w-full sm:w-auto px-5 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl text-[10px] uppercase font-medium tracking-[0.15em] transition-colors border border-white/10">
@@ -257,23 +262,23 @@ const formatDate = (dateString) => {
                                 <div class="text-[10px] text-slate-400 uppercase tracking-widest font-medium mb-1">Informasi Tersimpan</div>
                                 <div class="text-sm font-medium text-slate-800">{{ user.bank_info.bank_name }}</div>
                                 <div class="text-xs font-mono text-slate-600">{{ user.bank_info.account_number }}</div>
-                                <div class="text-xs text-slate-600 font-medium">a.n {{ user.bank_info.account_name }}</div>
+                                <div class="text-xs text-slate-600 font-normal">a.n {{ user.bank_info.account_name }}</div>
                             </div>
 
                             <form v-else @submit.prevent="updateBankInfo" class="space-y-4 mt-2">
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
                                         <label class="block text-[10px] font-medium text-slate-400 uppercase tracking-wider mb-1.5">Nama Bank / Dompet Digital</label>
-                                        <input v-model="bankForm.bank_name" type="text" placeholder="BCA / Mandiri / Dana / Gopay" required class="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl px-4 py-3 text-xs md:text-sm font-medium text-slate-800" />
+                                        <input v-model="bankForm.bank_name" type="text" placeholder="BCA / Mandiri / Dana / Gopay" required class="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl px-4 py-3 text-xs md:text-sm font-normal text-slate-800" />
                                     </div>
                                     <div>
                                         <label class="block text-[10px] font-medium text-slate-400 uppercase tracking-wider mb-1.5">Nomor Rekening / No. HP</label>
-                                        <input v-model="bankForm.account_number" type="text" placeholder="Masukkan Nomor" required class="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl px-4 py-3 text-xs md:text-sm font-medium text-slate-800" />
+                                        <input v-model="bankForm.account_number" type="text" placeholder="Masukkan Nomor" required class="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl px-4 py-3 text-xs md:text-sm font-normal text-slate-800" />
                                     </div>
                                 </div>
                                 <div>
                                     <label class="block text-[10px] font-medium text-slate-400 uppercase tracking-wider mb-1.5">Atas Nama Pemilik</label>
-                                    <input v-model="bankForm.account_name" type="text" placeholder="Sesuai aplikasi/buku tabungan" required class="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl px-4 py-3 text-xs md:text-sm font-medium text-slate-800" />
+                                    <input v-model="bankForm.account_name" type="text" placeholder="Sesuai aplikasi/buku tabungan" required class="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl px-4 py-3 text-xs md:text-sm font-normal text-slate-800" />
                                 </div>
                                 <button type="submit" :disabled="bankForm.processing" class="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[11px] uppercase font-medium tracking-[0.2em] transition-all disabled:opacity-50">
                                     {{ bankForm.processing ? 'Menyimpan Data...' : 'Simpan Data Bank' }}
@@ -284,27 +289,27 @@ const formatDate = (dateString) => {
                         <div class="bg-white border border-slate-100 rounded-[1.5rem] p-5 md:p-6 shadow-sm space-y-4">
                             <h3 class="text-xs md:text-sm font-medium text-slate-800 uppercase tracking-widest">Pengajuan Tarik Saldo</h3>
                             <div class="bg-slate-50 rounded-xl p-4 text-xs md:text-sm space-y-2 border border-slate-100">
-                                <div class="flex justify-between items-center"><span class="text-slate-500 font-medium">Saldo Tersedia:</span><span class="font-medium text-slate-800">{{ formatCurrency(user?.affiliate_balance || 0) }}</span></div>
-                                <div class="flex justify-between items-center"><span class="text-slate-500 font-medium">Batas Minimal Tarik:</span><span class="font-medium text-indigo-600">{{ formatCurrency(min_withdrawal) }}</span></div>
+                                <div class="flex justify-between items-center"><span class="text-slate-500 font-normal">Saldo Tersedia:</span><span class="font-medium text-slate-800">{{ formatCurrency(user?.affiliate_balance || 0) }}</span></div>
+                                <div class="flex justify-between items-center"><span class="text-slate-500 font-normal">Batas Minimal Tarik:</span><span class="font-medium text-indigo-600">{{ formatCurrency(min_withdrawal) }}</span></div>
                             </div>
                             <form @submit.prevent="submitWithdrawal" class="space-y-4 mt-2">
                                 <div>
                                     <label class="block text-[10px] font-medium text-slate-400 uppercase tracking-wider mb-1.5">Jumlah Nominal (Rp)</label>
-                                    <input v-model="withdrawForm.amount" type="number" placeholder="Contoh: 30000" class="w-full bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:ring-0 rounded-xl px-4 py-3 text-sm font-medium text-emerald-600" />
+                                    <input v-model="withdrawForm.amount" type="number" placeholder="Contoh: 30000" class="w-full bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:ring-0 rounded-xl px-4 py-3 text-sm font-normal text-emerald-600" />
                                     <p v-if="withdrawForm.errors.amount" class="text-[10px] text-rose-500 mt-1 font-medium">{{ withdrawForm.errors.amount }}</p>
                                 </div>
                                 <button type="submit" :disabled="withdrawForm.processing || !user?.bank_info || (user?.affiliate_balance < min_withdrawal)" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] uppercase font-medium tracking-[0.2em] transition-all disabled:opacity-50">
                                     {{ withdrawForm.processing ? 'Meneruskan Pengajuan...' : 'Tarik Saldo Sekarang' }}
                                 </button>
-                                <p v-if="!user?.bank_info" class="text-[10px] text-rose-500 text-center font-medium mt-2">Harap atur dan simpan rekening pencairan di atas terlebih dahulu.</p>
-                                <p v-else class="text-[9px] text-slate-400 text-center font-medium mt-2 uppercase tracking-wide">Proses transfer membutuhkan waktu maksimal 1x24 Jam kerja.</p>
+                                <p v-if="!user?.bank_info" class="text-[10px] text-rose-500 text-center font-normal mt-2">Harap atur dan simpan rekening pencairan di atas terlebih dahulu.</p>
+                                <p v-else class="text-[9px] text-slate-400 text-center font-normal mt-2 uppercase tracking-wide">Proses transfer membutuhkan waktu maksimal 1x24 Jam kerja.</p>
                             </form>
                         </div>
                     </div>
 
                     <div class="space-y-3 md:col-span-1">
                         <h4 class="text-[10px] font-medium text-slate-400 uppercase tracking-[0.15em] px-1">Riwayat Status Pencairan</h4>
-                        <div v-if="withdrawals.length === 0" class="bg-white border border-slate-100 rounded-[1.5rem] p-6 text-center text-xs text-slate-400 font-medium shadow-sm">
+                        <div v-if="withdrawals.length === 0" class="bg-white border border-slate-100 rounded-[1.5rem] p-6 text-center text-xs text-slate-400 font-normal shadow-sm">
                             Belum ada riwayat penarikan.
                         </div>
                         <div v-else class="flex flex-col gap-2.5">
@@ -320,7 +325,7 @@ const formatDate = (dateString) => {
                                     </span>
                                 </div>
                                 <div class="flex justify-between items-end mt-1 pt-2 border-t border-slate-50">
-                                    <span class="text-[10px] text-slate-500 font-medium">Nominal:</span>
+                                    <span class="text-[10px] text-slate-500 font-normal">Nominal:</span>
                                     <span class="text-sm font-medium text-slate-900">{{ formatCurrency(wd.amount) }}</span>
                                 </div>
                             </div>
@@ -328,20 +333,29 @@ const formatDate = (dateString) => {
                     </div>
                 </div>
 
-                <div v-if="activeTab === 'referrals'" class="space-y-3">
-                    <h3 class="text-xs md:text-sm font-medium text-slate-900 uppercase tracking-wider px-1">Daftar Pengguna Referral</h3>
-                    <div v-if="referred_users.length === 0" class="bg-white border border-slate-100 rounded-[1.5rem] p-8 md:p-10 text-center text-xs md:text-sm text-slate-400 font-medium shadow-sm">
-                        Belum ada yang bergabung. Bagikan tautan/token Anda sekarang!
+                <div v-if="activeTab === 'earnings'" class="space-y-3">
+                    <h3 class="text-xs md:text-sm font-medium text-slate-900 uppercase tracking-wider px-1">Riwayat Pendapatan Afiliasi</h3>
+                    <div v-if="earning_history.length === 0" class="bg-white border border-slate-100 rounded-[1.5rem] p-8 md:p-10 text-center text-xs md:text-sm text-slate-400 font-normal shadow-sm">
+                        Belum ada yang menggunakan kode atau tautan Anda. Bagikan sekarang ke media sosial!
                     </div>
                     <div v-else class="flex flex-col gap-2.5">
-                        <div v-for="refItem in referred_users" :key="refItem.id" class="bg-white border border-slate-100 rounded-xl p-4 flex items-center justify-between gap-4 transition-all shadow-sm">
-                            <div class="min-w-0">
-                                <h4 class="text-xs md:text-sm font-medium text-slate-900 truncate tracking-tight pr-2">{{ refItem.name }}</h4>
-                                <p class="text-[9px] md:text-[10px] text-slate-400 font-medium mt-0.5">Mendaftar: {{ formatDate(refItem.created_at) }}</p>
+                        <div v-for="earn in earning_history" :key="earn.id" class="bg-white border border-slate-100 rounded-xl p-4 flex items-center justify-between gap-4 transition-all shadow-sm">
+                            <div class="min-w-0 flex items-start gap-3">
+                                <div class="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center border" :class="earn.type.includes('Token') ? 'bg-indigo-50 border-indigo-100 text-indigo-500' : 'bg-emerald-50 border-emerald-100 text-emerald-500'">
+                                    <span class="text-xs">
+                                        {{ earn.type.includes('Token') ? '🎫' : '👤' }}
+                                    </span>
+                                </div>
+                                <div>
+                                    <h4 class="text-xs md:text-sm font-medium text-slate-900 truncate tracking-tight">{{ earn.name }}</h4>
+                                    <p class="text-[9px] md:text-[10px] text-slate-400 font-medium mt-0.5">
+                                        {{ earn.type }} &bull; {{ formatDate(earn.created_at) }}
+                                    </p>
+                                </div>
                             </div>
                             <div class="text-right shrink-0">
-                                <span class="text-[8px] md:text-[9px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-100 uppercase tracking-wider px-2 md:px-2.5 py-1 rounded-lg">
-                                    Berhasil Dikonversi
+                                <span class="text-xs md:text-sm font-medium text-emerald-600 block">
+                                    +{{ formatCurrency(earn.amount) }}
                                 </span>
                             </div>
                         </div>
@@ -350,17 +364,22 @@ const formatDate = (dateString) => {
 
                 <div v-if="activeTab === 'competition'" class="space-y-6">
                     <div class="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[1.5rem] p-5 md:p-8 shadow-md text-white">
-                        <h3 class="text-lg md:text-xl font-medium tracking-tight mb-2">Kompetisi Mingguan & Bulanan</h3>
-                        <p class="text-xs md:text-sm text-indigo-100 font-medium leading-relaxed max-w-3xl">
-                            Raih target pendaftar terbanyak setiap minggu dan bulan untuk mendapatkan hadiah saldo khusus secara langsung! Bagikan tautan kompetisi atau token unik Anda di bawah ini ke seluruh media sosial.
+                        <div class="flex items-center gap-2 mb-2">
+                            <h3 class="text-lg md:text-xl font-medium tracking-tight">Kompetisi Penggunaan Token</h3>
+                        </div>
+                        <p class="text-xs md:text-sm text-indigo-100 font-normal leading-relaxed max-w-3xl">
+                            Raih target penggunaan token terbanyak setiap minggu dan bulan untuk mendapatkan hadiah saldo khusus secara langsung! Bagikan tautan kompetisi atau token unik Anda di bawah ini ke seluruh media sosial.
                         </p>
+                        <div class="mt-4 inline-block bg-white/20 border border-white/30 rounded-lg px-3 py-1.5 text-[10px] uppercase tracking-widest font-medium">
+                            Periode: {{ currentMonthName }}
+                        </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="bg-white border border-slate-100 rounded-[1.25rem] p-4 md:p-5 shadow-sm">
-                            <p class="text-[10px] text-slate-400 uppercase tracking-widest font-medium mb-2">Tautan Kompetisi Anda</p>
+                            <p class="text-[10px] text-slate-400 uppercase tracking-widest font-medium mb-2">Tautan Referensi Anda</p>
                             <div class="flex flex-col sm:flex-row gap-2">
-                                <div class="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs text-slate-600 font-medium select-all truncate flex items-center">
+                                <div class="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs text-slate-600 font-normal select-all truncate flex items-center">
                                     {{ affiliate_url }}
                                 </div>
                                 <button @click="copyLink" :class="copiedLink ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-white hover:bg-indigo-600'" class="w-full sm:w-auto px-4 py-2.5 rounded-xl text-[10px] uppercase font-medium tracking-wider transition-all shrink-0">
@@ -393,10 +412,10 @@ const formatDate = (dateString) => {
                                         </div>
                                         <span class="text-xs font-medium text-slate-700 truncate max-w-[120px] sm:max-w-[150px]">{{ leader.name }}</span>
                                     </div>
-                                    <span class="text-[10px] font-medium text-slate-500 uppercase tracking-wider shrink-0">{{ leader.total }} Rujukan</span>
+                                    <span class="text-[10px] font-medium text-slate-500 uppercase tracking-wider shrink-0">{{ leader.total }} Token</span>
                                 </div>
                             </div>
-                            <div v-else class="text-center py-8 text-xs text-slate-400 font-medium">
+                            <div v-else class="text-center py-8 text-xs text-slate-400 font-normal">
                                 Belum ada data minggu ini.
                             </div>
                         </div>
@@ -411,26 +430,29 @@ const formatDate = (dateString) => {
                                         </div>
                                         <span class="text-xs font-medium text-slate-700 truncate max-w-[120px] sm:max-w-[150px]">{{ leader.name }}</span>
                                     </div>
-                                    <span class="text-[10px] font-medium text-slate-500 uppercase tracking-wider shrink-0">{{ leader.total }} Rujukan</span>
+                                    <span class="text-[10px] font-medium text-slate-500 uppercase tracking-wider shrink-0">{{ leader.total }} Token</span>
                                 </div>
                             </div>
-                            <div v-else class="text-center py-8 text-xs text-slate-400 font-medium">
+                            <div v-else class="text-center py-8 text-xs text-slate-400 font-normal">
                                 Belum ada data bulan ini.
                             </div>
                         </div>
                     </div>
 
                     <div class="bg-white border border-slate-100 rounded-[1.5rem] p-5 md:p-6 shadow-sm space-y-4 mt-2">
-                        <h3 class="text-xs font-medium text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-2.5">Riwayat Penerima Hadiah Reward</h3>
+                        <h3 class="text-xs font-medium text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-2.5">Riwayat Pemenang Kompetisi</h3>
                         <div v-if="announcements && announcements.length > 0" class="divide-y divide-slate-100">
                             <div v-for="ann in announcements" :key="ann.id" class="py-3 flex justify-between items-center text-xs transition-colors hover:bg-slate-50/50 rounded-lg px-2">
-                                <span class="font-medium text-slate-700 truncate pr-2">{{ ann.user?.name }}</span>
+                                <div>
+                                    <span class="font-medium text-slate-700 truncate pr-2 block">{{ ann.user?.name }}</span>
+                                    <span class="text-[9px] text-slate-400 block mt-0.5">{{ formatDate(ann.created_at) }}</span>
+                                </div>
                                 <span class="font-medium text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded text-[9px] uppercase shrink-0 border border-indigo-100">
                                     {{ ann.proof_payment === 'REWARD-WEEKLY' ? 'Juara Mingguan' : 'Juara Bulanan' }}
                                 </span>
                             </div>
                         </div>
-                        <div v-else class="text-center py-6 text-xs text-slate-400 font-medium">
+                        <div v-else class="text-center py-6 text-xs text-slate-400 font-normal">
                             Belum ada pemenang kompetisi di periode ini. Jadilah yang pertama mencapai target!
                         </div>
                     </div>

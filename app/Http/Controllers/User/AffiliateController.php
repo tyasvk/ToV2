@@ -37,12 +37,12 @@ class AffiliateController extends Controller
                 'affiliate_url' => '',
                 'stats' => [
                     'clicks' => 0, 
-                    'registrations' => 0, 
+                    'token_usages' => 0, 
                     'conversions' => 0, 
                     'total_earnings' => 0, 
                     'current_balance' => 0
                 ],
-                'referred_users' => [],
+                'earning_history' => [],
                 'withdrawals' => [],
                 'announcements' => [],
                 'monthly_count' => 0,
@@ -60,33 +60,53 @@ class AffiliateController extends Controller
             ->take(10)
             ->get();
 
+        // Hitung total penggunaan token di bulan ini
         $monthlyReferralCount = Transaction::where('referrer_id', $user->id)
             ->whereIn('status', ['paid', 'success'])
             ->whereMonth('created_at', now()->month)
             ->whereYear('created_at', now()->year)
             ->count();
 
-        $referralTransactions = Transaction::where('referrer_id', $user->id)
+        // ===============================================
+        // MENGAMBIL RIWAYAT PENDAPATAN (GABUNGAN)
+        // ===============================================
+        // A. Dari Pendaftaran Baru
+        $registeredUsers = User::where('referred_by', $user->id)->get()->map(function($u) use ($systemInfo) {
+            return [
+                'id' => 'reg_'.$u->id,
+                'name' => $u->name,
+                'type' => 'Pendaftaran Akun Baru',
+                'amount' => $systemInfo['commission_per_referral'],
+                'created_at' => $u->created_at,
+            ];
+        });
+
+        // B. Dari Penggunaan Token Tryout
+        $tokenUsages = Transaction::where('referrer_id', $user->id)
             ->whereIn('status', ['paid', 'success'])
             ->with('user')
-            ->get();
+            ->get()
+            ->map(function($t) use ($systemInfo) {
+                return [
+                    'id' => 'trx_'.$t->id,
+                    'name' => $t->user->name ?? 'Pengguna',
+                    'type' => 'Pembelian Tryout (Token)',
+                    'amount' => $systemInfo['token_commission'],
+                    'created_at' => $t->created_at,
+                ];
+            });
+
+        // Gabungkan dan urutkan dari yang terbaru
+        $earningHistory = $registeredUsers->merge($tokenUsages)->sortByDesc('created_at')->values()->all();
+        // ===============================================
 
         $stats = [
             'clicks' => 0,
-            'registrations' => $referralTransactions->count(), 
-            'conversions' => $referralTransactions->count(),
+            'token_usages' => $tokenUsages->count(), 
+            'conversions' => $tokenUsages->count(),
             'total_earnings' => WithdrawalRequest::where('user_id', $user->id)->where('status', 'approved')->sum('amount') + ($user->affiliate_balance ?? 0),
             'current_balance' => $user->affiliate_balance ?? 0,
         ];
-
-        $referredUsers = $referralTransactions->map(function ($trx) {
-            return [
-                'id' => $trx->id,
-                'name' => $trx->user->name ?? 'Pengguna',
-                'created_at' => $trx->created_at,
-                'has_purchased' => true, 
-            ];
-        });
 
         $withdrawals = WithdrawalRequest::where('user_id', $user->id)
             ->latest()
@@ -102,7 +122,7 @@ class AffiliateController extends Controller
                 ];
             });
 
-        // KLASEMEN KOMPETISI
+        // KLASEMEN KOMPETISI MINGGUAN & BULANAN
         $weeklyLeaderboard = DB::table('transactions')
             ->join('users', 'transactions.referrer_id', '=', 'users.id')
             ->select('users.name', DB::raw('count(transactions.id) as total'))
@@ -129,7 +149,7 @@ class AffiliateController extends Controller
             'affiliate_code' => $user->affiliate_code,
             'affiliate_url' => $affiliateUrl,
             'stats' => $stats,
-            'referred_users' => $referredUsers,
+            'earning_history' => $earningHistory, // Data gabungan baru dikirim ke Vue
             'withdrawals' => $withdrawals,
             'announcements' => $announcements,
             'monthly_count' => $monthlyReferralCount,
