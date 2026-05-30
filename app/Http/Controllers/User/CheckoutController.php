@@ -29,106 +29,97 @@ class CheckoutController extends Controller
         return $transaction->tryout?->title ?? $nusantaraName ?? $transaction->description ?? 'Paket Belajar';
     }
 
-public function show(Transaction $transaction)
-{
-    if ($transaction->user_id !== auth()->id()) abort(403);
+    public function show(Transaction $transaction)
+    {
+        if ($transaction->user_id !== auth()->id()) abort(403);
 
-    $user = User::find(auth()->id());
-    $itemName = $this->resolveItemName($transaction);
+        $user = User::find(auth()->id());
+        $itemName = $this->resolveItemName($transaction);
 
-    if (in_array($transaction->status, ['paid', 'success'])) {
-        return redirect()->route('dashboard')->with('success', "Akses $itemName Aktif!");
-    }
+        if (in_array($transaction->status, ['paid', 'success'])) {
+            return redirect()->route('dashboard')->with('success', "Akses $itemName Aktif!");
+        }
 
-    $transaction->load(['tryout']); 
+        $transaction->load(['tryout']); 
 
-    $jumlahOrang = $transaction->metadata['jumlah_orang'] ?? 1;
-    $tokenAfiliasi = $transaction->metadata['token_afiliasi'] ?? null;
-    
-    $hargaDasar = $transaction->metadata['base_price'] ?? $transaction->amount;
-    $totalHarga = $hargaDasar * $jumlahOrang;
-    $persenDiskon = 0;
-
-    // 1. Hitung Diskon Group Buy (10% - 25coding%)
-    if ($jumlahOrang == 2) $persenDiskon = 0.10;
-    elseif ($jumlahOrang == 3) $persenDiskon = 0.15;
-    elseif ($jumlahOrang == 4) $persenDiskon = 0.20;
-    elseif ($jumlahOrang >= 5) $persenDiskon = 0.25;
-
-    $hargaSetelahGrup = $totalHarga - ($totalHarga * $persenDiskon);
-    $potonganToken = 0;
-
-    // ===================================================================
-    // PERBAIKAN VALIDASI: Hanya token afiliasi resmi yang memotong harga
-    // ===================================================================
-    if ($tokenAfiliasi) {
-        // Cari token secara spesifik di database
-        $pemilikToken = User::where('affiliate_code', trim($tokenAfiliasi))->first();
+        $jumlahOrang = $transaction->metadata['jumlah_orang'] ?? 1;
+        $tokenAfiliasi = $transaction->metadata['token_afiliasi'] ?? null;
         
-        if ($pemilikToken) {
-            // Proteksi: Pemilik token tidak boleh menggunakan kodenya sendiri
-            if ($pemilikToken->id !== $user->id) {
-                $potonganToken = 2000;
-                
-                if (!$transaction->referrer_id) {
-                    $transaction->update(['referrer_id' => $pemilikToken->id]);
+        $hargaDasar = $transaction->metadata['base_price'] ?? $transaction->amount;
+        $totalHarga = $hargaDasar * $jumlahOrang;
+        $persenDiskon = 0;
+
+        if ($jumlahOrang == 2) $persenDiskon = 0.10;
+        elseif ($jumlahOrang == 3) $persenDiskon = 0.15;
+        elseif ($jumlahOrang == 4) $persenDiskon = 0.20;
+        elseif ($jumlahOrang >= 5) $persenDiskon = 0.25;
+
+        $hargaSetelahGrup = $totalHarga - ($totalHarga * $persenDiskon);
+        $potonganToken = 0;
+
+        if ($tokenAfiliasi) {
+            $pemilikToken = User::where('affiliate_code', trim($tokenAfiliasi))->first();
+            
+            if ($pemilikToken) {
+                if ($pemilikToken->id !== $user->id) {
+                    $potonganToken = 2000;
+                    
+                    if (!$transaction->referrer_id) {
+                        $transaction->update(['referrer_id' => $pemilikToken->id]);
+                    }
+                } else {
+                    session()->flash('error', 'Anda tidak dapat menggunakan kode afiliasi Anda sendiri.');
+                    $tokenAfiliasi = null; 
                 }
             } else {
-                // Opsional: Jika kodenya milik sendiri, batalkan potongan dan kirim pesan
-                session()->flash('error', 'Anda tidak dapat menggunakan kode afiliasi Anda sendiri.');
-                $tokenAfiliasi = null; 
+                session()->flash('error', 'Kode voucher atau token afiliasi tidak valid / tidak ditemukan.');
+                $tokenAfiliasi = null;
             }
-        } else {
-            // JIKA KODE ASAL/TIDAK DAFTAR: Batalkan potongan harga dan kirim notifikasi eror
-            session()->flash('error', 'Kode voucher atau token afiliasi tidak valid / tidak ditemukan.');
-            $tokenAfiliasi = null;
         }
-    }
-    // ===================================================================
 
-    $finalTagihan = $hargaSetelahGrup - $potonganToken;
-    
-    if ($transaction->amount != $finalTagihan) {
-        $transaction->update(['amount' => $finalTagihan]);
-    }
+        $finalTagihan = $hargaSetelahGrup - $potonganToken;
+        
+        if ($transaction->amount != $finalTagihan) {
+            $transaction->update(['amount' => $finalTagihan]);
+        }
 
-    $fee = ceil($finalTagihan * 0.007 * 1.11); 
-    $totalToPay = (int) ($finalTagihan + $fee);
-    
-    $transaction->update(['total_amount' => $totalToPay]);
+        $fee = ceil($finalTagihan * 0.007 * 1.11); 
+        $totalToPay = (int) ($finalTagihan + $fee);
+        
+        $transaction->update(['total_amount' => $totalToPay]);
 
-    if (empty($transaction->snap_token) || $tokenAfiliasi === null) {
-        $this->initMidtrans();
-        $params = [
-            'transaction_details' => [
-                'order_id' => $transaction->invoice_code . '-' . time(),
-                'gross_amount' => $totalToPay
+        if (empty($transaction->snap_token) || $tokenAfiliasi === null) {
+            $this->initMidtrans();
+            $params = [
+                'transaction_details' => [
+                    'order_id' => $transaction->invoice_code . '-' . time(),
+                    'gross_amount' => $totalToPay
+                ],
+                'item_details' => [
+                    ['id' => $transaction->id, 'price' => (int) $finalTagihan, 'quantity' => 1, 'name' => substr($itemName, 0, 30)],
+                    ['id' => 'FEE', 'price' => (int) $fee, 'quantity' => 1, 'name' => 'Biaya Layanan']
+                ],
+                'customer_details' => ['first_name' => $user->name, 'email' => $user->email],
+            ];
+            try {
+                $snapToken = Snap::getSnapToken($params);
+                $transaction->update(['snap_token' => $snapToken]);
+            } catch (\Exception $e) {}
+        }
+
+        return Inertia::render('User/Checkout/Show', [
+            'transaction' => [
+                'id' => $transaction->id, 
+                'amount' => $transaction->amount, 
+                'total_amount' => $transaction->total_amount,
+                'invoice_code' => $transaction->invoice_code,
+                'snap_token' => $transaction->snap_token, 
+                'description' => $itemName, 
+                'tryout_id' => $transaction->tryout_id,
             ],
-            'item_details' => [
-                ['id' => $transaction->id, 'price' => (int) $finalTagihan, 'quantity' => 1, 'name' => substr($itemName, 0, 30)],
-                ['id' => 'FEE', 'price' => (int) $fee, 'quantity' => 1, 'name' => 'Biaya Layanan']
-            ],
-            'customer_details' => ['first_name' => $user->name, 'email' => $user->email],
-        ];
-        try {
-            $snapToken = Snap::getSnapToken($params);
-            $transaction->update(['snap_token' => $snapToken]);
-        } catch (\Exception $e) {}
+            'user_balance' => $user->balance,
+        ]);
     }
-
-    return Inertia::render('User/Checkout/Show', [
-        'transaction' => [
-            'id' => $transaction->id, 
-            'amount' => $transaction->amount, 
-            'total_amount' => $transaction->total_amount,
-            'invoice_code' => $transaction->invoice_code,
-            'snap_token' => $transaction->snap_token, 
-            'description' => $itemName, 
-            'tryout_id' => $transaction->tryout_id,
-        ],
-        'user_balance' => $user->balance,
-    ]);
-}
 
     public function process(Request $request, Transaction $transaction)
     {
@@ -153,18 +144,29 @@ public function show(Transaction $transaction)
                     'status' => 'success'
                 ]);
 
-                // ==========================================
-                // LOGIKA BARU: KOMISI TOKEN AFILIASI SETELAH LUNAS
-                // ==========================================
-                // Cek apakah transaksi ini dibantu oleh token afiliasi (ada referrer_id)
-                if ($transaction->referrer_id) {
-                    $referrer = User::find($transaction->referrer_id);
-                    if ($referrer) {
-                        // Tambahkan komisi token 2.000 ke afiliator
-                        $referrer->increment('affiliate_balance', 2000);
+                // ==========================================================
+                // SKEMA AMAN: EVALUASI TRANSAKSI PERTAMA BERDASARKAN ID TERLAMA
+                // ==========================================================
+                $firstPaidTxId = Transaction::where('user_id', $user->id)
+                    ->whereIn('status', ['paid', 'success'])
+                    ->orderBy('created_at', 'asc')
+                    ->value('id');
+
+                if ($firstPaidTxId == $transaction->id && $user->referred_by) {
+                    $upline = User::find($user->referred_by);
+                    if ($upline) {
+                        // Pemilik kode mendapat Rp 2.500 (Pendaftaran) + Rp 2.000 (Tryout Pertama) = Rp 4.500
+                        $upline->increment('affiliate_balance', 4500);
+                    }
+                } else {
+                    // Pembelian kedua dan seterusnya: Komisi Rp 2.000 masuk ke pemilik token transaksi
+                    if ($transaction->referrer_id) {
+                        $referrer = User::find($transaction->referrer_id);
+                        if ($referrer) {
+                            $referrer->increment('affiliate_balance', 2000);
+                        }
                     }
                 }
-                // ==========================================
 
                 if (!$transaction->tryout_id || (isset($transaction->metadata['type']) && $transaction->metadata['type'] === 'membership')) {
                     $daysToAdd = $transaction->metadata['days'] ?? $transaction->metadata['duration_days'] ?? 30; 

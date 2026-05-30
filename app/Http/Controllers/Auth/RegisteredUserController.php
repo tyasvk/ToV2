@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Models\WalletTransaction; // Pastikan model ini dipanggil
+use App\Models\WalletTransaction;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,7 +31,7 @@ class RegisteredUserController extends Controller
             'province_code' => 'required|string|size:2',
             'gender' => 'required|in:1,2',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
-            'referral_code' => 'nullable|string|exists:users,affiliate_code', // Validasi kode referral
+            'referral_code' => 'nullable|string|exists:users,affiliate_code', 
         ], [
             'referral_code.exists' => 'Kode referral tidak valid atau tidak ditemukan.',
         ]);
@@ -45,7 +45,7 @@ class RegisteredUserController extends Controller
             'agency_name' => $request->agency_name,
             'province_code' => $request->province_code,
             'gender' => $request->gender,
-            'balance' => 0, // Set awal 0
+            'balance' => 0, 
         ]);
 
         // Generate Nomor Peserta
@@ -55,10 +55,7 @@ class RegisteredUserController extends Controller
         $user->participant_number = $finalCode;
 
         // ==========================================
-        // LOGIKA BONUS AFILIASI & DOMPET
-        // ==========================================
-    // ==========================================
-        // LOGIKA BONUS AFILIASI & DOMPET
+        // LOGIKA BONUS DOMPET USER BARU LANGSUNG AKTIF
         // ==========================================
         $referralCode = $request->referral_code;
 
@@ -67,16 +64,14 @@ class RegisteredUserController extends Controller
             
             if ($referrer && $referrer->id !== $user->id) {
                 
-                // 1. Tambah saldo Dompet Pendaftar
+                // 1. Tambah saldo Dompet Pendaftar LANGSUNG
                 $user->balance += 2500;
                 
-                // --- INI YANG WAJIB DIAKTIFKAN ---
-                // Simpan ID perujuk ke database
+                // Simpan ID perujuk untuk mencairkan komisi upline saat pembelian pertama nanti
                 $user->referred_by = $referrer->id;
-                // ---------------------------------
                 
-                // Catat ke Riwayat Transaksi Dompet
-                \App\Models\WalletTransaction::create([
+                // Catat ke Riwayat Transaksi Dompet Pendaftar
+                WalletTransaction::create([
                     'user_id' => $user->id,
                     'type' => 'in',
                     'amount' => 2500,
@@ -85,13 +80,11 @@ class RegisteredUserController extends Controller
                     'proof_payment' => 'BONUS-REF-' . time()
                 ]);
                 
-                // 2. Tambah saldo Komisi Pemilik Kode
-                $referrer->increment('affiliate_balance', 2500);
+                // PENTING: Saldo Upline ($referrer) tidak ditambah di sini (DIPENDING)
             }
         }
         // ==========================================
 
-        // Simpan pembaruan saldo & nomor peserta
         $user->save();
 
         $user->assignRole('user'); 

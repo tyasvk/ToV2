@@ -178,7 +178,7 @@ const formatDate = (dateString) => {
                             <div class="mb-4">
                                 <p class="text-[10px] text-slate-400 uppercase tracking-[0.2em] font-medium mb-1">Tautan Pendaftaran (Saldo Dompet)</p>
                                 <p class="text-xs text-slate-500 font-normal leading-relaxed">
-                                    Pendaftar via link ini langsung mendapat Saldo Dompet <span class="text-indigo-600 font-medium">{{ formatCurrency(wallet_bonus_for_referral) }}</span>. Anda langsung mendapat komisi <span class="text-emerald-600 font-medium">{{ formatCurrency(commission_per_referral) }}</span>.
+                                    Pendaftar via link ini langsung mendapat Saldo Dompet <span class="text-indigo-600 font-medium">{{ formatCurrency(wallet_bonus_for_referral) }}</span>. Anda mendapat komisi <span class="text-emerald-600 font-medium">{{ formatCurrency(commission_per_referral) }}</span> ketika pendaftar melakukan pembelian tryout pertama.
                                 </p>
                             </div>
                             <div class="flex flex-col sm:flex-row gap-2">

@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 use Midtrans\Config;
 use Midtrans\Notification;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB; // Perbaikan: Tambahkan Import DB
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class MidtransCallbackController extends Controller
@@ -31,16 +31,13 @@ class MidtransCallbackController extends Controller
         $transactionStatus = $notif->transaction_status;
         $orderIdMidtrans = $notif->order_id;
 
-        // Perbaikan 1: Ambil Invoice Code asli (buang suffix timestamp jika ada)
         $invoiceCode = explode('-', $orderIdMidtrans)[0];
 
-        // 1. CEK TOP UP WALLET
         $walletTx = WalletTransaction::where('proof_payment', $orderIdMidtrans)->first();
         if ($walletTx) {
             return $this->handleWalletTopUp($walletTx, $transactionStatus);
         }
 
-        // 2. CEK PEMBELIAN (TRYOUT ATAU MEMBERSHIP)
         $tx = Transaction::where('invoice_code', $invoiceCode)->first();
         if ($tx) {
             return $this->handleGeneralPurchase($tx, $transactionStatus);
@@ -57,27 +54,43 @@ class MidtransCallbackController extends Controller
             DB::transaction(function () use ($transaction) {
                 $transaction->update(['status' => 'paid']);
 
-                // Komisi Afiliasi
-                if ($transaction->referrer_id && $transaction->affiliate_commission > 0) {
-                    User::find($transaction->referrer_id)->increment('affiliate_balance', $transaction->affiliate_commission);
+                $buyer = User::find($transaction->user_id);
+
+                // ==========================================================
+                // SKEMA AMAN MIDTRANS: EVALUASI TRANSAKSI PERTAMA BERDASARKAN ID TERLAMA
+                // ==========================================================
+                $firstPaidTxId = Transaction::where('user_id', $buyer->id)
+                    ->whereIn('status', ['paid', 'success'])
+                    ->orderBy('created_at', 'asc')
+                    ->value('id');
+
+                if ($firstPaidTxId == $transaction->id && $buyer->referred_by) {
+                    $upline = User::find($buyer->referred_by);
+                    if ($upline) {
+                        // Pemilik kode mendapat Rp 2.500 (Pendaftaran) + Rp 2.000 (Tryout Pertama) = Rp 4.500
+                        $upline->increment('affiliate_balance', 4500);
+                    }
+                } else {
+                    // Pembelian kedua dan seterusnya: Komisi Rp 2.000 masuk ke pemilik token transaksi
+                    if ($transaction->referrer_id) {
+                        $referrer = User::find($transaction->referrer_id);
+                        if ($referrer) {
+                            $referrer->increment('affiliate_balance', 2000);
+                        }
+                    }
                 }
 
-                // Perbaikan 2 & 3: Logika Aktivasi Membership (Konsisten dengan CheckoutController)
-                // Jika tryout_id kosong, berarti ini transaksi Membership
                 if (!$transaction->tryout_id) {
-                    $user = User::find($transaction->user_id);
-                    
-                    // Gunakan metadata['days'] sesuai yang disimpan di CheckoutController
                     $daysToAdd = $transaction->metadata['days'] ?? 30; 
 
-                    $currentExpiry = ($user->membership_expires_at && Carbon::parse($user->membership_expires_at)->isFuture()) 
-                        ? Carbon::parse($user->membership_expires_at) 
+                    $currentExpiry = ($buyer->membership_expires_at && Carbon::parse($buyer->membership_expires_at)->isFuture()) 
+                        ? Carbon::parse($buyer->membership_expires_at) 
                         : now();
 
-                    $user->membership_expires_at = $currentExpiry->addDays($daysToAdd);
-                    $user->save();
+                    $buyer->membership_expires_at = $currentExpiry->addDays($daysToAdd);
+                    $buyer->save();
                     
-                    Log::info("Membership user {$user->id} aktif via Midtrans selama {$daysToAdd} hari.");
+                    Log::info("Membership user {$buyer->id} aktif via Midtrans selama {$daysToAdd} hari.");
                 }
             });
         } else if (in_array($status, ['cancel', 'deny', 'expire'])) {

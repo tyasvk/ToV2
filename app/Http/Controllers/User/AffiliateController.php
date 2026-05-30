@@ -18,18 +18,16 @@ class AffiliateController extends Controller
     {
         $user = auth()->user();
 
-        // Konfigurasi Nominal Aturan Sistem Afiliasi Terbaru
         $systemInfo = [
             'min_withdrawal' => 30000,
-            'commission_per_referral' => 2500,   // Komisi pendaftar masuk ke saldo afiliasi
-            'wallet_bonus_for_referral' => 2500, // Bonus pendaftar masuk ke dompet pendaftar
-            'token_discount' => 2000,            // Diskon checkout pakai token
-            'token_commission' => 2000,          // Komisi pemilik token
+            'commission_per_referral' => 2500,   
+            'wallet_bonus_for_referral' => 2500, 
+            'token_discount' => 2000,            
+            'token_commission' => 2000,          
             'target_limit' => 100,
             'special_bonus' => 100000,
         ];
 
-        // 1. JIKA USER BELUM DAFTAR PROGRAM AFILIASI
         if (!$user->affiliate_code) {
             return Inertia::render('User/Affiliate/Index', array_merge([
                 'user' => $user, 
@@ -51,7 +49,6 @@ class AffiliateController extends Controller
             ], $systemInfo));
         }
 
-        // 2. JIKA USER SUDAH DAFTAR PROGRAM AFILIASI
         $affiliateUrl = url('/register?ref=' . $user->affiliate_code);
 
         $announcements = WalletTransaction::whereIn('proof_payment', ['REWARD-WEEKLY', 'REWARD-MONTHLY'])
@@ -60,7 +57,6 @@ class AffiliateController extends Controller
             ->take(10)
             ->get();
 
-        // Hitung total penggunaan token di bulan ini
         $monthlyReferralCount = Transaction::where('referrer_id', $user->id)
             ->whereIn('status', ['paid', 'success'])
             ->whereMonth('created_at', now()->month)
@@ -71,32 +67,66 @@ class AffiliateController extends Controller
         // MENGAMBIL RIWAYAT PENDAPATAN (GABUNGAN)
         // ===============================================
         // A. Dari Pendaftaran Baru
-        $registeredUsers = User::where('referred_by', $user->id)->get()->map(function($u) use ($systemInfo) {
-            return [
-                'id' => 'reg_'.$u->id,
-                'name' => $u->name,
-                'type' => 'Pendaftaran Akun Baru',
-                'amount' => $systemInfo['commission_per_referral'],
-                'created_at' => $u->created_at,
-            ];
-        });
-
-        // B. Dari Penggunaan Token Tryout
-        $tokenUsages = Transaction::where('referrer_id', $user->id)
-            ->whereIn('status', ['paid', 'success'])
-            ->with('user')
+        $registeredUsers = User::where('referred_by', $user->id)
+            ->whereHas('transactions', function($query) {
+                $query->whereIn('status', ['paid', 'success']);
+            })
             ->get()
-            ->map(function($t) use ($systemInfo) {
+            ->toBase()
+            ->map(function($u) use ($systemInfo) {
+                $firstPurchase = DB::table('transactions')
+                    ->where('user_id', $u->id)
+                    ->whereIn('status', ['paid', 'success'])
+                    ->orderBy('created_at', 'asc')
+                    ->first();
+
                 return [
-                    'id' => 'trx_'.$t->id,
-                    'name' => $t->user->name ?? 'Pengguna',
-                    'type' => 'Pembelian Tryout (Token)',
-                    'amount' => $systemInfo['token_commission'],
-                    'created_at' => $t->created_at,
+                    'id' => 'reg_'.$u->id,
+                    'name' => $u->name,
+                    'type' => 'Komisi Pendaftaran (User Aktif)',
+                    'amount' => $systemInfo['commission_per_referral'],
+                    'created_at' => $firstPurchase ? $firstPurchase->created_at : $u->created_at,
                 ];
             });
 
-        // Gabungkan dan urutkan dari yang terbaru
+        // B. Dari Penggunaan Token & Komisi Pembelian Pertama Downline
+        $explicitTokenUsages = Transaction::where('referrer_id', $user->id)
+            ->whereIn('status', ['paid', 'success'])
+            ->with('user')
+            ->get();
+
+        $downlineIds = User::where('referred_by', $user->id)->pluck('id');
+        $firstPurchaseTransactions = Transaction::whereIn('user_id', $downlineIds)
+            ->whereIn('status', ['paid', 'success'])
+            ->get()
+            ->groupBy('user_id')
+            ->map(function($group) {
+                return $group->sortBy('created_at')->first();
+            });
+
+        $allTokenTransactions = $explicitTokenUsages->merge($firstPurchaseTransactions)->unique('id');
+
+        $tokenUsages = $allTokenTransactions->toBase()->map(function($t) use ($systemInfo, $user) {
+            $isFirstForDownline = false;
+            if ($t->user && $t->user->referred_by == $user->id) {
+                $firstId = Transaction::where('user_id', $t->user_id)
+                    ->whereIn('status', ['paid', 'success'])
+                    ->orderBy('created_at', 'asc')
+                    ->value('id');
+                if ($firstId == $t->id) {
+                    $isFirstForDownline = true;
+                }
+            }
+
+            return [
+                'id' => 'trx_'.$t->id,
+                'name' => $t->user->name ?? 'Pengguna',
+                'type' => $isFirstForDownline ? 'Komisi Tryout Pertama (Downline)' : 'Pembelian Tryout (Token)',
+                'amount' => $systemInfo['token_commission'],
+                'created_at' => $t->created_at,
+            ];
+        });
+
         $earningHistory = $registeredUsers->merge($tokenUsages)->sortByDesc('created_at')->values()->all();
         // ===============================================
 
@@ -122,7 +152,6 @@ class AffiliateController extends Controller
                 ];
             });
 
-        // KLASEMEN KOMPETISI MINGGUAN & BULANAN
         $weeklyLeaderboard = DB::table('transactions')
             ->join('users', 'transactions.referrer_id', '=', 'users.id')
             ->select('users.name', DB::raw('count(transactions.id) as total'))
@@ -149,7 +178,7 @@ class AffiliateController extends Controller
             'affiliate_code' => $user->affiliate_code,
             'affiliate_url' => $affiliateUrl,
             'stats' => $stats,
-            'earning_history' => $earningHistory, // Data gabungan baru dikirim ke Vue
+            'earning_history' => $earningHistory, 
             'withdrawals' => $withdrawals,
             'announcements' => $announcements,
             'monthly_count' => $monthlyReferralCount,
