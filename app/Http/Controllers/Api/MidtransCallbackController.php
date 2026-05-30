@@ -46,18 +46,18 @@ class MidtransCallbackController extends Controller
         return response()->json(['message' => 'Transaction not found'], 404);
     }
 
-private function handleGeneralPurchase($transaction, $status)
+    private function handleGeneralPurchase($transaction, $status)
     {
         if ($transaction->status == 'paid') return response()->json(['message' => 'Already processed']);
 
         if ($status == 'capture' || $status == 'settlement') {
             DB::transaction(function () use ($transaction) {
-                // Ubah status transaksi menjadi paid terlebih dahulu
+                // 1. Ubah status transaksi menjadi paid
                 $transaction->update(['status' => 'paid']);
 
                 $buyer = User::find($transaction->user_id);
 
-                // HITUNG TOTAL TRANSAKSI LUNAS
+                // 2. HITUNG TOTAL TRANSAKSI LUNAS
                 $totalPaidTransactions = Transaction::where('user_id', $buyer->id)
                     ->whereIn('status', ['paid', 'success'])
                     ->count();
@@ -65,10 +65,25 @@ private function handleGeneralPurchase($transaction, $status)
                 // ----------------------------------------------------------
                 // ATURAN 1: KOMISI PENDAFTARAN AFILIASI VIA MIDTRANS (Rp 2.500)
                 // ----------------------------------------------------------
-                if ($totalPaidTransactions === 1 && $buyer->referred_by) {
-                    $upline = User::find($buyer->referred_by);
+                if ($totalPaidTransactions === 1 && !empty($buyer->referred_by)) {
+                    
+                    // PERBAIKAN: Cari upline berdasarkan ID atau kode afiliasinya
+                    $upline = User::where('id', $buyer->referred_by)
+                                  ->orWhere('affiliate_code', $buyer->referred_by)
+                                  ->first();
+
                     if ($upline) {
                         $upline->increment('affiliate_balance', 2500);
+                        
+                        // Opsional namun penting: Catat riwayat dompet (Sesuaikan kolom dengan migrasi Anda)
+                        WalletTransaction::create([
+                            'user_id' => $upline->id,
+                            'amount' => 2500,
+                            'type' => 'commission', // Sesuaikan dengan enum/tipe Anda
+                            'description' => "Komisi pendaftaran (User Aktif) dari: {$buyer->name}",
+                            'status' => 'success'
+                        ]);
+                        
                         Log::info("Midtrans: Komisi Pendaftaran Rp 2.500 masuk ke Upline ID: {$upline->id}");
                     }
                 }
@@ -76,14 +91,32 @@ private function handleGeneralPurchase($transaction, $status)
                 // ----------------------------------------------------------
                 // ATURAN 2: KOMISI KODE VOUCHER / TOKEN VIA MIDTRANS (Rp 2.000)
                 // ----------------------------------------------------------
-                if ($transaction->referrer_id) {
-                    $referrer = User::find($transaction->referrer_id);
+                if (!empty($transaction->referrer_id)) {
+                    
+                    // Jika referrer_id di tabel transactions bisa berupa kode, gunakan orWhere juga
+                    $referrer = User::where('id', $transaction->referrer_id)
+                                    ->orWhere('affiliate_code', $transaction->referrer_id)
+                                    ->first();
+
                     if ($referrer) {
                         $referrer->increment('affiliate_balance', 2000);
+                        
+                        // Opsional namun penting: Catat riwayat dompet
+                        WalletTransaction::create([
+                            'user_id' => $referrer->id,
+                            'amount' => 2000,
+                            'type' => 'commission',
+                            'description' => "Komisi penggunaan kode voucher dari: {$buyer->name}",
+                            'status' => 'success'
+                        ]);
+                        
                         Log::info("Midtrans: Komisi Voucher Rp 2.000 masuk ke Referrer ID: {$referrer->id}");
                     }
                 }
 
+                // ----------------------------------------------------------
+                // 3. LOGIKA MEMBERSHIP / TRYOUT
+                // ----------------------------------------------------------
                 if (!$transaction->tryout_id) {
                     $daysToAdd = $transaction->metadata['days'] ?? 30; 
 
@@ -98,6 +131,7 @@ private function handleGeneralPurchase($transaction, $status)
         } else if (in_array($status, ['cancel', 'deny', 'expire'])) {
             $transaction->update(['status' => 'failed']);
         }
+        
         return response()->json(['message' => 'Purchase processed']);
     }
 
@@ -112,6 +146,7 @@ private function handleGeneralPurchase($transaction, $status)
         } else if (in_array($status, ['cancel', 'deny', 'expire'])) {
             $transaction->update(['status' => 'failed']);
         }
+        
         return response()->json(['message' => 'Wallet Top Up processed']);
     }
 }
