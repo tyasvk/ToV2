@@ -46,37 +46,41 @@ class MidtransCallbackController extends Controller
         return response()->json(['message' => 'Transaction not found'], 404);
     }
 
-    private function handleGeneralPurchase($transaction, $status)
+private function handleGeneralPurchase($transaction, $status)
     {
         if ($transaction->status == 'paid') return response()->json(['message' => 'Already processed']);
 
         if ($status == 'capture' || $status == 'settlement') {
             DB::transaction(function () use ($transaction) {
+                // Ubah status transaksi menjadi paid terlebih dahulu
                 $transaction->update(['status' => 'paid']);
 
                 $buyer = User::find($transaction->user_id);
 
-                // ==========================================================
-                // SKEMA AMAN MIDTRANS: EVALUASI TRANSAKSI PERTAMA BERDASARKAN ID TERLAMA
-                // ==========================================================
-                $firstPaidTxId = Transaction::where('user_id', $buyer->id)
+                // HITUNG TOTAL TRANSAKSI LUNAS
+                $totalPaidTransactions = Transaction::where('user_id', $buyer->id)
                     ->whereIn('status', ['paid', 'success'])
-                    ->orderBy('created_at', 'asc')
-                    ->value('id');
+                    ->count();
 
-                if ($firstPaidTxId == $transaction->id && $buyer->referred_by) {
+                // ----------------------------------------------------------
+                // ATURAN 1: KOMISI PENDAFTARAN AFILIASI VIA MIDTRANS (Rp 2.500)
+                // ----------------------------------------------------------
+                if ($totalPaidTransactions === 1 && $buyer->referred_by) {
                     $upline = User::find($buyer->referred_by);
                     if ($upline) {
-                        // Pemilik kode mendapat Rp 2.500 (Pendaftaran) + Rp 2.000 (Tryout Pertama) = Rp 4.500
-                        $upline->increment('affiliate_balance', 4500);
+                        $upline->increment('affiliate_balance', 2500);
+                        Log::info("Midtrans: Komisi Pendaftaran Rp 2.500 masuk ke Upline ID: {$upline->id}");
                     }
-                } else {
-                    // Pembelian kedua dan seterusnya: Komisi Rp 2.000 masuk ke pemilik token transaksi
-                    if ($transaction->referrer_id) {
-                        $referrer = User::find($transaction->referrer_id);
-                        if ($referrer) {
-                            $referrer->increment('affiliate_balance', 2000);
-                        }
+                }
+
+                // ----------------------------------------------------------
+                // ATURAN 2: KOMISI KODE VOUCHER / TOKEN VIA MIDTRANS (Rp 2.000)
+                // ----------------------------------------------------------
+                if ($transaction->referrer_id) {
+                    $referrer = User::find($transaction->referrer_id);
+                    if ($referrer) {
+                        $referrer->increment('affiliate_balance', 2000);
+                        Log::info("Midtrans: Komisi Voucher Rp 2.000 masuk ke Referrer ID: {$referrer->id}");
                     }
                 }
 
@@ -89,8 +93,6 @@ class MidtransCallbackController extends Controller
 
                     $buyer->membership_expires_at = $currentExpiry->addDays($daysToAdd);
                     $buyer->save();
-                    
-                    Log::info("Membership user {$buyer->id} aktif via Midtrans selama {$daysToAdd} hari.");
                 }
             });
         } else if (in_array($status, ['cancel', 'deny', 'expire'])) {

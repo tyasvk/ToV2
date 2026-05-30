@@ -121,7 +121,7 @@ class CheckoutController extends Controller
         ]);
     }
 
-    public function process(Request $request, Transaction $transaction)
+public function process(Request $request, Transaction $transaction)
     {
         $request->validate(['payment_method' => 'required|in:wallet,midtrans']);
         
@@ -132,10 +132,13 @@ class CheckoutController extends Controller
             }
 
             DB::transaction(function () use ($user, $transaction) {
+                // Potong saldo dompet pembeli
                 $user->decrement('balance', $transaction->amount);
                 
+                // Ubah status transaksi saat ini menjadi paid secara resmi
                 $transaction->update(['status' => 'paid', 'payment_method' => 'wallet']);
                 
+                // Catat transaksi di riwayat wallet pembeli
                 WalletTransaction::create([
                     'user_id' => $user->id, 
                     'type' => 'debit', 
@@ -144,30 +147,36 @@ class CheckoutController extends Controller
                     'status' => 'success'
                 ]);
 
-                // ==========================================================
-                // SKEMA AMAN: EVALUASI TRANSAKSI PERTAMA BERDASARKAN ID TERLAMA
-                // ==========================================================
-                $firstPaidTxId = Transaction::where('user_id', $user->id)
+                // HITUNG TOTAL TRANSAKSI LUNAS (Kunci Validasi Pembelian Pertama)
+                $totalPaidTransactions = Transaction::where('user_id', $user->id)
                     ->whereIn('status', ['paid', 'success'])
-                    ->orderBy('created_at', 'asc')
-                    ->value('id');
+                    ->count();
 
-                if ($firstPaidTxId == $transaction->id && $user->referred_by) {
+                // ----------------------------------------------------------
+                // ATURAN 1: KOMISI PENDAFTARAN AFILIASI (Rp 2.500)
+                // ----------------------------------------------------------
+                // Jika total transaksi lunas tepat = 1, berarti ini mutlak pembelian pertama
+                if ($totalPaidTransactions === 1 && $user->referred_by) {
                     $upline = User::find($user->referred_by);
                     if ($upline) {
-                        // Pemilik kode mendapat Rp 2.500 (Pendaftaran) + Rp 2.000 (Tryout Pertama) = Rp 4.500
-                        $upline->increment('affiliate_balance', 4500);
-                    }
-                } else {
-                    // Pembelian kedua dan seterusnya: Komisi Rp 2.000 masuk ke pemilik token transaksi
-                    if ($transaction->referrer_id) {
-                        $referrer = User::find($transaction->referrer_id);
-                        if ($referrer) {
-                            $referrer->increment('affiliate_balance', 2000);
-                        }
+                        $upline->increment('affiliate_balance', 2500);
+                        Log::info("Komisi Pendaftaran Rp 2.500 masuk ke Upline ID: {$upline->id} dari Downline ID: {$user->id}");
                     }
                 }
 
+                // ----------------------------------------------------------
+                // ATURAN 2: KOMISI KODE VOUCHER / TOKEN (Rp 2.000)
+                // ----------------------------------------------------------
+                // Terlepas dari pembelian ke berapa, jika checkout pakai voucher/token, pemilik voucher dapat Rp 2.000
+                if ($transaction->referrer_id) {
+                    $referrer = User::find($transaction->referrer_id);
+                    if ($referrer) {
+                        $referrer->increment('affiliate_balance', 2000);
+                        Log::info("Komisi Voucher Rp 2.000 masuk ke Referrer ID: {$referrer->id} dari Transaksi ID: {$transaction->id}");
+                    }
+                }
+
+                // Perpanjang masa aktif membership jika berupa paket membership
                 if (!$transaction->tryout_id || (isset($transaction->metadata['type']) && $transaction->metadata['type'] === 'membership')) {
                     $daysToAdd = $transaction->metadata['days'] ?? $transaction->metadata['duration_days'] ?? 30; 
 
