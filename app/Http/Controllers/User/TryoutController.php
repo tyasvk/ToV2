@@ -616,9 +616,50 @@ public function leaderboard(Request $request, Tryout $tryout)
         return Inertia::render('User/Tryout/CollectiveRegister', ['tryout' => $tryout]);
     }
 
-    public function checkEmail(Request $request)
+public function checkEmail(Request $request)
     {
-        return response()->json(['exists' => User::where('email', $request->email)->exists()]);
+        // 1. Validasi request, pastikan tryout_id juga dikirim dari Vue
+        $request->validate([
+            'email' => 'required|email',
+            'tryout_id' => 'required|exists:tryouts,id'
+        ]);
+
+        // 2. Cari pengguna berdasarkan email
+        $user = \App\Models\User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Email belum terdaftar di aplikasi.'
+            ], 404);
+        }
+
+        // 3. CEK TRANSAKSI: Apakah user ini sudah pernah membeli tryout ini dan lunas?
+        $hasPurchased = \App\Models\Transaction::where('user_id', $user->id)
+            ->where('tryout_id', $request->tryout_id)
+            ->whereIn('status', ['paid', 'success'])
+            ->exists();
+
+        // Cek juga jika dia adalah pembuat tim / ada di dalam tim transaksi lunas (opsional, jika data tim disimpan di JSON metadata)
+        // $inOtherTeam = \App\Models\Transaction::where('tryout_id', $request->tryout_id)->whereJsonContains('metadata->team_members', $user->email)->whereIn('status', ['paid', 'success'])->exists();
+
+        if ($hasPurchased) {
+            return response()->json([
+                'status' => 'already_purchased',
+                'message' => 'Email ini sudah memiliki tryout ini.'
+            ], 400); // Kode 400 memicu blok catch() di frontend (berwarna merah)
+        }
+
+        // 4. Jika aman, kembalikan data user
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Email tersedia.',
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+            ]
+        ], 200);
     }
 
     // ==========================================

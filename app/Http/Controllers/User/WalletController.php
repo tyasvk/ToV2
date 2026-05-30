@@ -9,6 +9,15 @@ use Inertia\Inertia;
 use Midtrans\Config;
 use Midtrans\Snap;
 
+// PASTIKAN KE-4 MODEL INI DI-IMPORT:
+use App\Models\Voucher; 
+use App\Models\Transaction; 
+use App\Models\User;
+
+// PASTIKAN 2 FACADES INI JUGA DI-IMPORT:
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
 class WalletController extends Controller
 {
 
@@ -79,6 +88,80 @@ public function index()
         } catch (\Exception $e) {
             return back()->withErrors(['message' => 'Error: ' . $e->getMessage()]);
         }
+    }
+
+ public function claimVoucher(Request $request)
+    {
+        $request->validate([
+            'code' => 'required|string',
+        ]);
+
+        $user = auth()->user();
+        $code = strtoupper($request->code);
+
+        $voucher = Voucher::where('code', $code)->where('is_used', false)->first();
+
+        if (!$voucher) {
+            return redirect()->back()->withErrors(['code' => 'Kode voucher tidak valid atau sudah digunakan.']);
+        }
+
+        DB::transaction(function () use ($voucher, $user) {
+            // 1. Tandai voucher sudah dipakai
+            $voucher->update([
+                'is_used' => true,
+                'used_by' => $user->id,
+                'used_at' => now(),
+            ]);
+
+            // 2. Tambah saldo utama user
+            $user->increment('balance', $voucher->amount);
+
+            // 3. Catat di tabel WalletTransaction agar terhitung sebagai transaksi sukses
+            WalletTransaction::create([
+                'user_id' => $user->id,
+                'amount' => $voucher->amount,
+                'type' => 'topup', // atau 'in' (sesuaikan dengan tipe topup dompet Anda)
+                'description' => "Top Up via Voucher Code: {$voucher->code}",
+                'status' => 'success'
+            ]);
+
+            // -----------------------------------------------------------------
+            // CEK KOMISI PENDAFTARAN AFILIASI (Menggunakan Riwayat Upline)
+            // -----------------------------------------------------------------
+            if (!empty($user->referred_by)) {
+                $upline = User::where('id', $user->referred_by)
+                              ->orWhere('affiliate_code', $user->referred_by)
+                              ->first();
+
+                if ($upline) {
+                    // Deskripsi ini HARUS SAMA PERSIS dengan di MidtransCallbackController
+                    $descriptionTarget = "Komisi pendaftaran (User Aktif) dari: {$user->name} - ID:{$user->id}";
+
+                    // Cek riwayat dompet upline, apakah sudah pernah dapat dari pengguna ini?
+                    $hasReceivedCommission = WalletTransaction::where('user_id', $upline->id)
+                        ->where('type', 'commission')
+                        ->where('description', $descriptionTarget)
+                        ->where('status', 'success')
+                        ->exists();
+
+                    if (!$hasReceivedCommission) {
+                        $upline->increment('affiliate_balance', 2500);
+                        
+                        WalletTransaction::create([
+                            'user_id' => $upline->id,
+                            'amount' => 2500,
+                            'type' => 'commission', 
+                            'description' => $descriptionTarget,
+                            'status' => 'success'
+                        ]);
+                        
+                        Log::info("Klaim Voucher: Komisi Pendaftaran Rp 2.500 masuk ke Upline ID: {$upline->id} dari Downline ID: {$user->id}");
+                    }
+                }
+            }
+        });
+
+        return redirect()->back()->with('success', "Berhasil klaim voucher! Saldo sebesar Rp " . number_format($voucher->amount, 0, ',', '.') . " telah ditambahkan.");
     }
 
     /**

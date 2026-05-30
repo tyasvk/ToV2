@@ -7,14 +7,16 @@ use App\Models\User;
 use App\Models\Transaction;
 use App\Models\WithdrawalRequest;
 use App\Models\WalletTransaction;
+use App\Models\Setting; // PENTING: Pastikan Model Setting di-import di sini
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use Carbon\Carbon;
 
 class AffiliateController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $user = auth()->user();
 
@@ -26,6 +28,15 @@ class AffiliateController extends Controller
             'token_commission' => 2000,          
             'target_limit' => 100,
             'special_bonus' => 100000,
+        ];
+
+        // MENGAMBIL DATA SETTING TEKS KOMPETISI DARI DATABASE UNTUK USER
+        $competitionTitleSetting = Setting::where('key', 'competition_title')->first();
+        $competitionDescSetting = Setting::where('key', 'competition_description')->first();
+
+        $competitionSettings = [
+            'title' => $competitionTitleSetting ? $competitionTitleSetting->value : 'Kompetisi Penggunaan Token',
+            'description' => $competitionDescSetting ? $competitionDescSetting->value : 'Raih target penggunaan token terbanyak setiap minggu dan bulan untuk mendapatkan hadiah saldo khusus secara langsung! Bagikan tautan kompetisi atau token unik Anda di bawah ini ke seluruh media sosial.'
         ];
 
         if (!$user->affiliate_code) {
@@ -46,6 +57,9 @@ class AffiliateController extends Controller
                 'monthly_count' => 0,
                 'weekly_leaderboard' => [],
                 'monthly_leaderboard' => [],
+                'competitionSettings' => $competitionSettings, // Kirim ke Vue meskipun belum join
+                'archiveMonths' => [],
+                'archiveWeeks' => [],
             ], $systemInfo));
         }
 
@@ -63,10 +77,7 @@ class AffiliateController extends Controller
             ->whereYear('created_at', now()->year)
             ->count();
 
-        // ===============================================
-        // MENGAMBIL RIWAYAT PENDAPATAN (GABUNGAN)
-        // ===============================================
-        // A. Dari Pendaftaran Baru
+        // Riwayat pendapatan pendaftaran
         $registeredUsers = User::where('referred_by', $user->id)
             ->whereHas('transactions', function($query) {
                 $query->whereIn('status', ['paid', 'success']);
@@ -89,7 +100,6 @@ class AffiliateController extends Controller
                 ];
             });
 
-        // B. Dari Penggunaan Token & Komisi Pembelian Pertama Downline
         $explicitTokenUsages = Transaction::where('referrer_id', $user->id)
             ->whereIn('status', ['paid', 'success'])
             ->with('user')
@@ -128,7 +138,6 @@ class AffiliateController extends Controller
         });
 
         $earningHistory = $registeredUsers->merge($tokenUsages)->sortByDesc('created_at')->values()->all();
-        // ===============================================
 
         $stats = [
             'clicks' => 0,
@@ -152,22 +161,71 @@ class AffiliateController extends Controller
                 ];
             });
 
-        $weeklyLeaderboard = DB::table('transactions')
+        // Kalkulasi Arsip Waktu Dropdown
+        $now = Carbon::now();
+        $indoMonths = [1=>'Jan', 2=>'Feb', 3=>'Mar', 4=>'Apr', 5=>'Mei', 6=>'Jun', 7=>'Jul', 8=>'Agu', 9=>'Sep', 10=>'Okt', 11=>'Nov', 12=>'Des'];
+        
+        $firstTx = Transaction::whereNotNull('referrer_id')->orderBy('created_at', 'asc')->first();
+        $startDate = $firstTx ? Carbon::parse($firstTx->created_at) : $now->copy();
+        
+        // Dropdown Bulanan
+        $archiveMonths = [];
+        $currentMonthLoop = $startDate->copy()->startOfMonth();
+        $nowMonth = $now->copy()->startOfMonth();
+        while ($currentMonthLoop <= $nowMonth) {
+            $archiveMonths[] = [
+                'value' => $currentMonthLoop->format('Y-m'),
+                'label' => $indoMonths[(int)$currentMonthLoop->format('m')] . ' ' . $currentMonthLoop->format('Y')
+            ];
+            $currentMonthLoop->addMonth();
+        }
+        $archiveMonths = array_reverse($archiveMonths);
+
+        // Dropdown Mingguan
+        $archiveWeeks = [];
+        $currentWeekLoop = $startDate->copy()->startOfWeek();
+        $nowWeek = $now->copy()->startOfWeek();
+        while ($currentWeekLoop <= $nowWeek) {
+            $weekNum = $currentWeekLoop->weekOfMonth;
+            $monthLabel = $indoMonths[(int)$currentWeekLoop->format('m')] . ' ' . $currentWeekLoop->format('Y');
+            
+            $archiveWeeks[] = [
+                'value' => $currentWeekLoop->format('Y-m-d'),
+                'label' => "Mg ke-$weekNum $monthLabel"
+            ];
+            $currentWeekLoop->addWeek();
+        }
+        $archiveWeeks = array_reverse($archiveWeeks);
+
+        // Filter Pilihan dari Frontend
+        $selectedMonth = $request->input('month', count($archiveMonths) > 0 ? $archiveMonths[0]['value'] : $now->format('Y-m'));
+        $selectedWeek = $request->input('week', count($archiveWeeks) > 0 ? $archiveWeeks[0]['value'] : $now->startOfWeek()->format('Y-m-d'));
+
+        // PENCEGAHAN ERROR: Pastikan array key pecahan bulan & tahun aman
+        $monthParts = explode('-', $selectedMonth);
+        $targetYear = isset($monthParts[0]) && strlen($monthParts[0]) == 4 ? $monthParts[0] : now()->year;
+        $targetMonth = isset($monthParts[1]) ? $monthParts[1] : now()->month;
+
+        // Query Peringkat Bulanan
+        $monthlyLeaderboard = DB::table('transactions')
             ->join('users', 'transactions.referrer_id', '=', 'users.id')
             ->select('users.name', DB::raw('count(transactions.id) as total'))
             ->whereIn('transactions.status', ['paid', 'success'])
-            ->whereBetween('transactions.created_at', [now()->startOfWeek(), now()->endOfWeek()])
+            ->whereYear('transactions.created_at', $targetYear)
+            ->whereMonth('transactions.created_at', $targetMonth)
             ->groupBy('users.id', 'users.name')
             ->orderByDesc('total')
             ->limit(5)
             ->get();
 
-        $monthlyLeaderboard = DB::table('transactions')
+        // Query Peringkat Mingguan
+        $weekStartObj = Carbon::parse($selectedWeek);
+        $weekEndObj = $weekStartObj->copy()->endOfWeek();
+        $weeklyLeaderboard = DB::table('transactions')
             ->join('users', 'transactions.referrer_id', '=', 'users.id')
             ->select('users.name', DB::raw('count(transactions.id) as total'))
             ->whereIn('transactions.status', ['paid', 'success'])
-            ->whereMonth('transactions.created_at', now()->month)
-            ->whereYear('transactions.created_at', now()->year)
+            ->whereBetween('transactions.created_at', [$weekStartObj->format('Y-m-d 00:00:00'), $weekEndObj->format('Y-m-d 23:59:59')])
             ->groupBy('users.id', 'users.name')
             ->orderByDesc('total')
             ->limit(5)
@@ -184,6 +242,13 @@ class AffiliateController extends Controller
             'monthly_count' => $monthlyReferralCount,
             'weekly_leaderboard' => $weeklyLeaderboard,
             'monthly_leaderboard' => $monthlyLeaderboard,
+            'competitionSettings' => $competitionSettings, // <--- SEKARANG DATA SUDAH TERKIRIM KE USER!
+            'archiveMonths' => $archiveMonths,
+            'archiveWeeks' => $archiveWeeks,
+            'selectedFilters' => [
+                'month' => $selectedMonth,
+                'week' => $selectedWeek
+            ]
         ], $systemInfo));
     }
 

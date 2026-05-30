@@ -11,7 +11,7 @@ use App\Http\Controllers\User\TryoutController as UserTryoutController;
 use App\Http\Controllers\User\CheckoutController;
 use App\Http\Controllers\User\WalletController;
 use App\Http\Controllers\User\TryoutAkbarController as UserTryoutAkbarController;
-use App\Http\Controllers\User\TryoutController;
+use App\Http\Controllers\User\TryoutController; // Note: Ini duplikat dengan UserTryoutController tapi kita biarkan jika di bawah ada yang memanggil TryoutController
 use App\Http\Controllers\User\MembershipController;
 use App\Http\Controllers\User\AffiliateController as UserAffiliateController;
 
@@ -25,6 +25,10 @@ use App\Http\Controllers\Admin\TryoutAkbarController as AdminTryoutAkbarControll
 use App\Http\Controllers\Admin\AffiliateManagerController;
 use App\Http\Controllers\Admin\MembershipSettingController;
 use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\MembershipPackageController;
+use App\Http\Controllers\Admin\AdminAffiliateController;
+use App\Http\Controllers\Admin\AdidayaManagerController;
+use App\Http\Controllers\Admin\VoucherController; // Tambahkan import VoucherController
 
 /*
 |--------------------------------------------------------------------------
@@ -61,7 +65,10 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     // --- WALLET ---
     Route::get('/wallet', [WalletController::class, 'index'])->name('wallet.index');
     Route::post('/wallet/topup', [WalletController::class, 'topup'])->name('wallet.topup');
-    Route::post('/wallet/pay-pending/{transaction}', [\App\Http\Controllers\User\WalletController::class, 'payPending'])->name('wallet.payPending');
+    Route::post('/wallet/pay-pending/{transaction}', [WalletController::class, 'payPending'])->name('wallet.payPending');
+    
+    // PERBAIKAN NAMA ROUTE VOUCHER (Menyesuaikan dengan nama route di Vue: route('wallet.claim_voucher'))
+    Route::post('/wallet/claim-voucher', [WalletController::class, 'claimVoucher'])->name('wallet.claim_voucher');
 
     // --- TRYOUT ADIDAYA ---
     Route::get('/tryout/adidaya', [TryoutController::class, 'adidaya'])->name('tryout.adidaya');
@@ -73,7 +80,7 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     // --- PENDAFTARAN TRYOUT ---
     Route::get('/tryout/{tryout}/register', [UserTryoutController::class, 'registerForm'])->name('tryout.register');
     Route::post('/tryout/{tryout}/register', [TryoutController::class, 'processRegistration'])->name('tryout.processRegistration');
-    Route::post('/check-voucher-validity', [App\Http\Controllers\User\TryoutController::class, 'checkVoucher'])->name('voucher.check');
+    Route::post('/check-voucher-validity', [TryoutController::class, 'checkVoucher'])->name('voucher.check');
     
     // --- API & MEMBERSHIP ---
     Route::post('/check-email-availability', [UserTryoutController::class, 'checkEmail'])->name('api.check.email');
@@ -90,6 +97,8 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     Route::post('/affiliate/join', [UserAffiliateController::class, 'join'])->name('affiliate.join');
     Route::post('/affiliate/withdraw', [UserAffiliateController::class, 'withdraw'])->name('affiliate.withdraw');
     Route::post('/affiliate/bank-info', [UserAffiliateController::class, 'updateBankInfo'])->name('affiliate.bank-info');
+    Route::post('/affiliate/register', [UserAffiliateController::class, 'register'])->name('affiliate.register');
+    Route::put('/affiliate/bank-update', [UserAffiliateController::class, 'updateBankInfo'])->name('affiliate.bank.update');
 
     // --- TRYOUT SAYA & PROSES UJIAN ---
     Route::get('/my-tryouts', [UserTryoutController::class, 'myTryouts'])->name('tryout.my');
@@ -105,7 +114,6 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     Route::get('/history', [UserTryoutController::class, 'history'])->name('tryout.history');
     Route::get('/history/{tryout}', [UserTryoutController::class, 'historyDetail'])->name('tryout.history.detail');
     Route::get('/certificate/{attempt}', [UserTryoutController::class, 'certificate'])->name('tryout.certificate');
-    Route::get('/tryout/certificate/{attempt}', [App\Http\Controllers\User\TryoutController::class, 'certificate'])->name('tryout.certificate');
 
     // --- TRYOUT AKBAR ---
     Route::prefix('tryout-akbar')->name('tryout-akbar.')->group(function() {
@@ -115,11 +123,6 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
         Route::post('/{tryout}/register', [UserTryoutAkbarController::class, 'storeRegistration'])->name('store-registration');
         Route::get('/{tryout}/waiting-room', [UserTryoutAkbarController::class, 'waitingRoom'])->name('wait');
     });
-
-    Route::post('/affiliate/register', [App\Http\Controllers\User\AffiliateController::class, 'register'])->name('affiliate.register');
-    Route::get('/affiliate', [App\Http\Controllers\User\AffiliateController::class, 'index'])->name('affiliate.index');
-    Route::post('/affiliate/withdraw', [App\Http\Controllers\User\AffiliateController::class, 'withdraw'])->name('affiliate.withdraw');
-    Route::put('/affiliate/bank-update', [App\Http\Controllers\User\AffiliateController::class, 'updateBankInfo'])->name('affiliate.bank.update');
 });
 
 // ==========================================
@@ -151,7 +154,7 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::put('/settings', [SettingController::class, 'update'])->name('settings.update');
     
     // Adidaya Management
-    Route::resource('adidaya-manage', \App\Http\Controllers\Admin\AdidayaManagerController::class)->names('adidaya');
+    Route::resource('adidaya-manage', AdidayaManagerController::class)->names('adidaya');
     
     // Question Management
     Route::patch('/questions/reorder', [QuestionManagerController::class, 'reorder'])->name('questions.reorder');
@@ -173,13 +176,26 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::post('/membership-setting', [MembershipSettingController::class, 'update'])->name('membership-setting.update');
 
     // Management Paket Membership
-    Route::get('/membership-packages', [App\Http\Controllers\Admin\MembershipPackageController::class, 'index'])->name('membership-packages.index');
-    Route::post('/membership-packages/{id}', [App\Http\Controllers\Admin\MembershipPackageController::class, 'update'])->name('membership-packages.update');
+    Route::get('/membership-packages', [MembershipPackageController::class, 'index'])->name('membership-packages.index');
+    Route::post('/membership-packages/{id}', [MembershipPackageController::class, 'update'])->name('membership-packages.update');
 
     // Halaman utama kelola afiliasi
-    Route::get('/affiliate', [App\Http\Controllers\Admin\AdminAffiliateController::class, 'index'])->name('affiliate.index');
-    Route::post('/affiliate/user/{user}/reward', [App\Http\Controllers\Admin\AdminAffiliateController::class, 'giveReward'])->name('affiliate.reward');
-    Route::post('/affiliate/withdraw/{withdrawal}/status', [App\Http\Controllers\Admin\AdminAffiliateController::class, 'updateWithdrawStatus'])->name('affiliate.withdraw.status');
+    Route::get('/affiliate', [AdminAffiliateController::class, 'index'])->name('affiliate.index');
+    Route::post('/affiliate/user/{user}/reward', [AdminAffiliateController::class, 'giveReward'])->name('affiliate.reward');
+    Route::post('/affiliate/withdraw/{withdrawal}/status', [AdminAffiliateController::class, 'updateWithdrawStatus'])->name('affiliate.withdraw.status');
+    // Halaman utama kelola afiliasi
+    Route::get('/affiliate', [AdminAffiliateController::class, 'index'])->name('affiliate.index');
+    Route::post('/affiliate/user/{user}/reward', [AdminAffiliateController::class, 'giveReward'])->name('affiliate.reward');
+    Route::post('/affiliate/withdraw/{withdrawal}/status', [AdminAffiliateController::class, 'updateWithdrawStatus'])->name('affiliate.withdraw.status');
+    
+    // TAMBAHKAN BARIS INI UNTUK UPDATE TEKS KOMPETISI:
+    Route::post('/affiliate/settings/competition', [AdminAffiliateController::class, 'updateCompetitionSetting'])->name('affiliate.competition.update');
+
+
+    // --- VOUCHER SALDO DOMPET ---
+    Route::get('/vouchers', [VoucherController::class, 'index'])->name('vouchers.index');
+    Route::post('/vouchers', [VoucherController::class, 'store'])->name('vouchers.store');
+    Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->name('vouchers.destroy');
 });
 
 require __DIR__.'/auth.php';

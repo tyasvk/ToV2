@@ -55,6 +55,9 @@ const removeParticipant = (index) => {
     errorMessage.value.splice(index, 1);
 };
 
+// ==========================================
+// PENGECEKAN EMAIL & VALIDASI PEMBELIAN GANDA
+// ==========================================
 const checkEmail = async (index, emailValue) => {
     validationStatus.value.splice(index, 1, null);
     errorMessage.value.splice(index, 1, null);
@@ -71,24 +74,29 @@ const checkEmail = async (index, emailValue) => {
     abortControllers.value[index] = controller;
 
     try {
-        const response = await axios.post('/check-email-availability', { email: emailValue }, {
+        // Mengirimkan email dan ID tryout untuk dicek oleh backend
+        const response = await axios.post('/check-email-availability', { 
+            email: emailValue,
+            tryout_id: props.tryout.id 
+        }, {
             signal: controller.signal
         });
 
         if (abortControllers.value[index] === controller) {
-            const exists = response.data.exists;
-            if (exists) {
-                validationStatus.value.splice(index, 1, 'valid');
-                errorMessage.value.splice(index, 1, 'User terdaftar');
-            } else {
-                validationStatus.value.splice(index, 1, 'invalid');
-                errorMessage.value.splice(index, 1, 'Email tidak ditemukan');
-            }
+            // Jika sukses (status 200) dan belum pernah beli
+            validationStatus.value.splice(index, 1, 'valid');
+            errorMessage.value.splice(index, 1, response.data.message || 'Email terdaftar & valid');
         }
     } catch (error) {
-        if (!axios.isCancel(error)) {
+        // Jika error (sudah beli [400] atau tidak terdaftar [404])
+        if (!axios.isCancel(error) && abortControllers.value[index] === controller) {
             validationStatus.value.splice(index, 1, 'invalid');
-            errorMessage.value.splice(index, 1, 'Error validasi');
+            if (error.response && error.response.data && error.response.data.message) {
+                // Mengambil pesan spesifik dari Laravel (misal: "Email ini sudah memiliki tryout ini.")
+                errorMessage.value.splice(index, 1, error.response.data.message);
+            } else {
+                errorMessage.value.splice(index, 1, 'Error memvalidasi email');
+            }
         }
     } finally {
         if (abortControllers.value[index] === controller) {
@@ -116,7 +124,6 @@ const executeSubmit = () => {
             showSuccessModal.value = true;
         },
         onError: (errors) => {
-            // Error dari backend akan muncul langsung tanpa blokir frontend
             console.error(errors);
         }
     });
@@ -128,7 +135,7 @@ const goToMyTryouts = () => {
 };
 
 // ==========================================
-// PENGECEKAN KODE VOUCHER STRICT (ANTI ASAL KETIK)
+// PENGECEKAN KODE VOUCHER STRICT
 // ==========================================
 let voucherTimeout = null;
 watch(() => form.voucher_code, (newCode) => {
@@ -139,7 +146,7 @@ watch(() => form.voucher_code, (newCode) => {
 
     const cleanCode = newCode ? newCode.trim() : '';
     if (cleanCode.length === 0) {
-        return; // Jika dikosongkan (Tanpa Kode), proses berhenti di sini dan user bebas bayar
+        return; 
     }
 
     voucherTimeout = setTimeout(async () => {
@@ -147,10 +154,10 @@ watch(() => form.voucher_code, (newCode) => {
         try {
             const response = await axios.post(route('voucher.check'), { voucher_code: cleanCode });
             if (response.data.valid) {
-                isVoucherValid.value = true; // KODE ASLI! Diskon boleh diterapkan
+                isVoucherValid.value = true; 
             } else {
                 isVoucherValid.value = false;
-                voucherErrorMessage.value = response.data.message; // KODE PALSU!
+                voucherErrorMessage.value = response.data.message; 
             }
         } catch (error) {
             isVoucherValid.value = false;
@@ -161,7 +168,7 @@ watch(() => form.voucher_code, (newCode) => {
     }, 600);
 });
 
-// Perhitungan Diskon Kelompok Nominal Tetap
+// Perhitungan Diskon Kelompok
 const groupDiscountAmount = computed(() => {
     const qty = form.emails.length + 1;
     let discount = 0;
@@ -174,7 +181,7 @@ const groupDiscountAmount = computed(() => {
     return discount;
 });
 
-// Total Akhir (Potongan voucher hanya aktif jika Valid dari server)
+// Total Akhir
 const totalAmount = computed(() => {
     const qty = form.emails.length + 1;
     const baseAmount = props.tryout.price * qty;
@@ -290,7 +297,7 @@ const totalAmount = computed(() => {
                                             <div class="flex justify-between items-start mt-1.5 ml-1">
                                                 <div class="h-4">
                                                     <p v-if="validationStatus[index] === 'valid'" class="text-[9px] font-medium text-emerald-600 uppercase tracking-wide">
-                                                        Email terdaftar & valid
+                                                        {{ errorMessage[index] }}
                                                     </p>
                                                     <p v-if="validationStatus[index] === 'invalid'" class="text-[9px] font-medium text-red-500 uppercase tracking-wide">
                                                         {{ errorMessage[index] }}

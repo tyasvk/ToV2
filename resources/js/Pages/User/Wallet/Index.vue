@@ -114,7 +114,7 @@ const handleClaimVoucher = () => {
 };
 
 const isIncome = (type) => {
-    return ['in', 'credit', 'deposit'].includes(type?.toLowerCase());
+    return ['in', 'credit', 'deposit', 'topup', 'commission'].includes(type?.toLowerCase());
 };
 
 const getStatusText = (status) => {

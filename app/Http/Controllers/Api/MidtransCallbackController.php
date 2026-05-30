@@ -46,6 +46,46 @@ class MidtransCallbackController extends Controller
         return response()->json(['message' => 'Transaction not found'], 404);
     }
 
+    /**
+     * Helper untuk memproses komisi pendaftaran Rp 2.500 ke Upline
+     * BERDASARKAN PENGECEKAN RIWAYAT SALDO (ANTI GAGAL / ANTI DOBEL)
+     */
+    private function processRegistrationCommission($buyer)
+    {
+        if (empty($buyer->referred_by)) return;
+
+        $upline = User::where('id', $buyer->referred_by)
+                      ->orWhere('affiliate_code', $buyer->referred_by)
+                      ->first();
+
+        if (!$upline) return;
+
+        // Deskripsi unik yang mengikat nama dan ID pembeli untuk mencegah komisi ganda
+        $descriptionTarget = "Komisi pendaftaran (User Aktif) dari: {$buyer->name} - ID:{$buyer->id}";
+
+        // Cek apakah Upline SUDAH PERNAH menerima komisi ini sebelumnya
+        $hasReceivedCommission = WalletTransaction::where('user_id', $upline->id)
+            ->where('type', 'commission')
+            ->where('description', $descriptionTarget)
+            ->where('status', 'success')
+            ->exists();
+
+        // Jika belum pernah dapat, berikan komisinya sekarang
+        if (!$hasReceivedCommission) {
+            $upline->increment('affiliate_balance', 2500);
+            
+            WalletTransaction::create([
+                'user_id' => $upline->id,
+                'amount' => 2500,
+                'type' => 'commission', 
+                'description' => $descriptionTarget,
+                'status' => 'success'
+            ]);
+            
+            Log::info("Midtrans: Komisi Pendaftaran Rp 2.500 masuk ke Upline ID: {$upline->id} dari Downline ID: {$buyer->id}");
+        }
+    }
+
     private function handleGeneralPurchase($transaction, $status)
     {
         if ($transaction->status == 'paid') return response()->json(['message' => 'Already processed']);
@@ -57,43 +97,15 @@ class MidtransCallbackController extends Controller
 
                 $buyer = User::find($transaction->user_id);
 
-                // 2. HITUNG TOTAL TRANSAKSI LUNAS
-                $totalPaidTransactions = Transaction::where('user_id', $buyer->id)
-                    ->whereIn('status', ['paid', 'success'])
-                    ->count();
-
                 // ----------------------------------------------------------
-                // ATURAN 1: KOMISI PENDAFTARAN AFILIASI VIA MIDTRANS (Rp 2.500)
+                // ATURAN 1: KOMISI PENDAFTARAN AFILIASI 
                 // ----------------------------------------------------------
-                if ($totalPaidTransactions === 1 && !empty($buyer->referred_by)) {
-                    
-                    // PERBAIKAN: Cari upline berdasarkan ID atau kode afiliasinya
-                    $upline = User::where('id', $buyer->referred_by)
-                                  ->orWhere('affiliate_code', $buyer->referred_by)
-                                  ->first();
-
-                    if ($upline) {
-                        $upline->increment('affiliate_balance', 2500);
-                        
-                        // Opsional namun penting: Catat riwayat dompet (Sesuaikan kolom dengan migrasi Anda)
-                        WalletTransaction::create([
-                            'user_id' => $upline->id,
-                            'amount' => 2500,
-                            'type' => 'commission', // Sesuaikan dengan enum/tipe Anda
-                            'description' => "Komisi pendaftaran (User Aktif) dari: {$buyer->name}",
-                            'status' => 'success'
-                        ]);
-                        
-                        Log::info("Midtrans: Komisi Pendaftaran Rp 2.500 masuk ke Upline ID: {$upline->id}");
-                    }
-                }
+                $this->processRegistrationCommission($buyer);
 
                 // ----------------------------------------------------------
                 // ATURAN 2: KOMISI KODE VOUCHER / TOKEN VIA MIDTRANS (Rp 2.000)
                 // ----------------------------------------------------------
                 if (!empty($transaction->referrer_id)) {
-                    
-                    // Jika referrer_id di tabel transactions bisa berupa kode, gunakan orWhere juga
                     $referrer = User::where('id', $transaction->referrer_id)
                                     ->orWhere('affiliate_code', $transaction->referrer_id)
                                     ->first();
@@ -101,7 +113,6 @@ class MidtransCallbackController extends Controller
                     if ($referrer) {
                         $referrer->increment('affiliate_balance', 2000);
                         
-                        // Opsional namun penting: Catat riwayat dompet
                         WalletTransaction::create([
                             'user_id' => $referrer->id,
                             'amount' => 2000,
@@ -140,9 +151,19 @@ class MidtransCallbackController extends Controller
         if ($transaction->status == 'success') return response()->json(['message' => 'Already processed']);
 
         if ($status == 'capture' || $status == 'settlement') {
-            $transaction->update(['status' => 'success']);
-            $user = User::find($transaction->user_id);
-            $user->increment('balance', $transaction->amount);
+            DB::transaction(function () use ($transaction) {
+                // 1. Update status top up dompet menjadi success
+                $transaction->update(['status' => 'success']);
+                
+                // 2. Tambahkan saldo utama user
+                $user = User::find($transaction->user_id);
+                $user->increment('balance', $transaction->amount);
+
+                // ----------------------------------------------------------
+                // ATURAN 1: KOMISI PENDAFTARAN AFILIASI VIA TOP UP DOMPET
+                // ----------------------------------------------------------
+                $this->processRegistrationCommission($user);
+            });
         } else if (in_array($status, ['cancel', 'deny', 'expire'])) {
             $transaction->update(['status' => 'failed']);
         }

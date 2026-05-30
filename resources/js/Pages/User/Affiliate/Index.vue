@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed } from 'vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { ref, computed, watch } from 'vue';
+import { Head, useForm, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 
 const props = defineProps({
@@ -8,11 +8,12 @@ const props = defineProps({
     affiliate_code: String,
     affiliate_url: String,
     stats: Object,
-    earning_history: Array, // <-- Menggunakan earning_history
+    earning_history: Array, 
     withdrawals: Array,
     announcements: Array,
     weekly_leaderboard: { type: Array, default: () => [] },
     monthly_leaderboard: { type: Array, default: () => [] },
+    competitionSettings: Object, // Menampung judul & deskripsi dinamis dari admin
     monthly_count: Number,
     target_limit: Number,
     special_bonus: Number,
@@ -21,6 +22,9 @@ const props = defineProps({
     wallet_bonus_for_referral: Number,
     token_discount: Number,
     token_commission: Number,
+    archiveMonths: Array,
+    archiveWeeks: Array,
+    selectedFilters: Object,
     flash: Object,
     errors: Object
 });
@@ -28,10 +32,23 @@ const props = defineProps({
 const activeTab = ref('overview');
 const copiedLink = ref(false);
 const copiedToken = ref(false);
-
 const isEditingBank = ref(!props.user?.bank_info);
 
-// Mengambil bulan saat ini untuk UI
+// Filter Arsip Peringkat
+const filterWeek = ref(props.selectedFilters?.week || '');
+const filterMonth = ref(props.selectedFilters?.month || '');
+
+const updateLeaderboardFilter = () => {
+    router.get(route('affiliate.index'), {
+        week: filterWeek.value,
+        month: filterMonth.value
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true
+    });
+};
+
 const currentMonthName = computed(() => {
     return new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
 });
@@ -172,7 +189,6 @@ const formatDate = (dateString) => {
                 </div>
 
                 <div v-if="activeTab === 'overview'" class="space-y-4 md:space-y-6">
-                    
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="bg-white border border-slate-100 rounded-[1.5rem] p-4 sm:p-5 shadow-sm flex flex-col justify-between">
                             <div class="mb-4">
@@ -195,7 +211,7 @@ const formatDate = (dateString) => {
                             <div class="mb-4">
                                 <p class="text-[10px] text-indigo-400 uppercase tracking-[0.2em] font-medium mb-1">Token Diskon & Group Buy</p>
                                 <p class="text-xs text-slate-600 font-normal leading-relaxed">
-                                    Dimasukkan saat checkout: Pembeli dipotong harga <span class="text-indigo-600 font-medium">{{ formatCurrency(token_discount) }}</span>, Anda komisi <span class="text-emerald-600 font-medium">{{ formatCurrency(token_commission) }}</span>. Ekstra diskon hingga Rp 25.000 untuk pembelian kelompok!
+                                    Dimasukkan saat checkout: Pembeli dipotong harga <span class="text-indigo-600 font-medium">{{ formatCurrency(token_discount) }}</span>, Anda komisi <span class="text-emerald-600 font-medium">{{ formatCurrency(token_commission) }}</span>. Ekstra diskon hingga Rp 25.000 untuk kelompok!
                                 </p>
                             </div>
                             <div class="flex flex-col sm:flex-row gap-2">
@@ -244,27 +260,20 @@ const formatDate = (dateString) => {
 
                 <div v-if="activeTab === 'withdraw'" class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="md:col-span-2 space-y-6">
-                        
                         <div class="bg-white border border-slate-100 rounded-[1.5rem] p-5 md:p-6 shadow-sm space-y-4">
                             <div class="flex justify-between items-center">
                                 <h3 class="text-xs md:text-sm font-medium text-slate-800 uppercase tracking-widest">Rekening Pencairan</h3>
                                 <div class="flex gap-2">
-                                    <button v-if="user?.bank_info && !isEditingBank" @click="isEditingBank = true" type="button" class="text-[10px] text-indigo-600 hover:text-indigo-800 font-medium uppercase tracking-wider px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors">
-                                        Edit Rekening
-                                    </button>
-                                    <button v-if="user?.bank_info && isEditingBank" @click="isEditingBank = false" type="button" class="text-[10px] text-slate-500 hover:text-slate-700 font-medium uppercase tracking-wider px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
-                                        Batal Edit
-                                    </button>
+                                    <button v-if="user?.bank_info && !isEditingBank" @click="isEditingBank = true" type="button" class="text-[10px] text-indigo-600 hover:text-indigo-800 font-medium uppercase tracking-wider px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors">Edit Rekening</button>
+                                    <button v-if="user?.bank_info && isEditingBank" @click="isEditingBank = false" type="button" class="text-[10px] text-slate-500 hover:text-slate-700 font-medium uppercase tracking-wider px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">Batal Edit</button>
                                 </div>
                             </div>
-
                             <div v-if="user?.bank_info && !isEditingBank" class="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col gap-1.5 transition-all">
                                 <div class="text-[10px] text-slate-400 uppercase tracking-widest font-medium mb-1">Informasi Tersimpan</div>
                                 <div class="text-sm font-medium text-slate-800">{{ user.bank_info.bank_name }}</div>
                                 <div class="text-xs font-mono text-slate-600">{{ user.bank_info.account_number }}</div>
                                 <div class="text-xs text-slate-600 font-normal">a.n {{ user.bank_info.account_name }}</div>
                             </div>
-
                             <form v-else @submit.prevent="updateBankInfo" class="space-y-4 mt-2">
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
@@ -285,7 +294,6 @@ const formatDate = (dateString) => {
                                 </button>
                             </form>
                         </div>
-
                         <div class="bg-white border border-slate-100 rounded-[1.5rem] p-5 md:p-6 shadow-sm space-y-4">
                             <h3 class="text-xs md:text-sm font-medium text-slate-800 uppercase tracking-widest">Pengajuan Tarik Saldo</h3>
                             <div class="bg-slate-50 rounded-xl p-4 text-xs md:text-sm space-y-2 border border-slate-100">
@@ -301,12 +309,10 @@ const formatDate = (dateString) => {
                                 <button type="submit" :disabled="withdrawForm.processing || !user?.bank_info || (user?.affiliate_balance < min_withdrawal)" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] uppercase font-medium tracking-[0.2em] transition-all disabled:opacity-50">
                                     {{ withdrawForm.processing ? 'Meneruskan Pengajuan...' : 'Tarik Saldo Sekarang' }}
                                 </button>
-                                <p v-if="!user?.bank_info" class="text-[10px] text-rose-500 text-center font-normal mt-2">Harap atur dan simpan rekening pencairan di atas terlebih dahulu.</p>
-                                <p v-else class="text-[9px] text-slate-400 text-center font-normal mt-2 uppercase tracking-wide">Proses transfer membutuhkan waktu maksimal 1x24 Jam kerja.</p>
+                                <p v-if="!user?.bank_info" class="text-[10px] text-rose-500 text-center font-normal mt-2">Harap simpan rekening pencairan di atas terlebih dahulu.</p>
                             </form>
                         </div>
                     </div>
-
                     <div class="space-y-3 md:col-span-1">
                         <h4 class="text-[10px] font-medium text-slate-400 uppercase tracking-[0.15em] px-1">Riwayat Status Pencairan</h4>
                         <div v-if="withdrawals.length === 0" class="bg-white border border-slate-100 rounded-[1.5rem] p-6 text-center text-xs text-slate-400 font-normal shadow-sm">
@@ -321,7 +327,7 @@ const formatDate = (dateString) => {
                                     </div>
                                     <span :class="wd.status === 'approved' ? 'text-emerald-600 bg-emerald-50 border border-emerald-100' : wd.status === 'pending' ? 'text-amber-600 bg-amber-50 border border-amber-100' : 'text-rose-600 bg-rose-50 border border-rose-100'" 
                                           class="text-[9px] font-medium uppercase tracking-wider px-2 py-1 rounded-md text-center shrink-0">
-                                        {{ wd.status === 'approved' ? 'Telah Dikirim' : wd.status === 'pending' ? 'Menunggu Proses' : 'Ditolak' }}
+                                        {{ wd.status === 'approved' ? 'Telah Dikirim' : wd.status === 'pending' ? 'Menunggu' : 'Ditolak' }}
                                     </span>
                                 </div>
                                 <div class="flex justify-between items-end mt-1 pt-2 border-t border-slate-50">
@@ -342,9 +348,7 @@ const formatDate = (dateString) => {
                         <div v-for="earn in earning_history" :key="earn.id" class="bg-white border border-slate-100 rounded-xl p-4 flex items-center justify-between gap-4 transition-all shadow-sm">
                             <div class="min-w-0 flex items-start gap-3">
                                 <div class="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center border" :class="earn.type.includes('Token') ? 'bg-indigo-50 border-indigo-100 text-indigo-500' : 'bg-emerald-50 border-emerald-100 text-emerald-500'">
-                                    <span class="text-xs">
-                                        {{ earn.type.includes('Token') ? '🎫' : '👤' }}
-                                    </span>
+                                    <span class="text-xs">{{ earn.type.includes('Token') ? '🎫' : '👤' }}</span>
                                 </div>
                                 <div>
                                     <h4 class="text-xs md:text-sm font-medium text-slate-900 truncate tracking-tight">{{ earn.name }}</h4>
@@ -354,9 +358,7 @@ const formatDate = (dateString) => {
                                 </div>
                             </div>
                             <div class="text-right shrink-0">
-                                <span class="text-xs md:text-sm font-medium text-emerald-600 block">
-                                    +{{ formatCurrency(earn.amount) }}
-                                </span>
+                                <span class="text-xs md:text-sm font-medium text-emerald-600 block">+{{ formatCurrency(earn.amount) }}</span>
                             </div>
                         </div>
                     </div>
@@ -365,13 +367,15 @@ const formatDate = (dateString) => {
                 <div v-if="activeTab === 'competition'" class="space-y-6">
                     <div class="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[1.5rem] p-5 md:p-8 shadow-md text-white">
                         <div class="flex items-center gap-2 mb-2">
-                            <h3 class="text-lg md:text-xl font-medium tracking-tight">Kompetisi Penggunaan Token</h3>
+                            <h3 class="text-lg md:text-xl font-medium tracking-tight">
+                                {{ competitionSettings?.title || 'Kompetisi Penggunaan Token' }}
+                            </h3>
                         </div>
-                        <p class="text-xs md:text-sm text-indigo-100 font-normal leading-relaxed max-w-3xl">
-                            Raih target penggunaan token terbanyak setiap minggu dan bulan untuk mendapatkan hadiah saldo khusus secara langsung! Bagikan tautan kompetisi atau token unik Anda di bawah ini ke seluruh media sosial.
+                        <p class="text-xs md:text-sm text-indigo-100 font-normal leading-relaxed max-w-3xl whitespace-pre-line">
+                            {{ competitionSettings?.description || 'Raih target penggunaan token terbanyak setiap minggu dan bulan untuk mendapatkan hadiah saldo khusus secara langsung! Bagikan tautan kompetisi atau token unik Anda di bawah ini ke seluruh media sosial.' }}
                         </p>
                         <div class="mt-4 inline-block bg-white/20 border border-white/30 rounded-lg px-3 py-1.5 text-[10px] uppercase tracking-widest font-medium">
-                            Periode: {{ currentMonthName }}
+                            Periode Berjalan: {{ currentMonthName }}
                         </div>
                     </div>
 
@@ -403,38 +407,54 @@ const formatDate = (dateString) => {
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
                         <div class="bg-white border border-slate-100 rounded-[1.5rem] p-5 md:p-6 shadow-sm">
-                            <h3 class="text-xs font-medium text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-3 mb-3">Top 5 Peringkat Mingguan</h3>
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 mb-3 gap-2">
+                                <h3 class="text-xs font-medium text-slate-800 uppercase tracking-widest">Top 5 Peringkat Mingguan</h3>
+                                <select v-model="filterWeek" @change="updateLeaderboardFilter" class="bg-slate-50 border border-slate-200 text-slate-700 text-[9px] md:text-[10px] uppercase font-medium rounded-lg px-2 pr-8 py-1.5 focus:border-indigo-500 focus:ring-0 transition-colors cursor-pointer w-full sm:w-auto">     <option v-for="week in archiveWeeks" :key="week.value" :value="week.value">{{ week.label }}</option>
+                                </select>
+                            </div>
+
                             <div v-if="weekly_leaderboard.length > 0" class="flex flex-col gap-2">
                                 <div v-for="(leader, index) in weekly_leaderboard" :key="'w'+index" class="flex items-center justify-between p-3 rounded-xl transition-colors" :class="index === 0 ? 'bg-amber-50 border border-amber-100' : index === 1 ? 'bg-slate-50 border border-slate-200' : index === 2 ? 'bg-orange-50 border border-orange-100' : 'hover:bg-slate-50'">
                                     <div class="flex items-center gap-3">
                                         <div class="w-6 h-6 flex items-center justify-center rounded-full text-[10px] font-medium" :class="index === 0 ? 'bg-amber-500 text-white' : index === 1 ? 'bg-slate-400 text-white' : index === 2 ? 'bg-orange-400 text-white' : 'bg-slate-100 text-slate-500'">
                                             {{ index + 1 }}
                                         </div>
-                                        <span class="text-xs font-medium text-slate-700 truncate max-w-[120px] sm:max-w-[150px]">{{ leader.name }}</span>
+                                        <span class="text-xs font-medium text-slate-700 truncate max-w-[120px] sm:max-w-[150px]">
+                                            {{ leader.name }}
+                                            <span v-if="leader.name === user.name" class="ml-1 text-[9px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded uppercase">(Anda)</span>
+                                        </span>
                                     </div>
                                     <span class="text-[10px] font-medium text-slate-500 uppercase tracking-wider shrink-0">{{ leader.total }} Token</span>
                                 </div>
                             </div>
                             <div v-else class="text-center py-8 text-xs text-slate-400 font-normal">
-                                Belum ada data minggu ini.
+                                Belum ada data di minggu ini.
                             </div>
                         </div>
 
                         <div class="bg-white border border-slate-100 rounded-[1.5rem] p-5 md:p-6 shadow-sm">
-                            <h3 class="text-xs font-medium text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-3 mb-3">Top 5 Peringkat Bulanan</h3>
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 mb-3 gap-2">
+                                <h3 class="text-xs font-medium text-slate-800 uppercase tracking-widest">Top 5 Peringkat Bulanan</h3>
+                                <select v-model="filterMonth" @change="updateLeaderboardFilter" class="bg-slate-50 border border-slate-200 text-slate-700 text-[9px] md:text-[10px] uppercase font-medium rounded-lg px-2 pr-8 py-1.5 focus:border-indigo-500 focus:ring-0 transition-colors cursor-pointer w-full sm:w-auto">    <option v-for="month in archiveMonths" :key="month.value" :value="month.value">{{ month.label }}</option>
+                                </select>
+                            </div>
+
                             <div v-if="monthly_leaderboard.length > 0" class="flex flex-col gap-2">
                                 <div v-for="(leader, index) in monthly_leaderboard" :key="'m'+index" class="flex items-center justify-between p-3 rounded-xl transition-colors" :class="index === 0 ? 'bg-indigo-50 border border-indigo-100' : index === 1 ? 'bg-slate-50 border border-slate-200' : index === 2 ? 'bg-orange-50 border border-orange-100' : 'hover:bg-slate-50'">
                                     <div class="flex items-center gap-3">
                                         <div class="w-6 h-6 flex items-center justify-center rounded-full text-[10px] font-medium" :class="index === 0 ? 'bg-indigo-500 text-white' : index === 1 ? 'bg-slate-400 text-white' : index === 2 ? 'bg-orange-400 text-white' : 'bg-slate-100 text-slate-500'">
                                             {{ index + 1 }}
                                         </div>
-                                        <span class="text-xs font-medium text-slate-700 truncate max-w-[120px] sm:max-w-[150px]">{{ leader.name }}</span>
+                                        <span class="text-xs font-medium text-slate-700 truncate max-w-[120px] sm:max-w-[150px]">
+                                            {{ leader.name }}
+                                            <span v-if="leader.name === user.name" class="ml-1 text-[9px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded uppercase">(Anda)</span>
+                                        </span>
                                     </div>
                                     <span class="text-[10px] font-medium text-slate-500 uppercase tracking-wider shrink-0">{{ leader.total }} Token</span>
                                 </div>
                             </div>
                             <div v-else class="text-center py-8 text-xs text-slate-400 font-normal">
-                                Belum ada data bulan ini.
+                                Belum ada data di bulan ini.
                             </div>
                         </div>
                     </div>
