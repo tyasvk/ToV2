@@ -188,84 +188,100 @@ class TryoutManagerController extends Controller
         return back()->with('success', 'Data pengerjaan peserta berhasil dihapus. Peserta sekarang dapat mengikuti ujian kembali.');
     }
 
-/**
-     * Fitur Kalkulasi Ulang Skor (Recalculate)
-     */
-    public function recalculate(Tryout $tryout) // Pastikan namanya 'recalculate' 
+public function recalculate(Tryout $tryout)
     {
-        // 1. Ambil semua soal terbaru dari Tryout ini
+        
+        // 1. Ambil semua soal dari tryout ini
         $questions = \App\Models\Question::where('tryout_id', $tryout->id)->get()->keyBy('id');
 
-        // 2. Ambil semua riwayat pengerjaan yang sudah "completed"
+        // 2. Ambil attempt (pengerjaan) yang sudah selesai
         $attempts = \App\Models\ExamAttempt::where('tryout_id', $tryout->id)
                         ->whereNotNull('completed_at')
                         ->get();
+
+        $updatedCount = 0;
 
         foreach ($attempts as $attempt) {
             $twkScore = 0;
             $tiuScore = 0;
             $tkpScore = 0;
 
-            // Decode JSON jawaban peserta
-            $userAnswers = is_string($attempt->answers) ? json_decode($attempt->answers, true) : $attempt->answers;
+            // Pastikan format JSON terbaca
+            $userAnswers = $attempt->answers;
+            if (is_string($userAnswers)) {
+                $userAnswers = json_decode($userAnswers, true);
+            }
 
             if (is_array($userAnswers) || is_object($userAnswers)) {
                 foreach ($userAnswers as $key => $answerData) {
                     
-                    // DETEKSI OTOMATIS ID SOAL:
-                    // Mendukung format [{"question_id": 1, "answer": "A"}] ATAU format {"1": "A"}
                     $questionId = (is_array($answerData) && isset($answerData['question_id'])) 
                                   ? $answerData['question_id'] 
                                   : $key;
 
-                    // DETEKSI OTOMATIS PILIHAN JAWABAN (A, B, C, D, E):
                     $userChoiceRaw = (is_array($answerData) && isset($answerData['answer'])) 
                                   ? $answerData['answer'] 
                                   : (is_string($answerData) ? $answerData : null);
                     
-                    // Jadikan huruf besar semua untuk menghindari error 'a' != 'A'
-                    $userChoice = $userChoiceRaw !== null ? strtoupper($userChoiceRaw) : null;
+                    $userChoice = $userChoiceRaw !== null ? strtoupper(trim($userChoiceRaw)) : null;
 
                     if (isset($questions[$questionId]) && $userChoice !== null) {
                         $question = $questions[$questionId];
-                        $correctAnswer = strtoupper($question->correct_answer);
                         
-                        // --- PENILAIAN SKOR TWK & TIU (Benar: 5, Salah: 0) ---
-                        if ($question->category === 'TWK' || $question->category === 'TIU') {
+                        // Menangkap berbagai kemungkinan nama kolom kategori (category/type/kategori)
+                        $category = strtoupper(trim($question->category ?? $question->type ?? $question->kategori ?? '')); 
+                        
+                        // -- LOGIKA SKOR TWK & TIU --
+                        if ($category === 'TWK' || $category === 'TIU') {
+                            $correctAnswer = strtoupper(trim($question->correct_answer));
                             if ($userChoice === $correctAnswer) {
-                                if ($question->category === 'TWK') {
-                                    $twkScore += 5;
-                                } else {
-                                    $tiuScore += 5;
-                                }
+                                if ($category === 'TWK') $twkScore += 5;
+                                if ($category === 'TIU') $tiuScore += 5;
                             }
                         } 
-                        // --- PENILAIAN SKOR TKP (Poin 1 sampai 5) ---
-                        elseif ($question->category === 'TKP') {
-                            $points = is_string($question->points) ? json_decode($question->points, true) : $question->points;
-                            
-                            if (is_array($points) && isset($points[$userChoice])) {
-                                $tkpScore += (int) $points[$userChoice];
+                        // -- LOGIKA SKOR TKP --
+                        elseif ($category === 'TKP') {
+                            if (!empty($question->points)) {
+                                $points = is_string($question->points) ? json_decode($question->points, true) : $question->points;
+                                if (is_array($points) && isset($points[$userChoice])) {
+                                    $tkpScore += (int) $points[$userChoice];
+                                }
+                            } else {
+                                // Mengecek SEMUA kemungkinan penamaan kolom nilai TKP di database Anda
+                                $possibleColumns = [
+                                    'point_' . strtolower($userChoice), // point_a
+                                    'poin_' . strtolower($userChoice),  // poin_a
+                                    'score_' . strtolower($userChoice), // score_a
+                                    'skor_' . strtolower($userChoice),  // skor_a
+                                    strtolower($userChoice),            // a, b, c, d, e
+                                ];
+
+                                foreach ($possibleColumns as $col) {
+                                    if (isset($question->$col)) {
+                                        $tkpScore += (int) $question->$col;
+                                        break; // Hentikan loop jika kolom ditemukan
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
 
-            // 3. Simpan Total Skor Terbaru ke tabel exam_attempts
-            $attempt->update([
-                'twk_score'   => $twkScore,
-                'tiu_score'   => $tiuScore,
-                'tkp_score'   => $tkpScore,
-                'total_score' => $twkScore + $tiuScore + $tkpScore,
-                // Perbarui status Lulus / Tidak (sesuai passing grade BKN)
-                'is_passed'   => ($twkScore >= (\App\Models\ExamAttempt::PASSING_GRADE_TWK ?? 65) && 
-                                  $tiuScore >= (\App\Models\ExamAttempt::PASSING_GRADE_TIU ?? 80) && 
-                                  $tkpScore >= (\App\Models\ExamAttempt::PASSING_GRADE_TKP ?? 166))
-            ]);
+            // 3. BYPASS $FILLABLE DENGAN DIRECT ASSIGNMENT
+            // Cara ini menjamin bahwa angka baru PASTI dimasukkan ke dalam database meskipun ada restriksi model
+            $attempt->twk_score   = $twkScore;
+            $attempt->tiu_score   = $tiuScore;
+            $attempt->tkp_score   = $tkpScore;
+            $attempt->total_score = $twkScore + $tiuScore + $tkpScore;
+            $attempt->is_passed   = ($twkScore >= 65 && $tiuScore >= 80 && $tkpScore >= 166);
+            
+            // Simpan paksa ke database
+            $attempt->save();
+
+            $updatedCount++;
         }
 
-        // Return back() akan membuat Inertia otomatis memuat ulang (refresh) props tabel Results
-        return back()->with('success', 'Berhasil! Skor peserta dikalkulasi ulang berdasarkan kunci terbaru.');
+        return back()->with('success', "Kalkulasi berhasil! $updatedCount data peserta telah diperbarui.");
     }
 }

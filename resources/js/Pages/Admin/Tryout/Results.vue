@@ -56,7 +56,7 @@ const deleteAttempt = (attemptId) => {
 // --- FITUR RECALCULATE SKOR ---
 const recalculateScores = () => {
     if (confirm('Apakah Anda yakin ingin menghitung ulang skor seluruh peserta pada Tryout ini? Proses ini akan menyesuaikan ulang nilai dan peringkat jika ada perubahan kunci jawaban.')) {
-        router.post(route('admin.tryouts.recalculate-scores', props.tryout.id), {}, {
+        router.post(route('admin.tryouts.recalculate', props.tryout.id), {}, {
             preserveScroll: true,
             onSuccess: () => {
                 alert('Skor berhasil dikalkulasi ulang!');
