@@ -783,4 +783,26 @@ public function checkEmail(Request $request)
 
         return response()->json(['valid' => true, 'message' => 'Kode valid.']);
     }
+
+    /**
+     * Menyimpan laporan soal dari user
+     */
+    public function reportQuestion(\Illuminate\Http\Request $request)
+    {
+        $request->validate([
+            'question_id' => 'required|exists:questions,id',
+            'reason' => 'required|string|max:255',
+            'description' => 'nullable|string|max:1000',
+        ]);
+
+        \App\Models\QuestionReport::create([
+            'user_id' => auth()->id(),
+            'question_id' => $request->question_id,
+            'reason' => $request->reason,
+            'description' => $request->description,
+            'status' => 'pending',
+        ]);
+
+        return back()->with('success', 'Laporan berhasil dikirim. Terima kasih atas masukan Anda!');
+    }
 }

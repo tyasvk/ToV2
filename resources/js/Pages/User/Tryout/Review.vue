@@ -1,6 +1,6 @@
 <script setup>
-import { Head, Link, usePage } from '@inertiajs/vue3';
-import { ref, computed } from 'vue';
+import { Head, Link, usePage, useForm } from '@inertiajs/vue3';
+import { ref, computed, watch } from 'vue';
 
 const props = defineProps({
     tryout: Object,
@@ -15,21 +15,49 @@ const page = usePage();
 const currentIndex = ref(0);
 const isSidebarOpen = ref(false);
 
+// --- FITUR LAPORKAN SOAL ---
+const showReportModal = ref(false);
+
+const reportForm = useForm({
+    question_id: '',
+    reason: 'Kunci Jawaban Salah',
+    description: ''
+});
+
+const openReportModal = (questionId) => {
+    reportForm.reset();
+    reportForm.question_id = questionId;
+    reportForm.reason = 'Kunci Jawaban Salah';
+    showReportModal.value = true;
+};
+
+const closeReportModal = () => {
+    showReportModal.value = false;
+    reportForm.reset();
+};
+
+const submitReport = () => {
+    reportForm.post(route('tryout.report-question'), {
+        preserveScroll: true,
+        onSuccess: () => {
+            closeReportModal();
+            alert('Laporan berhasil dikirim. Tim kami akan segera meninjunya!');
+        }
+    });
+};
+
 // --- 1. SUPER ROBUST DATA GETTER ---
 const getUserAnswer = (question) => {
     if (!question) return null;
     
-    // Cek 1: Langsung di properti question
     if (question.user_answer !== undefined && question.user_answer !== null) {
         return question.user_answer;
     }
     
-    // Cek 2: Pivot
     if (question.pivot && question.pivot.answer) {
         return question.pivot.answer;
     }
 
-    // Cek 3: Answer saja
     if (question.answer !== undefined && question.answer !== null) {
         return question.answer;
     }
@@ -185,16 +213,23 @@ const getBknOptionClass = (key) => {
                             <span class="text-[10px] font-medium text-slate-500 uppercase tracking-widest">{{ currentQuestion.type }}</span>
                         </div>
                         
-                        <div v-if="isUserCorrectHeader" class="flex items-center gap-1.5 text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-100">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
-                            <span class="text-[10px] font-medium uppercase">Benar</span>
-                        </div>
-                        <div v-else-if="!isUnansweredHeader" class="flex items-center gap-1.5 text-rose-600 bg-rose-50 px-2.5 py-0.5 rounded border border-rose-100">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>
-                            <span class="text-[10px] font-medium uppercase">Salah</span>
-                        </div>
-                        <div v-else class="flex items-center gap-1.5 text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded border border-slate-200">
-                            <span class="text-[10px] font-medium uppercase">Kosong</span>
+                        <div class="flex items-center gap-2">
+                            <button @click="openReportModal(currentQuestion.id)" type="button" class="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-600 border border-rose-100 rounded text-[10px] font-bold transition hover:bg-rose-100 active:scale-95">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" /></svg>
+                                LAPORKAN
+                            </button>
+
+                            <div v-if="isUserCorrectHeader" class="flex items-center gap-1.5 text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-100">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                                <span class="text-[10px] font-medium uppercase">Benar</span>
+                            </div>
+                            <div v-else-if="!isUnansweredHeader" class="flex items-center gap-1.5 text-rose-600 bg-rose-50 px-2.5 py-0.5 rounded border border-rose-100">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>
+                                <span class="text-[10px] font-medium uppercase">Salah</span>
+                            </div>
+                            <div v-else class="flex items-center gap-1.5 text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded border border-slate-200">
+                                <span class="text-[10px] font-medium uppercase">Kosong</span>
+                            </div>
                         </div>
                     </div>
                     
@@ -297,7 +332,6 @@ const getBknOptionClass = (key) => {
         </div>
     </div>
 
-
     <div v-else class="h-screen flex flex-col font-sans text-slate-700 bg-slate-50 overflow-hidden">
         
         <header class="bg-[#1e60aa] text-white shadow-sm z-40 shrink-0 h-14 flex items-center px-3 sm:px-4 justify-between">
@@ -395,6 +429,11 @@ const getBknOptionClass = (key) => {
                         
                         <div class="bg-slate-50 border-b border-slate-100 px-4 py-3 flex items-center justify-between">
                             <span class="font-medium text-[11px] sm:text-xs text-slate-600 tracking-wide uppercase">{{ subtestTopic }}</span>
+                            
+                            <button @click="openReportModal(currentQuestion.id)" type="button" class="inline-flex items-center gap-1 px-2 py-1 bg-rose-50 text-rose-600 border border-rose-200 rounded text-[10px] font-bold tracking-wide transition hover:bg-rose-100 active:scale-95">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" /></svg>
+                                LAPORKAN
+                            </button>
                         </div>
 
                         <div v-if="currentQuestion" class="p-4 sm:p-6 lg:p-8 flex-1">
@@ -461,6 +500,50 @@ const getBknOptionClass = (key) => {
             </main>
         </div>
     </div>
+
+    <Teleport to="body">
+        <div v-if="showReportModal" class="fixed inset-0 z-[999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-sm">
+            <div class="absolute inset-0" @click="closeReportModal"></div>
+            
+            <div class="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-200 z-10">
+                
+                <div class="p-4 sm:p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <h3 class="font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                        Laporkan Kesalahan Soal
+                    </h3>
+                    <button @click="closeReportModal" class="text-slate-400 hover:text-slate-600 bg-slate-100 p-1.5 rounded-full transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+                
+                <form @submit.prevent="submitReport" class="p-4 sm:p-5 space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">Jenis Masalah <span class="text-rose-500">*</span></label>
+                        <select v-model="reportForm.reason" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium text-slate-800" required>
+                            <option value="Kunci Jawaban Salah">Kunci Jawaban Salah</option>
+                            <option value="Pembahasan Kurang Jelas / Salah">Pembahasan Kurang Jelas / Salah</option>
+                            <option value="Soal Tidak Lengkap / Typo">Soal Tidak Lengkap / Typo</option>
+                            <option value="Pilihan Ganda Error / Jawaban Ganda">Pilihan Ganda Error / Jawaban Ganda</option>
+                            <option value="Lainnya">Lainnya</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">Jelaskan Letak Kesalahannya</label>
+                        <textarea v-model="reportForm.description" rows="3" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs sm:text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all resize-none placeholder:text-slate-400 font-medium text-slate-800" placeholder="Contoh: Kunci jawaban tertulis A, namun berdasarkan pembahasan di buku panduan harusnya B..."></textarea>
+                    </div>
+
+                    <div class="pt-1">
+                        <button type="submit" :disabled="reportForm.processing" class="w-full py-2.5 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white rounded-xl font-bold text-xs sm:text-sm shadow-sm active:scale-95 transition-all flex justify-center items-center gap-2 uppercase tracking-wider">
+                            <span v-if="reportForm.processing">Mengirim...</span>
+                            <span v-else>Kirim Laporan</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </Teleport>
 </template>
 
 <style scoped>

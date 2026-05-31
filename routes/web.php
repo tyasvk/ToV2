@@ -11,7 +11,7 @@ use App\Http\Controllers\User\TryoutController as UserTryoutController;
 use App\Http\Controllers\User\CheckoutController;
 use App\Http\Controllers\User\WalletController;
 use App\Http\Controllers\User\TryoutAkbarController as UserTryoutAkbarController;
-use App\Http\Controllers\User\TryoutController; // Note: Ini duplikat dengan UserTryoutController tapi kita biarkan jika di bawah ada yang memanggil TryoutController
+use App\Http\Controllers\User\TryoutController; 
 use App\Http\Controllers\User\MembershipController;
 use App\Http\Controllers\User\AffiliateController as UserAffiliateController;
 
@@ -28,7 +28,7 @@ use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\MembershipPackageController;
 use App\Http\Controllers\Admin\AdminAffiliateController;
 use App\Http\Controllers\Admin\AdidayaManagerController;
-use App\Http\Controllers\Admin\VoucherController; // Tambahkan import VoucherController
+use App\Http\Controllers\Admin\VoucherController; 
 
 /*
 |--------------------------------------------------------------------------
@@ -66,8 +66,6 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     Route::get('/wallet', [WalletController::class, 'index'])->name('wallet.index');
     Route::post('/wallet/topup', [WalletController::class, 'topup'])->name('wallet.topup');
     Route::post('/wallet/pay-pending/{transaction}', [WalletController::class, 'payPending'])->name('wallet.payPending');
-    
-    // PERBAIKAN NAMA ROUTE VOUCHER (Menyesuaikan dengan nama route di Vue: route('wallet.claim_voucher'))
     Route::post('/wallet/claim-voucher', [WalletController::class, 'claimVoucher'])->name('wallet.claim_voucher');
 
     // --- TRYOUT ADIDAYA ---
@@ -114,6 +112,7 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     Route::get('/history', [UserTryoutController::class, 'history'])->name('tryout.history');
     Route::get('/history/{tryout}', [UserTryoutController::class, 'historyDetail'])->name('tryout.history.detail');
     Route::get('/certificate/{attempt}', [UserTryoutController::class, 'certificate'])->name('tryout.certificate');
+    Route::post('/tryouts/report-question', [\App\Http\Controllers\User\TryoutController::class, 'reportQuestion'])->name('tryout.report-question');
 
     Route::post('/tryouts/{tryout}/penalty', [\App\Http\Controllers\User\TryoutController::class, 'incrementPenalty'])->name('tryout.penalty');
 
@@ -138,6 +137,11 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::post('/users/{user}/add-balance', [UserManagerController::class, 'addBalance'])->name('users.add-balance');
     Route::post('/users/{user}/add-membership', [UserManagerController::class, 'addMembership'])->name('users.add-membership');
 
+    // --- Laporan Soal ---
+    Route::get('/question-reports', [\App\Http\Controllers\Admin\QuestionReportController::class, 'index'])->name('question-reports.index');
+    Route::patch('/question-reports/{report}/status', [\App\Http\Controllers\Admin\QuestionReportController::class, 'updateStatus'])->name('question-reports.update-status');
+    Route::delete('/question-reports/{report}', [\App\Http\Controllers\Admin\QuestionReportController::class, 'destroy'])->name('question-reports.destroy');
+
     // Affiliate Management
     Route::get('/affiliate/withdrawals', [AffiliateManagerController::class, 'withdrawals'])->name('affiliate.withdrawals');
     Route::post('/affiliate/withdrawals/{withdrawal}/approve', [AffiliateManagerController::class, 'approveWithdrawal'])->name('affiliate.approve');
@@ -148,15 +152,25 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::get('/affiliate/export-pdf', [AffiliateManagerController::class, 'exportPdf'])->name('affiliate.export-pdf');
     Route::post('/affiliate/send-bonus', [AffiliateManagerController::class, 'sendSpecialBonus'])->name('admin.affiliate.send-bonus');
 
-    // Tryout Management
+    // --- 1. TRYOUT BIASA ---
     Route::resource('tryouts', TryoutManagerController::class);
+    Route::get('/tryouts/{tryout}/results', [\App\Http\Controllers\Admin\TryoutManagerController::class, 'results'])->name('tryouts.results');
+    Route::delete('/tryouts/attempts/{attempt}', [\App\Http\Controllers\Admin\TryoutManagerController::class, 'destroyAttempt'])->name('tryouts.attempts.destroy');
+    // Tambahkan Rute Kalkulasi Ulang di sini:
+    Route::post('/tryouts/{tryout}/recalculate-scores', [\App\Http\Controllers\Admin\TryoutManagerController::class, 'recalculateScores'])->name('tryouts.recalculate-scores');
+    // --- 2. ADIDAYA MANAGEMENT ---
+    Route::resource('adidaya-manage', AdidayaManagerController::class)->names('adidaya');
+    Route::get('/adidaya-manage/{tryout}/results', [\App\Http\Controllers\Admin\TryoutManagerController::class, 'results'])->name('adidaya.results');
 
-    // Pengaturan Sistem (Diperbarui)
+    // --- 3. TRYOUT AKBAR MANAGEMENT ---
+    Route::resource('tryout-akbar', AdminTryoutAkbarController::class);
+    Route::get('tryout-akbar/{tryout}/participants', [AdminTryoutAkbarController::class, 'participants'])->name('tryout-akbar.participants');
+    Route::post('tryout-akbar/verify/{transaction}', [AdminTryoutAkbarController::class, 'verifyRegistration'])->name('tryout-akbar.verify');
+    Route::get('/tryout-akbar/{tryout}/results', [\App\Http\Controllers\Admin\TryoutManagerController::class, 'results'])->name('tryout-akbar.results');
+
+    // Pengaturan Sistem
     Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
     Route::put('/settings', [SettingController::class, 'update'])->name('settings.update');
-    
-    // Adidaya Management
-    Route::resource('adidaya-manage', AdidayaManagerController::class)->names('adidaya');
     
     // Question Management
     Route::patch('/questions/reorder', [QuestionManagerController::class, 'reorder'])->name('questions.reorder');
@@ -167,13 +181,6 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     // Transaction Management
     Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
     Route::post('/transactions/{transaction}/approve', [TransactionController::class, 'approve'])->name('transactions.approve');
-    // Tambahkan baris ini di dalam grup route admin yang mengelola tryout
-Route::get('/tryouts/{tryout}/results', [App\Http\Controllers\Admin\TryoutController::class, 'results'])->name('admin.tryouts.results');
-
-    // Tryout Akbar Management
-    Route::resource('tryout-akbar', AdminTryoutAkbarController::class);
-    Route::get('tryout-akbar/{tryout}/participants', [AdminTryoutAkbarController::class, 'participants'])->name('tryout-akbar.participants');
-    Route::post('tryout-akbar/verify/{transaction}', [AdminTryoutAkbarController::class, 'verifyRegistration'])->name('tryout-akbar.verify');
 
     // Membership Settings
     Route::get('/membership-setting', [MembershipSettingController::class, 'index'])->name('membership-setting.index');
@@ -187,14 +194,7 @@ Route::get('/tryouts/{tryout}/results', [App\Http\Controllers\Admin\TryoutContro
     Route::get('/affiliate', [AdminAffiliateController::class, 'index'])->name('affiliate.index');
     Route::post('/affiliate/user/{user}/reward', [AdminAffiliateController::class, 'giveReward'])->name('affiliate.reward');
     Route::post('/affiliate/withdraw/{withdrawal}/status', [AdminAffiliateController::class, 'updateWithdrawStatus'])->name('affiliate.withdraw.status');
-    // Halaman utama kelola afiliasi
-    Route::get('/affiliate', [AdminAffiliateController::class, 'index'])->name('affiliate.index');
-    Route::post('/affiliate/user/{user}/reward', [AdminAffiliateController::class, 'giveReward'])->name('affiliate.reward');
-    Route::post('/affiliate/withdraw/{withdrawal}/status', [AdminAffiliateController::class, 'updateWithdrawStatus'])->name('affiliate.withdraw.status');
-    
-    // TAMBAHKAN BARIS INI UNTUK UPDATE TEKS KOMPETISI:
     Route::post('/affiliate/settings/competition', [AdminAffiliateController::class, 'updateCompetitionSetting'])->name('affiliate.competition.update');
-
 
     // --- VOUCHER SALDO DOMPET ---
     Route::get('/vouchers', [VoucherController::class, 'index'])->name('vouchers.index');
