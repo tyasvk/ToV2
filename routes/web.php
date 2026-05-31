@@ -157,7 +157,8 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::get('/tryouts/{tryout}/results', [\App\Http\Controllers\Admin\TryoutManagerController::class, 'results'])->name('tryouts.results');
     Route::delete('/tryouts/attempts/{attempt}', [\App\Http\Controllers\Admin\TryoutManagerController::class, 'destroyAttempt'])->name('tryouts.attempts.destroy');
     // Tambahkan Rute Kalkulasi Ulang di sini:
-    Route::post('/tryouts/{tryout}/recalculate-scores', [\App\Http\Controllers\Admin\TryoutManagerController::class, 'recalculateScores'])->name('tryouts.recalculate-scores');
+  Route::post('tryouts/{tryout}/recalculate', [TryoutManagerController::class, 'recalculate'])
+    ->name('admin.tryouts.recalculate');
     // --- 2. ADIDAYA MANAGEMENT ---
     Route::resource('adidaya-manage', AdidayaManagerController::class)->names('adidaya');
     Route::get('/adidaya-manage/{tryout}/results', [\App\Http\Controllers\Admin\TryoutManagerController::class, 'results'])->name('adidaya.results');
