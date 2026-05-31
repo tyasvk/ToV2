@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('exam_attempts', function (Blueprint $table) {
-            // Ubah 'status' menjadi kolom yang memang ada di tabel, misalnya 'completed_at' atau 'total_score'
-            $table->integer('left_count')->default(3)->after('completed_at');
+            // Mengubah kolom menjadi bisa kosong (nullable)
+            $table->timestamp('completed_at')->nullable()->change();
         });
     }
 
@@ -23,7 +23,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('exam_attempts', function (Blueprint $table) {
-            $table->dropColumn('left_count');
+            // Mengembalikan ke pengaturan semula jika di-rollback
+            $table->timestamp('completed_at')->nullable(false)->change();
         });
     }
 };

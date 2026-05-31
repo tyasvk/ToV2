@@ -29,6 +29,7 @@ class ExamAttempt extends Model
         'total_score',
         'status',
         'completed_at', // <--- WAJIB ADA AGAR WAKTU TERSIMPAN!
+        'left_count', // Tambahkan ini
     ];
 
     /**

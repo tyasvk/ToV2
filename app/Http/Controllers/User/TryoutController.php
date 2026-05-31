@@ -424,25 +424,133 @@ class TryoutController extends Controller
         return Inertia::render('User/Tryout/Wait', ['tryout' => $tryout->loadCount('questions')]);
     }
 
-    public function examBkn(Tryout $tryout)
+public function examBkn(Tryout $tryout)
     {
         $check = $this->validateAccess($tryout);
         if (!$check['allowed']) return redirect()->route($check['route'], $tryout->id)->with('error', $check['message']);
-        return Inertia::render('User/Tryout/ExamSheetBKN', ['tryout' => $tryout, 'questions' => $tryout->questions()->orderBy('order', 'asc')->get(), 'user' => auth()->user()]);
+        
+        $user = auth()->user();
+
+        $attempt = ExamAttempt::where('user_id', $user->id)
+            ->where('tryout_id', $tryout->id)
+            ->whereNull('completed_at')
+            ->first();
+
+        if (!$attempt) {
+            $attempt = ExamAttempt::create([
+                'user_id' => $user->id,
+                'tryout_id' => $tryout->id,
+                'answers' => [],
+                'twk_score' => 0,
+                'tiu_score' => 0,
+                'tkp_score' => 0,
+                'total_score' => 0,
+                'left_count' => 0,
+                'completed_at' => null
+            ]);
+        }
+
+        // KUNCI ABSOLUT: Hitung selisih detik murni dari created_at awal ke waktu SEKARANG (now)
+        $durationSeconds = ($tryout->duration ?? 100) * 60;
+        $elapsedSeconds = now()->diffInSeconds($attempt->created_at, true); 
+        $serverTimeLeft = (int) ($durationSeconds - $elapsedSeconds);
+
+        if ($serverTimeLeft <= 0) {
+            $attempt->update(['completed_at' => now()]);
+            return redirect()->route('tryout.history.detail', $tryout->id)->with('error', 'Waktu pengerjaan tryout telah habis.');
+        }
+
+        return Inertia::render('User/Tryout/ExamSheetBKN', [
+            'tryout' => $tryout, 
+            'questions' => $tryout->questions()->orderBy('order', 'asc')->get(), 
+            'user' => $user,
+            'attempt' => $attempt,
+            'server_time_left' => $serverTimeLeft
+        ]);
     }
 
     public function exam(Tryout $tryout)
     {
         $check = $this->validateAccess($tryout);
         if (!$check['allowed']) return redirect()->route($check['route'], $tryout->id)->with('error', $check['message']);
-        return Inertia::render('User/Tryout/ExamSheet', ['tryout' => $tryout, 'questions' => $tryout->questions()->orderBy('order', 'asc')->get(), 'user' => auth()->user()]);
+        
+        $user = auth()->user();
+
+        $attempt = ExamAttempt::where('user_id', $user->id)
+            ->where('tryout_id', $tryout->id)
+            ->whereNull('completed_at')
+            ->first();
+
+        if (!$attempt) {
+            $attempt = ExamAttempt::create([
+                'user_id' => $user->id,
+                'tryout_id' => $tryout->id,
+                'answers' => [],
+                'twk_score' => 0,
+                'tiu_score' => 0,
+                'tkp_score' => 0,
+                'total_score' => 0,
+                'left_count' => 0,
+                'completed_at' => null
+            ]);
+        }
+
+        // KUNCI ABSOLUT: Hitung selisih detik murni dari created_at awal ke waktu SEKARANG (now)
+        $durationSeconds = ($tryout->duration ?? 100) * 60;
+        $elapsedSeconds = now()->diffInSeconds($attempt->created_at, true);
+        $serverTimeLeft = (int) ($durationSeconds - $elapsedSeconds);
+
+        if ($serverTimeLeft <= 0) {
+            $attempt->update(['completed_at' => now()]);
+            return redirect()->route('tryout.history.detail', $tryout->id)->with('error', 'Waktu pengerjaan tryout telah habis.');
+        }
+
+        return Inertia::render('User/Tryout/ExamSheet', [
+            'tryout' => $tryout, 
+            'questions' => $tryout->questions()->orderBy('order', 'asc')->get(), 
+            'user' => $user,
+            'attempt' => $attempt,
+            'server_time_left' => $serverTimeLeft
+        ]);
+    }   
+
+public function incrementPenalty(Tryout $tryout)
+{
+    $attempt = ExamAttempt::where('user_id', auth()->id())
+        ->where('tryout_id', $tryout->id)
+        ->whereNull('completed_at')
+        ->first();
+
+    if ($attempt) {
+        $attempt->increment('left_count');
+        
+        // Jika kesempatan habis saat dipanggil
+        if ($attempt->left_count >= 3) {
+            $attempt->update(['completed_at' => now()]);
+            return response()->json(['status' => 'kicked']);
+        }
     }
 
-    public function finish(Request $request, Tryout $tryout)
+    return response()->json(['status' => 'ok']);
+}
+
+public function finish(Request $request, Tryout $tryout)
     {
-        $answers = $request->answers ?? [];
-        $timeLeft = $request->time_left ?? 0; 
+        $user = auth()->user();
         
+        // Cari sesi attempt aktif yang dibuat di awal halaman tadi
+        $attempt = ExamAttempt::where('user_id', $user->id)
+            ->where('tryout_id', $tryout->id)
+            ->whereNull('completed_at')
+            ->first();
+
+        // Antisipasi jika data attempt sudah terkunci otomatis oleh sistem/tidak ditemukan
+        if (!$attempt) {
+            return redirect()->route('tryout.history.detail', $tryout->id)
+                ->with('error', 'Sesi ujian Anda telah berakhir atau sudah tersimpan sebelumnya.');
+        }
+
+        $answers = $request->answers ?? [];
         $questions = $tryout->questions;
         $twk = 0; $tiu = 0; $tkp = 0;
 
@@ -459,9 +567,8 @@ class TryoutController extends Controller
             }
         }
 
-        $attempt = ExamAttempt::create([
-            'user_id' => auth()->id(), 
-            'tryout_id' => $tryout->id, 
+        // Lakukan UPDATE data, bukan membuat data baru (mencegah double attempts)
+        $attempt->update([
             'answers' => $answers, 
             'twk_score' => $twk, 
             'tiu_score' => $tiu, 
@@ -469,14 +576,6 @@ class TryoutController extends Controller
             'total_score' => $twk + $tiu + $tkp, 
             'completed_at' => now() 
         ]);
-        
-        $tryoutDurationSeconds = ($tryout->duration ?? 110) * 60;
-        $timeTaken = $tryoutDurationSeconds - $timeLeft;
-        $timeTaken = max(0, $timeTaken); 
-        
-        $attempt->timestamps = false; 
-        $attempt->created_at = now()->subSeconds($timeTaken);
-        $attempt->save();
         
         return redirect()->route('tryout.result', $attempt->id);
     }

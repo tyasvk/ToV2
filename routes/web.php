@@ -115,6 +115,8 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     Route::get('/history/{tryout}', [UserTryoutController::class, 'historyDetail'])->name('tryout.history.detail');
     Route::get('/certificate/{attempt}', [UserTryoutController::class, 'certificate'])->name('tryout.certificate');
 
+    Route::post('/tryouts/{tryout}/penalty', [\App\Http\Controllers\User\TryoutController::class, 'incrementPenalty'])->name('tryout.penalty');
+
     // --- TRYOUT AKBAR ---
     Route::prefix('tryout-akbar')->name('tryout-akbar.')->group(function() {
         Route::get('/', [UserTryoutAkbarController::class, 'index'])->name('index');
@@ -165,6 +167,8 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     // Transaction Management
     Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
     Route::post('/transactions/{transaction}/approve', [TransactionController::class, 'approve'])->name('transactions.approve');
+    // Tambahkan baris ini di dalam grup route admin yang mengelola tryout
+Route::get('/tryouts/{tryout}/results', [App\Http\Controllers\Admin\TryoutController::class, 'results'])->name('admin.tryouts.results');
 
     // Tryout Akbar Management
     Route::resource('tryout-akbar', AdminTryoutAkbarController::class);

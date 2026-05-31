@@ -2,97 +2,92 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Tryout;
-use App\Models\User;
 use App\Models\ExamAttempt;
-use App\Models\Setting;
+use App\Models\Transaction;
+use App\Models\Tryout;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Illuminate\Support\Carbon;
 
 class DashboardController extends Controller
 {
-    /**
-     * Dashboard Utama untuk Peserta (User)
-     */
-/**
-     * Dashboard Utama untuk Peserta (User)
-     */
     public function index()
     {
         $user = auth()->user();
 
-        // 1. Logic Smart Redirect: Jika Admin nyasar ke sini, lempar ke Admin Dashboard
-        if ($user->hasRole('admin')) {
-            return redirect()->route('admin.dashboard');
+        // 1. CARI SESI UJIAN YANG BERJALAN DENGAN STATUS BELUM SELESAI
+        $activeAttempt = ExamAttempt::where('user_id', $user->id)
+            ->whereNull('completed_at')
+            ->with('tryout')
+            ->latest()
+            ->first();
+
+        $activeExam = null;
+
+        if ($activeAttempt && $activeAttempt->tryout) {
+            $tryout = $activeAttempt->tryout;
+            
+            // Kalkulasi selisih sisa waktu nyata dari server
+            $durationSeconds = ($tryout->duration ?? 100) * 60;
+            $elapsedSeconds = now()->diffInSeconds($activeAttempt->created_at, true);
+            $serverTimeLeft = (int) ($durationSeconds - $elapsedSeconds);
+
+            // Jika ternyata waktu pengerjaan aslinya sudah habis saat ditinggal, langsung kunci sepihak
+            if ($serverTimeLeft <= 0) {
+                $activeAttempt->update(['completed_at' => now()]);
+            } else {
+                // Siapkan data ringkas untuk dioper ke Dashboard Vue
+                $activeExam = [
+                    'id' => $tryout->id,
+                    'title' => $tryout->title,
+                    // Kita kirim detik mentahnya agar bisa dihitung mundur oleh Vue
+                    'time_left_seconds' => max(0, $serverTimeLeft) 
+                ];
+            }
         }
 
-        // 2. Ambil Pengumuman Pusat dari tabel settings (jika ada)
-        $announcement = \App\Models\Setting::where('key', 'announcement')->value('value') 
-            ?? 'Selamat datang di CPNS Nusantara! Terus tingkatkan kemampuan Anda dan persiapkan diri untuk ujian sesungguhnya.';
+        // 2. RETRIEVE DATA BAWAAN DASHBOARD SEBELUMNYA
+        $isPremiumMember = $user->membership_expires_at && now()->lt($user->membership_expires_at);
 
-        // 3. Ambil Tryout terbaru yang BENAR-BENAR BELUM DIBELI & BELUM DIKERJAKAN
-        $unpurchasedTryouts = Tryout::withCount('questions')
-            ->whereNotIn('id', function($query) use ($user) {
-                $query->select('tryout_id')
-                      ->from('purchases')
-                      ->where('user_id', $user->id);
+        $catalogTryouts = Tryout::query()
+            ->where('is_published', true)
+            ->where(function ($query) {
+                $query->whereNotIn('type', ['akbar', 'adidaya'])->orWhereNull('type');
             })
-            ->whereNotIn('id', function($query) use ($user) {
-                $query->select('tryout_id')
-                      ->from('exam_attempts')
-                      ->where('user_id', $user->id);
+            ->whereDoesntHave('transactions', function($q) use ($user) {
+                $q->whereIn('status', ['paid', 'success'])
+                  ->where(function($subQuery) use ($user) {
+                      $subQuery->where('user_id', $user->id)
+                               ->orWhereJsonContains('participants_data', $user->email);
+                  });
             })
-            ->where('is_active', true)
-            ->where('published_at', '<=', Carbon::now())
             ->latest()
-            ->take(3)
+            ->take(3) // Batasi rekomendasi awal di dashboard
             ->get();
 
-        // 4. Hitung statistik personal peserta
-        $attempts = ExamAttempt::where('user_id', $user->id);
-        $averageScore = $attempts->count() > 0 ? round($attempts->avg('total_score')) : 0;
+        // Logic stats sederhana
+        $completedAttempts = ExamAttempt::where('user_id', $user->id)->whereNotNull('completed_at')->get();
+        $stats = [
+            'completed_count' => $completedAttempts->count(),
+            'average_score' => $completedAttempts->count() > 0 ? round($completedAttempts->avg('total_score')) : 0,
+        ];
 
         return Inertia::render('Dashboard', [
-            'announcement' => $announcement,
-            'unpurchased_tryouts' => $unpurchasedTryouts,
-            'balance' => $user->balance, // <-- Tambahkan baris ini untuk mengirim saldo dompet
-            'stats' => [
-                'completed_count' => $attempts->count(),
-                'average_score'   => $averageScore,
-            ]
+            'activeExam' => $activeExam, // Dioper ke frontend
+            'unpurchased_tryouts' => $catalogTryouts,
+            'balance' => $user->balance ?? 0,
+            'stats' => $stats,
+            'announcement' => \App\Models\Setting::where('key', 'announcement')->first()?->value ?? null
         ]);
     }
 
     /**
-     * Dashboard Khusus Administrator
+     * Memformat sisa detik menjadi Jam:Menit:Detik
      */
-    public function adminIndex()
+    private function formatSecondsToTime($seconds)
     {
-        if (!auth()->user()->hasRole('admin')) {
-            abort(403, 'Unauthorized action.');
-        }
-
-        return Inertia::render('Admin/Dashboard', [
-            'stats' => [
-                'total_users'    => User::role('user')->count(),
-                'total_tryouts'  => Tryout::count(),
-                'total_attempts' => ExamAttempt::count(),
-                'active_exams'   => Tryout::where('is_active', true)->count(),
-            ],
-            'recent_activity' => ExamAttempt::with(['user', 'tryout'])
-                ->latest()
-                ->take(5)
-                ->get()
-                ->map(function ($item) {
-                    return [
-                        'id'         => $item->id,
-                        'user_name'  => $item->user->name,
-                        'tryout'     => $item->tryout->title,
-                        'score'      => $item->total_score,
-                        'date'       => $item->completed_at->format('d M Y H:i'),
-                    ];
-                })
-        ]);
+        $h = floor($seconds / 3600);
+        $m = floor(($seconds % 3600) / 60);
+        $s = $seconds % 60;
+        return sprintf('%02d:%02d:%02d', $h, $m, $s);
     }
 }

@@ -1,7 +1,7 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 
 const props = defineProps({
     announcement: String,
@@ -13,72 +13,81 @@ const props = defineProps({
         type: Number,
         default: 0
     },
-    stats: Object
+    stats: Object,
+    activeExam: { 
+        type: Object,
+        default: null
+    }
 });
 
 const page = usePage();
 
 // --- SAFE USER ACCESS ---
-const user = computed(() => {
-    return page.props.auth?.user || {};
-});
+const user = computed(() => page.props.auth?.user || {});
 
 // --- LOGIC FOTO PROFIL ---
 const userAvatar = computed(() => {
     const u = user.value;
-    if (u.profile_photo_url && !u.profile_photo_url.includes('ui-avatars.com')) {
-        return u.profile_photo_url;
-    }
+    if (u.profile_photo_url && !u.profile_photo_url.includes('ui-avatars.com')) return u.profile_photo_url;
     const rawPath = u.profile_photo_path || u.avatar;
-    if (rawPath) {
-        const cleanPath = rawPath.replace(/^\//, '');
-        return `/storage/${cleanPath}`;
-    }
+    if (rawPath) return `/storage/${rawPath.replace(/^\//, '')}`;
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || 'User')}&color=2563EB&background=EFF6FF`;
 });
 
-// --- LOGIC MEMBENTUK LINK DI TEKS PENGUMUMAN ---
+// --- PENGUMUMAN LINK FORMATTER ---
 const formattedAnnouncement = computed(() => {
     if (!props.announcement) return '';
-    
-    // Regex untuk mendeteksi URL http/https
     const urlPattern = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
-    
-    return props.announcement.replace(urlPattern, (url) => {
-        return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline transition-colors break-all font-medium">${url}</a>`;
-    });
+    return props.announcement.replace(urlPattern, (url) => 
+        `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline transition-colors break-all font-medium">${url}</a>`
+    );
 });
 
-// --- FORMAT RUPIAH ---
-const formatCurrency = (value) => {
-    return new Intl.NumberFormat('id-ID', {
-        style: 'currency',
-        currency: 'IDR',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-    }).format(value);
-};
+// --- FORMAT FORMATTER ---
+const formatCurrency = (value) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
 
-// --- FIX TANGGAL & JAM REGISTRASI ---
 const formatDate = (dateString) => {
     if (!dateString) return 'Memuat...'; 
     try {
         const date = new Date(dateString);
         if (isNaN(date.getTime())) return 'Format salah';
-        return date.toLocaleString('id-ID', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false
-        }).replace('.', ':') + ' WIB';
+        return date.toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).replace('.', ':') + ' WIB';
     } catch (e) {
         return '-';
     }
 };
 
 const motivation = "Masa depan adalah milik mereka yang menyiapkan diri hari ini. Konsistensi adalah kunci kemenangan.";
+
+// --- LOGIKA TIMER BERGERAK UNTUK DASHBOARD ---
+const activeTimeLeft = ref(props.activeExam?.time_left_seconds || 0);
+let countdownTimer = null;
+
+const formattedActiveTimeLeft = computed(() => {
+    const safeSeconds = Math.max(0, Math.floor(activeTimeLeft.value));
+    const h = Math.floor(safeSeconds / 3600);
+    const m = Math.floor((safeSeconds % 3600) / 60);
+    const s = safeSeconds % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+});
+
+onMounted(() => {
+    if (props.activeExam && activeTimeLeft.value > 0) {
+        countdownTimer = setInterval(() => {
+            if (activeTimeLeft.value > 0) {
+                activeTimeLeft.value--;
+            } else {
+                clearInterval(countdownTimer);
+                // Waktu habis, refresh dashboard agar banner ujian aktif hilang dan data sinkron
+                router.reload({ only: ['activeExam', 'stats'] }); 
+            }
+        }, 1000);
+    }
+});
+
+onUnmounted(() => {
+    if (countdownTimer) clearInterval(countdownTimer);
+});
 </script>
 
 <template>
@@ -92,14 +101,9 @@ const motivation = "Masa depan adalah milik mereka yang menyiapkan diri hari ini
                 <div class="absolute bottom-0 left-0 w-[150px] h-[150px] bg-slate-50 rounded-full blur-[40px] pointer-events-none -ml-16 -mb-16"></div>
 
                 <div class="p-4 md:p-5 flex flex-col md:flex-row items-center gap-4 md:gap-6 relative z-10">
-                    
                     <div class="relative shrink-0">
                         <div class="relative w-16 h-16 md:w-20 md:h-20 bg-white rounded-xl overflow-hidden border border-slate-200 p-0.5 shadow-sm">
-                            <img 
-                                :src="userAvatar" 
-                                :alt="user.name"
-                                class="w-full h-full object-cover rounded-lg"
-                            />
+                            <img :src="userAvatar" :alt="user.name" class="w-full h-full object-cover rounded-lg" />
                         </div>
                         <div class="absolute -bottom-0.5 -right-0.5 bg-blue-600 p-0.5 rounded-full shadow-sm border border-white">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -118,7 +122,6 @@ const motivation = "Masa depan adalah milik mereka yang menyiapkan diri hari ini
                                     Peserta Aktif
                                 </span>
                             </div>
-                            
                             <div class="flex flex-wrap justify-center md:justify-start gap-2 items-center">
                                 <p class="text-[9px] font-mono font-medium text-slate-600 bg-slate-100 border border-slate-200/60 px-1.5 py-0.5 rounded">
                                     #{{ user.participant_number || 'PENDING' }}
@@ -152,6 +155,37 @@ const motivation = "Masa depan adalah milik mereka yang menyiapkan diri hari ini
                 </div>
             </div>
 
+            <div v-if="activeExam && activeTimeLeft > 0" class="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 p-0.5 rounded-xl shadow-sm animate-pulse-slow">
+                <div class="bg-white p-3.5 rounded-[10px] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-left">
+                    <div class="flex items-start gap-3">
+                        <div class="p-2 bg-amber-50 rounded-lg text-amber-500 shrink-0 mt-0.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                        </div>
+                        <div class="space-y-0.5 overflow-hidden">
+                            <span class="text-[9px] font-bold text-amber-600 uppercase tracking-wider block">Ujian Sedang Berjalan!</span>
+                            <h4 class="text-xs sm:text-sm font-bold text-slate-800 truncate uppercase tracking-tight">
+                                {{ activeExam.title }}
+                            </h4>
+                            <p class="text-[10px] text-slate-400 font-normal leading-normal">
+                                Sesi ujian Anda masih aktif. Sisa waktu pengerjaan terus berkurang.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-t-0 border-slate-100 pt-2.5 sm:pt-0 shrink-0">
+                        <div class="font-mono text-xs font-semibold text-slate-700 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100 flex flex-col min-w-[70px]">
+                            <span class="text-[8px] text-slate-400 font-sans uppercase font-medium tracking-wide leading-none mb-0.5">Sisa Waktu</span>
+                            <span class="tabular-nums" :class="{ 'text-rose-500': activeTimeLeft <= 300 }">⏱️ {{ formattedActiveTimeLeft }}</span>
+                        </div>
+                        <Link :href="route('tryout.exam', activeExam.id)" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm transition active:scale-95">
+                            Lanjutkan
+                        </Link>
+                    </div>
+                </div>
+            </div>
+
             <div v-if="announcement" class="bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 shadow-sm flex items-start gap-3 relative overflow-hidden">
                 <div class="absolute left-0 top-0 bottom-0 w-1 bg-amber-400"></div>
                 <div class="shrink-0 text-amber-500 bg-amber-100 p-1.5 rounded-lg mt-0.5">
@@ -169,7 +203,7 @@ const motivation = "Masa depan adalah milik mereka yang menyiapkan diri hari ini
                 <Link :href="route('wallet.index')" class="bg-white p-2.5 sm:p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-2 sm:gap-3 hover:border-blue-300 transition-colors group">
                     <div class="w-7 h-7 sm:w-8 sm:h-8 bg-blue-50 border border-blue-100 group-hover:bg-blue-100 group-hover:border-blue-200 rounded-lg flex items-center justify-center text-xs shrink-0 transition-colors">💳</div>
                     <div class="min-w-0">
-                        <p class="text-xs sm:text-sm font-medium text-slate-900 leading-none truncate">{{ formatCurrency(balance) }}</p>
+                        <p class="text-xs sm:text-sm font-medium text-slate-900 tracking-tight leading-none truncate">{{ formatCurrency(balance) }}</p>
                         <p class="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wider mt-1 truncate">Saldo Aktif</p>
                     </div>
                 </Link>
@@ -177,7 +211,7 @@ const motivation = "Masa depan adalah milik mereka yang menyiapkan diri hari ini
                 <div class="bg-white p-2.5 sm:p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-2 sm:gap-3">
                     <div class="w-7 h-7 sm:w-8 sm:h-8 bg-slate-50 border border-slate-100 rounded-lg flex items-center justify-center text-xs shrink-0">📝</div>
                     <div class="min-w-0">
-                        <p class="text-xs sm:text-sm font-medium text-slate-900 leading-none truncate">{{ stats?.completed_count || 0 }}</p>
+                        <p class="text-xs sm:text-sm font-medium text-slate-900 tracking-tight leading-none truncate">{{ stats?.completed_count || 0 }}</p>
                         <p class="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wider mt-1 truncate">Total Ujian</p>
                     </div>
                 </div>
@@ -185,7 +219,7 @@ const motivation = "Masa depan adalah milik mereka yang menyiapkan diri hari ini
                 <div class="bg-white p-2.5 sm:p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-2 sm:gap-3">
                     <div class="w-7 h-7 sm:w-8 sm:h-8 bg-emerald-50 border border-emerald-100 rounded-lg flex items-center justify-center text-xs shrink-0">📈</div>
                     <div class="min-w-0">
-                        <p class="text-xs sm:text-sm font-medium text-slate-900 leading-none truncate">{{ stats?.average_score || 0 }}</p>
+                        <p class="text-xs sm:text-sm font-medium text-slate-900 tracking-tight leading-none truncate">{{ stats?.average_score || 0 }}</p>
                         <p class="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wider mt-1 truncate">Rata Rata</p>
                     </div>
                 </div>
@@ -246,4 +280,13 @@ const motivation = "Masa depan adalah milik mereka yang menyiapkan diri hari ini
     animation-fill-mode: both;
     animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+@keyframes pulseSlow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.95; }
+}
+.animate-pulse-slow {
+    animation: pulseSlow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+.tabular-nums { font-variant-numeric: tabular-nums; }
 </style>
