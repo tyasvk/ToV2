@@ -30,6 +30,9 @@ use App\Http\Controllers\Admin\AdminAffiliateController;
 use App\Http\Controllers\Admin\AdidayaManagerController;
 use App\Http\Controllers\Admin\VoucherController; 
 
+// Import Controller API Midtrans
+use App\Http\Controllers\Api\MidtransCallbackController;
+
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -157,8 +160,9 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::get('/tryouts/{tryout}/results', [\App\Http\Controllers\Admin\TryoutManagerController::class, 'results'])->name('tryouts.results');
     Route::delete('/tryouts/attempts/{attempt}', [\App\Http\Controllers\Admin\TryoutManagerController::class, 'destroyAttempt'])->name('tryouts.attempts.destroy');
     // Tambahkan Rute Kalkulasi Ulang di sini:
- Route::post('tryouts/{tryout}/recalculate', [TryoutManagerController::class, 'recalculate'])
-  ->name('tryouts.recalculate');
+    Route::post('tryouts/{tryout}/recalculate', [TryoutManagerController::class, 'recalculate'])
+        ->name('tryouts.recalculate');
+    
     // --- 2. ADIDAYA MANAGEMENT ---
     Route::resource('adidaya-manage', AdidayaManagerController::class)->names('adidaya');
     Route::get('/adidaya-manage/{tryout}/results', [\App\Http\Controllers\Admin\TryoutManagerController::class, 'results'])->name('adidaya.results');
@@ -190,6 +194,8 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     // Management Paket Membership
     Route::get('/membership-packages', [MembershipPackageController::class, 'index'])->name('membership-packages.index');
     Route::post('/membership-packages/{id}', [MembershipPackageController::class, 'update'])->name('membership-packages.update');
+    Route::post('/membership-packages', [MembershipPackageController::class, 'store'])->name('membership-packages.store');
+    Route::delete('/membership-packages/{membershipPackage}', [MembershipPackageController::class, 'destroy'])->name('membership-packages.destroy');
 
     // Halaman utama kelola afiliasi
     Route::get('/affiliate', [AdminAffiliateController::class, 'index'])->name('affiliate.index');
@@ -202,5 +208,15 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::post('/vouchers', [VoucherController::class, 'store'])->name('vouchers.store');
     Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->name('vouchers.destroy');
 });
+
+
+// ==========================================
+// RUTE BEBAS AKSES (WEBHOOK MIDTRANS)
+// ==========================================
+// Rute ini diletakkan di luar middleware auth dan dibebaskan dari proteksi CSRF
+// agar server Midtrans dapat mengirimkan notifikasi ke sini tanpa hambatan.
+Route::post('/midtrans/callback', [MidtransCallbackController::class, 'handle'])
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+
 
 require __DIR__.'/auth.php';
