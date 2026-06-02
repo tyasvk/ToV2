@@ -15,8 +15,12 @@ use Illuminate\Support\Facades\Log;
 
 class MidtransCallbackController extends Controller
 {
-    public function handle(Request $request)
+ public function handle(Request $request)
     {
+        // 1. Catat payload mentah dari Midtrans ke laravel.log
+        Log::info('--- WEBHOOK MIDTRANS MASUK ---');
+        Log::info($request->all());
+
         Config::$serverKey = config('services.midtrans.server_key');
         Config::$isProduction = config('services.midtrans.is_production');
         Config::$isSanitized = true;
@@ -24,25 +28,32 @@ class MidtransCallbackController extends Controller
 
         try {
             $notif = new Notification();
+            Log::info("Status Transaksi Midtrans: " . $notif->transaction_status);
         } catch (\Exception $e) {
+            Log::error('Midtrans Notification Error: ' . $e->getMessage());
             return response()->json(['message' => 'Invalid Notification'], 400);
         }
 
         $transactionStatus = $notif->transaction_status;
         $orderIdMidtrans = $notif->order_id;
+        
+        Log::info("Mencari Order ID: " . $orderIdMidtrans);
 
         $invoiceCode = explode('-', $orderIdMidtrans)[0];
 
         $walletTx = WalletTransaction::where('proof_payment', $orderIdMidtrans)->first();
         if ($walletTx) {
+            Log::info("Ketemu di WalletTransaction. Memproses Top Up...");
             return $this->handleWalletTopUp($walletTx, $transactionStatus);
         }
 
         $tx = Transaction::where('invoice_code', $invoiceCode)->first();
         if ($tx) {
+            Log::info("Ketemu di Transaction biasa. Memproses Pembelian...");
             return $this->handleGeneralPurchase($tx, $transactionStatus);
         }
 
+        Log::warning('Data Transaksi Tidak Ditemukan di Database!');
         return response()->json(['message' => 'Transaction not found'], 404);
     }
 

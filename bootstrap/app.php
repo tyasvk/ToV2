@@ -28,7 +28,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // 3. Pengecualian CSRF (GABUNGKAN DI SINI)
         $middleware->validateCsrfTokens(except: [
-            'api/midtrans-callback',
+        
+            'api/midtrans/callback', // Tambahkan baris ini
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
