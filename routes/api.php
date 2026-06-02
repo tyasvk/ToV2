@@ -15,4 +15,4 @@ Route::get('/user', function (Request $request) {
 })->middleware('auth:sanctum');
 
 // TAMBAHKAN INI:
-Route::post('/midtrans-callback', [MidtransCallbackController::class, 'handle']);
+Route::post('/midtrans/callback', [MidtransCallbackController::class, 'handle']);

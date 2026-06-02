@@ -215,8 +215,8 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
 // ==========================================
 // Rute ini diletakkan di luar middleware auth dan dibebaskan dari proteksi CSRF
 // agar server Midtrans dapat mengirimkan notifikasi ke sini tanpa hambatan.
-Route::post('/midtrans/callback', [MidtransCallbackController::class, 'handle'])
-    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+//Route::post('/midtrans/callback', [MidtransCallbackController::class, 'handle'])
+ //   ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
 
 require __DIR__.'/auth.php';

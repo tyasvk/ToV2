@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Log;
 
 class MidtransCallbackController extends Controller
 {
-public function handle(Request $request)
+    public function handle(Request $request)
     {
         // 1. Catat payload mentah dari Midtrans ke laravel.log
         Log::info('--- WEBHOOK MIDTRANS MASUK ---');
@@ -45,9 +45,22 @@ public function handle(Request $request)
         
         Log::info("Mencari Order ID: " . $orderIdMidtrans);
 
-        $invoiceCode = explode('-', $orderIdMidtrans)[0];
+        // ==========================================
+        // KODE YANG DIPERBAIKI (MENGHAPUS TIMESTAMP)
+        // ==========================================
+        $parts = explode('-', $orderIdMidtrans);
+        
+        // Jika ada lebih dari 1 bagian (berarti ada strip/hyphen), buang bagian paling belakang (timestamp)
+        if (count($parts) > 1) {
+            array_pop($parts); 
+        }
+        
+        // Gabungkan kembali sisa teksnya (Misal: MEMB-ABCDEFGHIJ)
+        $invoiceCode = implode('-', $parts);
+        // ==========================================
 
         // CEK 1: Apakah ini transaksi Top Up Dompet?
+        // Top Up mencari berdasarkan Order ID lengkap (proof_payment)
         $walletTx = WalletTransaction::where('proof_payment', $orderIdMidtrans)->first();
         if ($walletTx) {
             Log::info("Ketemu di WalletTransaction. Memproses Top Up...");
@@ -55,13 +68,14 @@ public function handle(Request $request)
         }
 
         // CEK 2: Apakah ini transaksi Pembelian Membership/Tryout?
+        // Pembelian produk mencari berdasarkan invoice_code tanpa timestamp
         $tx = Transaction::where('invoice_code', $invoiceCode)->first();
         if ($tx) {
             Log::info("Ketemu di Transaction biasa. Memproses Pembelian...");
             return $this->handleGeneralPurchase($tx, $transactionStatus);
         }
 
-        Log::warning('Data Transaksi Tidak Ditemukan di Database! Order ID: ' . $orderIdMidtrans);
+        Log::warning('Data Transaksi Tidak Ditemukan di Database! Order ID: ' . $orderIdMidtrans . ' (Mencari Invoice: ' . $invoiceCode . ')');
         return response()->json(['message' => 'Transaction not found'], 404);
     }
 

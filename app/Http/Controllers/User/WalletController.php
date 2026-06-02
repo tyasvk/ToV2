@@ -35,7 +35,7 @@ public function index()
         $transactions = WalletTransaction::where('user_id', $userId)->latest()->get();
 
         return Inertia::render('User/Wallet/Index', [
-            'balance' => auth()->user()->balance,
+            'balance' => (float) auth()->user()->balance, // <--- TAMBAHKAN (float) DISINI
             'transactions' => $transactions,
             'midtrans_client_key' => config('services.midtrans.client_key'), 
             'snapToken' => session('snapToken'), 
@@ -167,7 +167,7 @@ public function index()
     /**
      * Method Baru: Bayar Transaksi Pending dari History
      */
-    public function payPending(WalletTransaction $transaction)
+public function payPending(WalletTransaction $transaction)
     {
         // 1. Validasi Kepemilikan & Status
         if ($transaction->user_id !== auth()->id()) {
@@ -183,11 +183,13 @@ public function index()
         Config::$isSanitized = true;
         Config::$is3ds = true;
 
-        // 3. Gunakan Order ID yang lama (disimpan di proof_payment)
-        // Midtrans pintar: jika order_id sama dan belum dibayar, dia kembalikan token yang sama.
+        // 3. BUAT ORDER ID BARU UNTUK MENGHINDARI ERROR "ORDER_ID SUDAH DIGUNAKAN"
+        // Kita tambahkan suffix '-R' dan timestamp agar Midtrans menganggap ini order valid yang baru
+        $newOrderId = $transaction->proof_payment . '-R' . time(); 
+
         $params = [
             'transaction_details' => [
-                'order_id' => $transaction->proof_payment, 
+                'order_id' => $newOrderId, // Gunakan ID Baru
                 'gross_amount' => (int) $transaction->amount,
             ],
             'customer_details' => [
@@ -199,6 +201,9 @@ public function index()
         try {
             $snapToken = Snap::getSnapToken($params);
             
+            // 4. Update order_id (proof_payment) lama di database dengan yang baru
+            $transaction->update(['proof_payment' => $newOrderId]);
+
             // Kirim token kembali ke frontend
             return back()->with('snapToken', $snapToken);
             
