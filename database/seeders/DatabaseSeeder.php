@@ -22,8 +22,8 @@ public function run(): void
     // 2. Buat User Admin
     $admin = \App\Models\User::create([
         'name' => 'Administrator',
-        'email' => 'admin@test.com',
-        'password' => bcrypt('admin123'), // Passwordnya: admin123
+        'email' => 'tyas.vk@gmail.com',
+        'password' => bcrypt('Senositi.89278272'), // Passwordnya: admin123
     ]);
 
     // 3. Tempelkan Role ke User
