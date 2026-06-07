@@ -290,9 +290,18 @@ const formatTime = (seconds) => {
                                         <span class="font-medium">{{ key.toUpperCase() }}</span>
                                     </div>
 
-                                    <span class="text-xs sm:text-sm font-normal text-slate-600 flex-1 leading-relaxed">{{ option }}</span>
+                                    <div class="flex-1 flex flex-col">
+                                        <span v-if="option" class="text-xs sm:text-sm font-normal text-slate-600 leading-relaxed">{{ option }}</span>
+                                        
+                                        <div v-if="currentQuestion?.option_images && currentQuestion.option_images[key]" class="mt-2">
+                                            <img :src="'/storage/' + currentQuestion.option_images[key]" 
+                                                 class="max-h-24 sm:max-h-32 object-contain rounded border border-slate-200 bg-white p-1 shadow-sm" 
+                                                 alt="Gambar Opsi">
+                                        </div>
+                                    </div>
                                 </label>
                             </div>
+
                         </div>
                     </div>
                 </div>

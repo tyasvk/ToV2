@@ -25,6 +25,7 @@ class Question extends Model
     protected $casts = [
         'options' => 'array',
         'tkp_scores' => 'array',
+        'option_images' => 'array', // Tambahkan ini
     ];
 
     /**

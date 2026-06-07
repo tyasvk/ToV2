@@ -23,19 +23,45 @@ class QuestionManagerController extends Controller
 
     public function store(Request $request, Tryout $tryout)
     {
+        // Validasi: Wajib isi teks JIKA gambar kosong, wajib isi gambar JIKA teks kosong
         $request->validate([
             'type' => 'required|in:TWK,TIU,TKP',
-            'content' => 'required', // Kembali menggunakan 'content'
-            'image' => 'nullable|image|max:2048', 
+            'content' => 'required_without:image|nullable|string',
+            'image' => 'required_without:content|nullable|image|max:2048',
             'options' => 'required|array',
+            'option_images.*' => 'nullable|image|max:2048', 
             'explanation' => 'nullable|string',
+            'correct_answer' => 'nullable|string',
+            'tkp_scores' => 'nullable|array',
+        ], [
+            'content.required_without' => 'Teks pertanyaan harus diisi jika tidak ada gambar.',
+            'image.required_without' => 'Gambar harus diunggah jika teks pertanyaan kosong.',
         ]);
 
-        $data = $request->all();
+        $data = $request->except(['option_images', 'existing_option_images']);
+        
+        // Mencegah error database jika kolom 'content' tidak boleh NULL di DB
+        $data['content'] = $request->content ?? '';
 
+        // Handle Gambar Soal (Pertanyaan)
         if ($request->hasFile('image')) {
             $data['image'] = $request->file('image')->store('questions', 'public');
         }
+
+        // Handle Gambar Opsi (Khusus TIU)
+        if ($request->type === 'TIU' && $request->hasFile('option_images')) {
+            $optionImagePaths = [];
+            foreach (['a', 'b', 'c', 'd', 'e'] as $key) {
+                if ($request->hasFile("option_images.{$key}")) {
+                    $optionImagePaths[$key] = $request->file("option_images.{$key}")->store('option_images', 'public');
+                }
+            }
+            $data['option_images'] = $optionImagePaths;
+        }
+
+        // Set Order otomatis di akhir
+        $maxOrder = $tryout->questions()->max('order') ?? 0;
+        $data['order'] = $maxOrder + 1;
 
         $tryout->questions()->create($data);
 
@@ -46,19 +72,44 @@ class QuestionManagerController extends Controller
     {
         $request->validate([
             'type' => 'required|in:TWK,TIU,TKP',
-            'content' => 'required', // Kembali menggunakan 'content'
-            'image' => 'nullable|image|max:2048',
+            'content' => 'required_without:image|nullable|string',
+            'image' => 'required_without:content|nullable|image|max:2048',
             'options' => 'required|array',
+            'option_images.*' => 'nullable|image|max:2048',
             'explanation' => 'nullable|string',
+            'correct_answer' => 'nullable|string',
+            'tkp_scores' => 'nullable|array',
+        ], [
+            'content.required_without' => 'Teks pertanyaan harus diisi jika tidak ada gambar.',
+            'image.required_without' => 'Gambar harus diunggah jika teks pertanyaan kosong.',
         ]);
 
-        $data = $request->all();
+        $data = $request->except(['option_images', 'existing_option_images']);
+        $data['content'] = $request->content ?? '';
 
+        // Handle update Gambar Soal
         if ($request->hasFile('image')) {
-            if ($question->image) {
+            if ($question->image && Storage::disk('public')->exists($question->image)) {
                 Storage::disk('public')->delete($question->image);
             }
             $data['image'] = $request->file('image')->store('questions', 'public');
+        }
+
+        // Handle update Gambar Opsi (Khusus TIU)
+        $optionImagePaths = is_string($question->option_images) ? json_decode($question->option_images, true) : ($question->option_images ?? []);
+
+        if ($request->type === 'TIU') {
+            foreach (['a', 'b', 'c', 'd', 'e'] as $key) {
+                if ($request->hasFile("option_images.{$key}")) {
+                    // Hapus gambar lama jika ada
+                    if (!empty($optionImagePaths[$key]) && Storage::disk('public')->exists($optionImagePaths[$key])) {
+                        Storage::disk('public')->delete($optionImagePaths[$key]);
+                    }
+                    // Simpan baru
+                    $optionImagePaths[$key] = $request->file("option_images.{$key}")->store('option_images', 'public');
+                }
+            }
+            $data['option_images'] = $optionImagePaths;
         }
 
         $question->update($data);
@@ -68,9 +119,21 @@ class QuestionManagerController extends Controller
 
     public function destroy(Tryout $tryout, Question $question)
     {
-        if ($question->image) {
+        // Hapus Gambar Soal Utama
+        if ($question->image && Storage::disk('public')->exists($question->image)) {
             Storage::disk('public')->delete($question->image);
         }
+
+        // Hapus file Gambar Opsi
+        $optionImages = is_string($question->option_images) ? json_decode($question->option_images, true) : ($question->option_images ?? []);
+        if (is_array($optionImages)) {
+            foreach ($optionImages as $imgPath) {
+                if (!empty($imgPath) && Storage::disk('public')->exists($imgPath)) {
+                    Storage::disk('public')->delete($imgPath);
+                }
+            }
+        }
+
         $question->delete();
         return back()->with('message', 'Soal berhasil dihapus.');
     }
@@ -84,77 +147,76 @@ class QuestionManagerController extends Controller
         return back()->with('message', 'Urutan soal diperbarui');
     }
 
-public function import(Request $request, Tryout $tryout)
-{
-    $request->validate([
-        'file' => 'required|file|mimes:csv,txt|max:2048', // Gunakan CSV
-    ]);
+    public function import(Request $request, Tryout $tryout)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:csv,txt|max:2048',
+        ]);
 
-    $file = $request->file('file');
-    $path = $file->getRealPath();
+        $file = $request->file('file');
+        $path = $file->getRealPath();
 
-    // Buka file untuk mendeteksi delimiter (koma atau titik koma)
-    $handle = fopen($path, "r");
-    $firstLine = fgets($handle);
-    $delimiter = (strpos($firstLine, ';') !== false) ? ';' : ',';
-    rewind($handle); // Kembalikan pointer ke awal file
+        $handle = fopen($path, "r");
+        $firstLine = fgets($handle);
+        $delimiter = (strpos($firstLine, ';') !== false) ? ';' : ',';
+        rewind($handle);
 
-    fgetcsv($handle, 1000, $delimiter); // Lewati header baris pertama
+        fgetcsv($handle, 1000, $delimiter);
 
-    DB::beginTransaction();
-    try {
-        $count = 0;
-        while (($row = fgetcsv($handle, 1000, $delimiter)) !== FALSE) {
-            // Lewati jika kolom inti (tipe dan soal) kosong
-            if (empty($row[0]) || empty($row[1])) continue;
+        DB::beginTransaction();
+        try {
+            $count = 0;
+            $maxOrder = $tryout->questions()->max('order') ?? 0;
 
-            $type = strtoupper(trim($row[0]));
-            
-            // Format Pilihan A-E
-            $options = [
-                'a' => $row[2] ?? '',
-                'b' => $row[3] ?? '',
-                'c' => $row[4] ?? '',
-                'd' => $row[5] ?? '',
-                'e' => $row[6] ?? '',
-            ];
+            while (($row = fgetcsv($handle, 1000, $delimiter)) !== FALSE) {
+                if (empty($row[0]) || empty($row[1])) continue;
 
-            $correctAnswer = trim($row[7] ?? '');
-            $tkpScores = null;
-
-            // Logika khusus Skor TKP (format 54321)
-            if ($type === 'TKP' && strlen($correctAnswer) === 5) {
-                $tkpScores = [
-                    'a' => (int)$correctAnswer[0],
-                    'b' => (int)$correctAnswer[1],
-                    'c' => (int)$correctAnswer[2],
-                    'd' => (int)$correctAnswer[3],
-                    'e' => (int)$correctAnswer[4],
+                $type = strtoupper(trim($row[0]));
+                
+                $options = [
+                    'a' => $row[2] ?? '',
+                    'b' => $row[3] ?? '',
+                    'c' => $row[4] ?? '',
+                    'd' => $row[5] ?? '',
+                    'e' => $row[6] ?? '',
                 ];
-                $correctAnswer = null;
+
+                $correctAnswer = trim($row[7] ?? '');
+                $tkpScores = null;
+
+                if ($type === 'TKP' && strlen($correctAnswer) === 5) {
+                    $tkpScores = [
+                        'a' => (int)$correctAnswer[0],
+                        'b' => (int)$correctAnswer[1],
+                        'c' => (int)$correctAnswer[2],
+                        'd' => (int)$correctAnswer[3],
+                        'e' => (int)$correctAnswer[4],
+                    ];
+                    $correctAnswer = null;
+                }
+
+                $maxOrder++;
+
+                $tryout->questions()->create([
+                    'type'           => $type,
+                    'content'        => $row[1],
+                    'options'        => $options,
+                    'correct_answer' => $correctAnswer,
+                    'tkp_scores'     => $tkpScores,
+                    'explanation'    => $row[8] ?? '',
+                    'order'          => $maxOrder
+                ]);
+                $count++;
             }
 
-            // Simpan ke database dengan kolom 'content'
-            $tryout->questions()->create([
-                'type'           => $type,
-                'content'        => $row[1],
-                'options'        => $options,
-                'correct_answer' => $correctAnswer,
-                'tkp_scores'     => $tkpScores,
-                'explanation'    => $row[8] ?? '',
-                'order'          => 999
-            ]);
-            $count++;
+            DB::commit();
+            fclose($handle);
+            return back()->with('message', "Berhasil mengimpor $count soal!");
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            fclose($handle);
+            return back()->withErrors(['file' => 'Gagal membaca isi file: ' . $e->getMessage()]);
         }
-
-        DB::commit();
-        fclose($handle);
-        return back()->with('message', "Berhasil mengimpor $count soal!");
-
-    } catch (\Exception $e) {
-        DB::rollBack();
-        fclose($handle);
-        return back()->withErrors(['file' => 'Gagal membaca isi file: ' . $e->getMessage()]);
     }
-}
 }

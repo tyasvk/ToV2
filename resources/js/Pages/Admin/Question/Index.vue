@@ -57,6 +57,8 @@ const form = useForm({
     content: '',
     image: null,
     options: { a: '', b: '', c: '', d: '', e: '' },
+    option_images: { a: null, b: null, c: null, d: null, e: null },
+    existing_option_images: { a: null, b: null, c: null, d: null, e: null },
     correct_answer: '',
     tkp_scores: { a: '', b: '', c: '', d: '', e: '' },
     explanation: ''
@@ -64,18 +66,38 @@ const form = useForm({
 
 const openCreateModal = () => {
     form.reset();
+    if (form.clearErrors) form.clearErrors(); // Aman dari error
+    
     form.id = null;
+    form.type = 'TWK';
+    form.content = '';
+    form.image = null;
+    form.options = { a: '', b: '', c: '', d: '', e: '' };
+    form.option_images = { a: null, b: null, c: null, d: null, e: null };
+    form.existing_option_images = { a: null, b: null, c: null, d: null, e: null };
+    form.correct_answer = '';
+    form.tkp_scores = { a: '', b: '', c: '', d: '', e: '' };
+    form.explanation = '';
+    
     isModalOpen.value = true;
 };
 
 const openEditModal = (q) => {
+    if (form.clearErrors) form.clearErrors(); 
+    
     form.id = q.id;
     form.type = q.type;
-    form.content = q.content;
-    form.options = { ...q.options };
-    form.correct_answer = q.correct_answer;
+    form.content = q.content || '';
+    form.image = null;
+    
+    form.options = q.options ? { ...q.options } : { a: '', b: '', c: '', d: '', e: '' };
+    form.option_images = { a: null, b: null, c: null, d: null, e: null };
+    form.existing_option_images = q.option_images ? { ...q.option_images } : { a: null, b: null, c: null, d: null, e: null };
+    
+    form.correct_answer = q.correct_answer || '';
     form.tkp_scores = q.tkp_scores ? { ...q.tkp_scores } : { a: '', b: '', c: '', d: '', e: '' };
-    form.explanation = q.explanation;
+    form.explanation = q.explanation || '';
+    
     isModalOpen.value = true;
 };
 
@@ -145,7 +167,9 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                                 <span class="w-8 h-8 shrink-0 bg-slate-100 rounded-lg flex items-center justify-center text-[10px] font-bold text-slate-500">#{{ index + 1 }}</span>
                                 <div @click="toggleAccordion(q.id)" class="cursor-pointer truncate">
                                     <span class="text-[10px] font-bold px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-md uppercase mr-2">{{ q.type }}</span>
-                                    <span class="text-sm font-semibold text-slate-800 truncate inline-block align-middle max-w-sm">{{ q.content }}</span>
+                                    <span class="text-sm font-semibold text-slate-800 truncate inline-block align-middle max-w-sm">
+                                        {{ q.content ? q.content : '[Gambar Soal]' }}
+                                    </span>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
@@ -159,12 +183,16 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                                 <img :src="'/storage/' + q.image" class="h-32 rounded-lg border border-slate-200 shadow-sm" />
                             </div>
                             <p class="text-sm text-slate-700 mb-4 whitespace-pre-wrap">{{ q.content }}</p>
+                            
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <div v-for="(val, key) in (q.options || {})" :key="key" 
                                     :class="[q.correct_answer === key ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-white border-slate-200']" 
                                     class="p-3 rounded-xl border text-xs flex justify-between">
-                                    <span class="font-medium"><span class="uppercase font-bold mr-2">{{ key }}.</span> {{ val }}</span>
-                                    <span v-if="q.type === 'TKP' && q.tkp_scores" class="font-bold text-slate-400">Poin: {{ q.tkp_scores[key] }}</span>
+                                    <div class="flex flex-col">
+                                        <span class="font-medium"><span class="uppercase font-bold mr-2">{{ key }}.</span> {{ val }}</span>
+                                        <img v-if="q.option_images && q.option_images[key]" :src="'/storage/' + q.option_images[key]" class="h-16 mt-2 rounded border border-slate-200 object-contain shadow-sm bg-white" />
+                                    </div>
+                                    <span v-if="q.type === 'TKP' && q.tkp_scores" class="font-bold text-slate-400 shrink-0 ml-2">Poin: {{ q.tkp_scores[key] }}</span>
                                 </div>
                             </div>
                         </div>
@@ -191,23 +219,36 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                                 </select>
                             </div>
                             <div class="col-span-1 md:col-span-2">
-                                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Gambar (Opsional)</label>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Gambar Soal (Opsional jika isi teks)</label>
                                 <input type="file" @input="form.image = $event.target.files[0]" class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                                
+                                <div v-if="form.errors.image" class="text-red-500 text-[10px] mt-1">{{ form.errors.image }}</div>
                             </div>
                         </div>
 
                         <div>
-                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Pertanyaan</label>
-                            <textarea v-model="form.content" rows="3" class="w-full border-slate-200 rounded-xl bg-slate-50 text-sm focus:border-indigo-500 focus:ring-indigo-500" required></textarea>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Pertanyaan (Opsional jika isi gambar)</label>
+                            <textarea v-model="form.content" rows="3" class="w-full border-slate-200 rounded-xl bg-slate-50 text-sm focus:border-indigo-500 focus:ring-indigo-500"></textarea>
+                            
+                            <div v-if="form.errors.content" class="text-red-500 text-[10px] mt-1">{{ form.errors.content }}</div>
                         </div>
 
                         <div class="space-y-3">
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Pilihan Jawaban</label>
-                            <div v-for="opt in ['a', 'b', 'c', 'd', 'e']" :key="opt" class="flex gap-3 items-center">
-                                <div class="w-8 h-8 shrink-0 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-xs text-slate-500">{{ opt.toUpperCase() }}</div>
-                                <input v-model="form.options[opt]" type="text" class="flex-1 border-slate-200 rounded-xl text-sm" required />
-                                <input v-if="form.type === 'TKP'" v-model="form.tkp_scores[opt]" type="number" placeholder="Poin" class="w-20 border-slate-200 rounded-xl text-sm text-center" />
-                                <input v-else type="radio" :value="opt" v-model="form.correct_answer" class="text-indigo-600 focus:ring-indigo-500" required />
+                            <div v-for="opt in ['a', 'b', 'c', 'd', 'e']" :key="opt" class="flex flex-col gap-2 p-3 bg-white border border-slate-100 rounded-xl shadow-sm">
+                                <div class="flex gap-3 items-center">
+                                    <div class="w-8 h-8 shrink-0 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-xs text-slate-500">{{ opt.toUpperCase() }}</div>
+                                    <input v-model="form.options[opt]" type="text" class="flex-1 border-slate-200 rounded-xl text-sm" required />
+                                    <input v-if="form.type === 'TKP'" v-model="form.tkp_scores[opt]" type="number" placeholder="Poin" class="w-20 border-slate-200 rounded-xl text-sm text-center" />
+                                    <input v-else type="radio" :value="opt" v-model="form.correct_answer" class="text-indigo-600 focus:ring-indigo-500" required />
+                                </div>
+                                
+                                <div v-if="form.type === 'TIU'" class="pl-11 mt-1 border-t border-slate-50 pt-2">
+                                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Gambar Opsi (Opsional)</label>
+                                    <input type="file" @input="form.option_images[opt] = $event.target.files[0]" accept="image/*" class="w-full text-xs text-slate-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
+                                    
+                                    <img v-if="form.existing_option_images && form.existing_option_images[opt]" :src="'/storage/' + form.existing_option_images[opt]" class="h-12 mt-2 rounded border border-slate-200 object-contain shadow-sm" />
+                                </div>
                             </div>
                         </div>
 
