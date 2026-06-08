@@ -9,25 +9,48 @@ const props = defineProps({
     questions: Array
 });
 
-const localQuestions = ref([...props.questions]);
+// ==========================================
+// HELPER: Mengubah String JSON dari database menjadi Object Vue
+// ==========================================
+const parseData = (data) => {
+    if (typeof data === 'string') {
+        try { return JSON.parse(data); } catch (e) { return null; }
+    }
+    return data;
+};
+
+// Format seluruh soal di awal agar format opsinya pasti menjadi Object
+const formatQuestions = (questions) => {
+    return questions.map(q => ({
+        ...q,
+        options: parseData(q.options) || { a: '', b: '', c: '', d: '', e: '' },
+        option_images: parseData(q.option_images) || { a: null, b: null, c: null, d: null, e: null },
+        tkp_scores: parseData(q.tkp_scores) || { a: '', b: '', c: '', d: '', e: '' }
+    }));
+};
+
+const localQuestions = ref(formatQuestions(props.questions));
 const expandedId = ref(null);
 const isModalOpen = ref(false);
 const fileInput = ref(null);
 
+const existingImages = ref({
+    question: null,
+    options: { a: null, b: null, c: null, d: null, e: null }
+});
+
+// Update list secara dinamis namun tetap melewati filter pemformatan
 watch(() => props.questions, (newVal) => {
-    localQuestions.value = [...newVal];
+    localQuestions.value = formatQuestions(newVal);
 }, { deep: true });
 
-// ==========================================
-// LOGIKA DINAMIS UNTUK URL TOMBOL KEMBALI
-// ==========================================
 const backUrl = computed(() => {
     if (props.tryout?.type === 'akbar') {
         return '/admin/tryout-akbar';
     } else if (props.tryout?.type === 'adidaya') {
         return '/admin/adidaya-manage';
     } else {
-        return '/admin/tryouts'; // Default ke tryout biasa
+        return '/admin/tryouts';
     }
 });
 
@@ -58,7 +81,6 @@ const form = useForm({
     image: null,
     options: { a: '', b: '', c: '', d: '', e: '' },
     option_images: { a: null, b: null, c: null, d: null, e: null },
-    existing_option_images: { a: null, b: null, c: null, d: null, e: null },
     correct_answer: '',
     tkp_scores: { a: '', b: '', c: '', d: '', e: '' },
     explanation: ''
@@ -74,10 +96,14 @@ const openCreateModal = () => {
     form.image = null;
     form.options = { a: '', b: '', c: '', d: '', e: '' };
     form.option_images = { a: null, b: null, c: null, d: null, e: null };
-    form.existing_option_images = { a: null, b: null, c: null, d: null, e: null };
     form.correct_answer = '';
     form.tkp_scores = { a: '', b: '', c: '', d: '', e: '' };
     form.explanation = '';
+    
+    existingImages.value = {
+        question: null,
+        options: { a: null, b: null, c: null, d: null, e: null }
+    };
     
     isModalOpen.value = true;
 };
@@ -88,15 +114,20 @@ const openEditModal = (q) => {
     form.id = q.id;
     form.type = q.type;
     form.content = q.content || '';
-    form.image = null;
+    form.image = null; 
     
-    form.options = q.options ? { ...q.options } : { a: '', b: '', c: '', d: '', e: '' };
-    form.option_images = { a: null, b: null, c: null, d: null, e: null };
-    form.existing_option_images = q.option_images ? { ...q.option_images } : { a: null, b: null, c: null, d: null, e: null };
+    // Karena sudah diformat oleh formatQuestions di awal, kita bisa langsung copy aman
+    form.options = { ...q.options };
+    form.option_images = { a: null, b: null, c: null, d: null, e: null }; 
     
     form.correct_answer = q.correct_answer || '';
-    form.tkp_scores = q.tkp_scores ? { ...q.tkp_scores } : { a: '', b: '', c: '', d: '', e: '' };
+    form.tkp_scores = { ...q.tkp_scores };
     form.explanation = q.explanation || '';
+
+    existingImages.value = {
+        question: q.image || null,
+        options: { ...q.option_images }
+    };
     
     isModalOpen.value = true;
 };
@@ -225,7 +256,14 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                             </div>
                             <div class="col-span-1 md:col-span-2">
                                 <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Gambar Soal (Opsional jika isi teks)</label>
-                                <input type="file" @input="form.image = $event.target.files[0]" class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                                
+                                <div v-if="form.id && existingImages.question" class="mb-3">
+                                    <p class="text-[10px] text-slate-500 font-bold mb-1">GAMBAR SAAT INI:</p>
+                                    <img :src="`/storage/${existingImages.question}`" class="h-24 rounded-lg border border-slate-200 object-contain shadow-sm bg-white" alt="Gambar Soal" />
+                                </div>
+
+                                <input type="file" @input="form.image = $event.target.files[0]" accept="image/*" class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                                <p v-if="form.id" class="text-[10px] text-slate-400 mt-1">Biarkan kosong jika tidak ingin mengubah gambar.</p>
                                 
                                 <div v-if="form.errors.image" class="text-red-500 text-[10px] mt-1">{{ form.errors.image }}</div>
                             </div>
@@ -243,16 +281,21 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                             <div v-for="opt in ['a', 'b', 'c', 'd', 'e']" :key="opt" class="flex flex-col gap-2 p-3 bg-white border border-slate-100 rounded-xl shadow-sm">
                                 <div class="flex gap-3 items-center">
                                     <div class="w-8 h-8 shrink-0 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-xs text-slate-500">{{ opt.toUpperCase() }}</div>
-                                    <input v-model="form.options[opt]" type="text" class="flex-1 border-slate-200 rounded-xl text-sm" :required="!form.option_images[opt] && !form.existing_option_images[opt]" />
+                                    <input v-model="form.options[opt]" type="text" class="flex-1 border-slate-200 rounded-xl text-sm" :required="!form.option_images[opt] && !existingImages.options[opt]" />
                                     <input v-if="form.type === 'TKP'" v-model="form.tkp_scores[opt]" type="number" placeholder="Poin" class="w-20 border-slate-200 rounded-xl text-sm text-center" />
                                     <input v-else type="radio" :value="opt" v-model="form.correct_answer" class="text-indigo-600 focus:ring-indigo-500" required />
                                 </div>
                                 
                                 <div v-if="form.type === 'TIU'" class="pl-11 mt-1 border-t border-slate-50 pt-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Gambar Opsi (Opsional)</label>
-                                    <input type="file" @input="form.option_images[opt] = $event.target.files[0]" accept="image/*" class="w-full text-xs text-slate-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
                                     
-                                    <img v-if="form.existing_option_images && form.existing_option_images[opt]" :src="'/storage/' + form.existing_option_images[opt]" class="h-12 mt-2 rounded border border-slate-200 object-contain shadow-sm" />
+                                    <div v-if="form.id && existingImages.options[opt]" class="mb-2">
+                                        <p class="text-[10px] text-slate-400 mb-1">Gambar saat ini:</p>
+                                        <img :src="`/storage/${existingImages.options[opt]}`" class="h-16 rounded border border-slate-200 object-contain shadow-sm bg-white" alt="Gambar Opsi" />
+                                    </div>
+
+                                    <input type="file" @input="form.option_images[opt] = $event.target.files[0]" accept="image/*" class="w-full text-xs text-slate-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
+                                    <p v-if="form.id" class="text-[10px] text-slate-400 mt-1">Biarkan kosong jika tidak diubah.</p>
                                 </div>
                             </div>
                         </div>

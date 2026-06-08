@@ -25,25 +25,30 @@ class QuestionManagerController extends Controller
 
     public function store(Request $request, Tryout $tryout)
     {
-        // Validasi: Wajib isi teks JIKA gambar kosong, wajib isi gambar JIKA teks kosong
+        // PERBAIKAN 1: Validasi dilonggarkan menjadi nullable agar teks boleh kosong jika diganti gambar
         $request->validate([
             'type'            => 'required|in:TWK,TIU,TKP',
-            'content'         => 'required_without:image|nullable|string',
-            'image'           => 'required_without:content|nullable|image|max:2048',
+            'content'         => 'nullable|string',
+            'image'           => 'nullable|image|max:2048',
             'options'         => 'required|array',
+            'options.*'       => 'nullable|string', // Izinkan tiap opsi kosong (null/empty)
             'option_images.*' => 'nullable|image|max:2048', 
             'explanation'     => 'nullable|string',
             'correct_answer'  => 'nullable|string',
             'tkp_scores'      => 'nullable|array',
-        ], [
-            'content.required_without' => 'Teks pertanyaan harus diisi jika tidak ada gambar.',
-            'image.required_without'   => 'Gambar harus diunggah jika teks pertanyaan kosong.',
         ]);
 
         $data = $request->except(['option_images', 'existing_option_images']);
         
-        // Mencegah error database jika kolom 'content' tidak boleh NULL di DB
+        // Mencegah error database jika kolom tidak boleh NULL
         $data['content'] = $request->content ?? '';
+
+        // PERBAIKAN 2: Pastikan nilai null pada opsi jawaban diubah menjadi string kosong ''
+        $options = $request->options ?? [];
+        foreach (['a', 'b', 'c', 'd', 'e'] as $opt) {
+            $options[$opt] = isset($options[$opt]) ? $options[$opt] : '';
+        }
+        $data['options'] = $options;
 
         // Handle Gambar Soal (Pertanyaan Utama)
         if ($request->hasFile('image')) {
@@ -72,22 +77,30 @@ class QuestionManagerController extends Controller
 
     public function update(Request $request, Tryout $tryout, Question $question)
     {
+        // PERBAIKAN 1: Validasi dilonggarkan
         $request->validate([
             'type'            => 'required|in:TWK,TIU,TKP',
-            'content'         => 'required_without:image|nullable|string',
-            'image'           => 'required_without:content|nullable|image|max:2048',
+            'content'         => 'nullable|string',
+            'image'           => 'nullable|image|max:2048',
             'options'         => 'required|array',
+            'options.*'       => 'nullable|string', // Izinkan tiap opsi kosong
             'option_images.*' => 'nullable|image|max:2048',
             'explanation'     => 'nullable|string',
             'correct_answer'  => 'nullable|string',
             'tkp_scores'      => 'nullable|array',
-        ], [
-            'content.required_without' => 'Teks pertanyaan harus diisi jika tidak ada gambar.',
-            'image.required_without'   => 'Gambar harus diunggah jika teks pertanyaan kosong.',
         ]);
 
         $data = $request->except(['option_images', 'existing_option_images']);
+        
+        // Mencegah error database
         $data['content'] = $request->content ?? '';
+
+        // PERBAIKAN 2: Mencegah nilai null pada opsi jawaban masuk ke database
+        $options = $request->options ?? [];
+        foreach (['a', 'b', 'c', 'd', 'e'] as $opt) {
+            $options[$opt] = isset($options[$opt]) ? $options[$opt] : '';
+        }
+        $data['options'] = $options;
 
         // Handle update Gambar Soal Utama
         if ($request->hasFile('image')) {
