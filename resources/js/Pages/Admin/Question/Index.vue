@@ -279,25 +279,25 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                         <div class="space-y-3">
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Pilihan Jawaban</label>
                             <div v-for="opt in ['a', 'b', 'c', 'd', 'e']" :key="opt" class="flex flex-col gap-2 p-3 bg-white border border-slate-100 rounded-xl shadow-sm">
-                                <div class="flex gap-3 items-center">
-                                    <div class="w-8 h-8 shrink-0 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-xs text-slate-500">{{ opt.toUpperCase() }}</div>
-                                    <input v-model="form.options[opt]" type="text" class="flex-1 border-slate-200 rounded-xl text-sm" :required="!form.option_images[opt] && !existingImages.options[opt]" />
-                                    <input v-if="form.type === 'TKP'" v-model="form.tkp_scores[opt]" type="number" placeholder="Poin" class="w-20 border-slate-200 rounded-xl text-sm text-center" />
-                                    <input v-else type="radio" :value="opt" v-model="form.correct_answer" class="text-indigo-600 focus:ring-indigo-500" required />
-                                </div>
-                                
-                                <div v-if="form.type === 'TIU'" class="pl-11 mt-1 border-t border-slate-50 pt-2">
-                                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Gambar Opsi (Opsional)</label>
-                                    
-                                    <div v-if="form.id && existingImages.options[opt]" class="mb-2">
-                                        <p class="text-[10px] text-slate-400 mb-1">Gambar saat ini:</p>
-                                        <img :src="`/storage/${existingImages.options[opt]}`" class="h-16 rounded border border-slate-200 object-contain shadow-sm bg-white" alt="Gambar Opsi" />
-                                    </div>
+    <div class="flex gap-3 items-center">
+        <div class="w-8 h-8 shrink-0 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-xs text-slate-500">{{ opt.toUpperCase() }}</div>
+        <input v-model="form.options[opt]" type="text" class="flex-1 border-slate-200 rounded-xl text-sm" :required="!form.option_images[opt] && !(existingImages.options && existingImages.options[opt])" />
+        <input v-if="form.type === 'TKP'" v-model="form.tkp_scores[opt]" type="number" placeholder="Poin" class="w-20 border-slate-200 rounded-xl text-sm text-center" />
+        <input v-else type="radio" :value="opt" v-model="form.correct_answer" class="text-indigo-600 focus:ring-indigo-500" required />
+    </div>
+    
+    <div class="pl-11 mt-1 border-t border-slate-50 pt-2">
+        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Gambar Opsi (Opsional)</label>
+        
+        <div v-if="form.id && existingImages.options && existingImages.options[opt]" class="mb-2">
+            <p class="text-[10px] text-slate-400 mb-1">Gambar saat ini:</p>
+            <img :src="`/storage/${existingImages.options[opt]}`" class="h-16 rounded border border-slate-200 object-contain shadow-sm bg-white" alt="Gambar Opsi" />
+        </div>
 
-                                    <input type="file" @input="form.option_images[opt] = $event.target.files[0]" accept="image/*" class="w-full text-xs text-slate-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
-                                    <p v-if="form.id" class="text-[10px] text-slate-400 mt-1">Biarkan kosong jika tidak diubah.</p>
-                                </div>
-                            </div>
+        <input type="file" @input="form.option_images[opt] = $event.target.files[0]" accept="image/*" class="w-full text-xs text-slate-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
+        <p v-if="form.id" class="text-[10px] text-slate-400 mt-1">Biarkan kosong jika tidak ingin mengubah gambar opsi ini.</p>
+    </div>
+</div>
                         </div>
 
                         <div>

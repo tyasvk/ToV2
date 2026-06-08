@@ -25,7 +25,7 @@ class QuestionManagerController extends Controller
 
     public function store(Request $request, Tryout $tryout)
     {
-        // PERBAIKAN 1: Validasi dilonggarkan menjadi nullable agar teks boleh kosong jika diganti gambar
+        // Validasi dilonggarkan menjadi nullable agar teks boleh kosong jika diganti gambar
         $request->validate([
             'type'            => 'required|in:TWK,TIU,TKP',
             'content'         => 'nullable|string',
@@ -43,7 +43,7 @@ class QuestionManagerController extends Controller
         // Mencegah error database jika kolom tidak boleh NULL
         $data['content'] = $request->content ?? '';
 
-        // PERBAIKAN 2: Pastikan nilai null pada opsi jawaban diubah menjadi string kosong ''
+        // Pastikan nilai null pada opsi jawaban diubah menjadi string kosong ''
         $options = $request->options ?? [];
         foreach (['a', 'b', 'c', 'd', 'e'] as $opt) {
             $options[$opt] = isset($options[$opt]) ? $options[$opt] : '';
@@ -55,8 +55,8 @@ class QuestionManagerController extends Controller
             $data['image'] = $request->file('image')->store('questions', 'public');
         }
 
-        // Handle Gambar Opsi (Khusus TIU)
-        if ($request->type === 'TIU' && $request->hasFile('option_images')) {
+        // Handle Gambar Opsi (SEKARANG BERLAKU UNTUK SEMUA TIPE SOAL, TIDAK HANYA TIU)
+        if ($request->hasFile('option_images')) {
             $optionImagePaths = [];
             foreach (['a', 'b', 'c', 'd', 'e'] as $key) {
                 if ($request->hasFile("option_images.{$key}")) {
@@ -77,7 +77,7 @@ class QuestionManagerController extends Controller
 
     public function update(Request $request, Tryout $tryout, Question $question)
     {
-        // PERBAIKAN 1: Validasi dilonggarkan
+        // Validasi dilonggarkan
         $request->validate([
             'type'            => 'required|in:TWK,TIU,TKP',
             'content'         => 'nullable|string',
@@ -95,38 +95,49 @@ class QuestionManagerController extends Controller
         // Mencegah error database
         $data['content'] = $request->content ?? '';
 
-        // PERBAIKAN 2: Mencegah nilai null pada opsi jawaban masuk ke database
+        // Mencegah nilai null pada opsi jawaban masuk ke database
         $options = $request->options ?? [];
         foreach (['a', 'b', 'c', 'd', 'e'] as $opt) {
             $options[$opt] = isset($options[$opt]) ? $options[$opt] : '';
         }
         $data['options'] = $options;
 
-        // Handle update Gambar Soal Utama
+        // ==========================================
+        // HANDLE GAMBAR SOAL UTAMA
+        // ==========================================
         if ($request->hasFile('image')) {
+            // Hapus gambar lama sebelum menyimpan yang baru
             if ($question->image && Storage::disk('public')->exists($question->image)) {
                 Storage::disk('public')->delete($question->image);
             }
             $data['image'] = $request->file('image')->store('questions', 'public');
+        } else {
+            // Jika tidak ada gambar baru, hapus 'image' dari array $data
+            // agar Eloquent TIDAK menimpa gambar lama dengan nilai NULL.
+            unset($data['image']);
         }
 
-        // Handle update Gambar Opsi (Khusus TIU)
+        // ==========================================
+        // HANDLE GAMBAR OPSI (SEKARANG BERLAKU UNTUK SEMUA TIPE)
+        // ==========================================
+        // Ambil data gambar opsi yang sudah ada di database sebelumnya
         $optionImagePaths = is_string($question->option_images) ? json_decode($question->option_images, true) : ($question->option_images ?? []);
 
-        if ($request->type === 'TIU') {
-            foreach (['a', 'b', 'c', 'd', 'e'] as $key) {
-                if ($request->hasFile("option_images.{$key}")) {
-                    // Hapus gambar opsi lama jika ada
-                    if (!empty($optionImagePaths[$key]) && Storage::disk('public')->exists($optionImagePaths[$key])) {
-                        Storage::disk('public')->delete($optionImagePaths[$key]);
-                    }
-                    // Simpan gambar opsi baru
-                    $optionImagePaths[$key] = $request->file("option_images.{$key}")->store('option_images', 'public');
+        // Langsung cek tanpa membatasi hanya untuk tipe TIU
+        foreach (['a', 'b', 'c', 'd', 'e'] as $key) {
+            if ($request->hasFile("option_images.{$key}")) {
+                // Hapus gambar opsi lama jika ada
+                if (!empty($optionImagePaths[$key]) && Storage::disk('public')->exists($optionImagePaths[$key])) {
+                    Storage::disk('public')->delete($optionImagePaths[$key]);
                 }
+                // Simpan gambar opsi baru
+                $optionImagePaths[$key] = $request->file("option_images.{$key}")->store('option_images', 'public');
             }
-            $data['option_images'] = $optionImagePaths;
         }
+        // Masukkan kembali kombinasi gambar opsi lama & baru ke dalam data untuk di-update
+        $data['option_images'] = $optionImagePaths;
 
+        // Update database
         $question->update($data);
 
         return back()->with('message', 'Soal berhasil diperbarui!');
