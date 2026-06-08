@@ -66,7 +66,7 @@ const form = useForm({
 
 const openCreateModal = () => {
     form.reset();
-    if (form.clearErrors) form.clearErrors(); // Aman dari error
+    if (form.clearErrors) form.clearErrors(); 
     
     form.id = null;
     form.type = 'TWK';
@@ -165,11 +165,10 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8h16M4 16h16" /></svg>
                                 </div>
                                 <span class="w-8 h-8 shrink-0 bg-slate-100 rounded-lg flex items-center justify-center text-[10px] font-bold text-slate-500">#{{ index + 1 }}</span>
-                                <div @click="toggleAccordion(q.id)" class="cursor-pointer truncate">
+                                <div @click="toggleAccordion(q.id)" class="cursor-pointer truncate flex items-center">
                                     <span class="text-[10px] font-bold px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-md uppercase mr-2">{{ q.type }}</span>
-                                    <span class="text-sm font-semibold text-slate-800 truncate inline-block align-middle max-w-sm">
-                                        {{ q.content ? q.content : '[Gambar Soal]' }}
-                                    </span>
+                                    
+                                    <div class="text-sm font-semibold text-slate-800 line-clamp-1 inline-block align-middle max-w-sm html-content" v-html="q.content || '[Gambar Soal]'"></div>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
@@ -182,14 +181,20 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                             <div v-if="q.image" class="mb-4">
                                 <img :src="'/storage/' + q.image" class="h-32 rounded-lg border border-slate-200 shadow-sm" />
                             </div>
-                            <p class="text-sm text-slate-700 mb-4 whitespace-pre-wrap">{{ q.content }}</p>
+
+                            <div class="text-sm text-slate-700 mb-4 whitespace-pre-wrap html-content" v-html="q.content"></div>
                             
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <div v-for="(val, key) in (q.options || {})" :key="key" 
                                     :class="[q.correct_answer === key ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-white border-slate-200']" 
                                     class="p-3 rounded-xl border text-xs flex justify-between">
                                     <div class="flex flex-col">
-                                        <span class="font-medium"><span class="uppercase font-bold mr-2">{{ key }}.</span> {{ val }}</span>
+                                        
+                                        <div class="font-medium flex items-start">
+                                            <span class="uppercase font-bold mr-2 mt-0.5 shrink-0">{{ key }}.</span> 
+                                            <div class="html-content" v-html="val"></div>
+                                        </div>
+
                                         <img v-if="q.option_images && q.option_images[key]" :src="'/storage/' + q.option_images[key]" class="h-16 mt-2 rounded border border-slate-200 object-contain shadow-sm bg-white" />
                                     </div>
                                     <span v-if="q.type === 'TKP' && q.tkp_scores" class="font-bold text-slate-400 shrink-0 ml-2">Poin: {{ q.tkp_scores[key] }}</span>
@@ -238,7 +243,7 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                             <div v-for="opt in ['a', 'b', 'c', 'd', 'e']" :key="opt" class="flex flex-col gap-2 p-3 bg-white border border-slate-100 rounded-xl shadow-sm">
                                 <div class="flex gap-3 items-center">
                                     <div class="w-8 h-8 shrink-0 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-xs text-slate-500">{{ opt.toUpperCase() }}</div>
-                                    <input v-model="form.options[opt]" type="text" class="flex-1 border-slate-200 rounded-xl text-sm" required />
+                                    <input v-model="form.options[opt]" type="text" class="flex-1 border-slate-200 rounded-xl text-sm" :required="!form.option_images[opt] && !form.existing_option_images[opt]" />
                                     <input v-if="form.type === 'TKP'" v-model="form.tkp_scores[opt]" type="number" placeholder="Poin" class="w-20 border-slate-200 rounded-xl text-sm text-center" />
                                     <input v-else type="radio" :value="opt" v-model="form.correct_answer" class="text-indigo-600 focus:ring-indigo-500" required />
                                 </div>
@@ -269,3 +274,20 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
         </Teleport>
     </AuthenticatedLayout>
 </template>
+
+<style scoped>
+/* PERUBAHAN 4: Styling tambahan agar format HTML / Gambar tidak bocor ukurannya */
+.html-content :deep(img) {
+    max-height: 120px;
+    width: auto;
+    border-radius: 6px;
+    display: inline-block;
+    vertical-align: middle;
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+.html-content :deep(p) {
+    margin: 0;
+    display: inline;
+}
+</style>

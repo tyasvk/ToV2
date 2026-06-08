@@ -14,9 +14,11 @@ class QuestionManagerController extends Controller
 {
     public function index(Tryout $tryout)
     {
+        // Data diambil mentah (termasuk tag HTML gambar) lalu dikirim ke Vue
         $questions = $tryout->questions()->orderBy('order', 'asc')->get();
+        
         return Inertia::render('Admin/Question/Index', [
-            'tryout' => $tryout,
+            'tryout'    => $tryout,
             'questions' => $questions
         ]);
     }
@@ -25,17 +27,17 @@ class QuestionManagerController extends Controller
     {
         // Validasi: Wajib isi teks JIKA gambar kosong, wajib isi gambar JIKA teks kosong
         $request->validate([
-            'type' => 'required|in:TWK,TIU,TKP',
-            'content' => 'required_without:image|nullable|string',
-            'image' => 'required_without:content|nullable|image|max:2048',
-            'options' => 'required|array',
+            'type'            => 'required|in:TWK,TIU,TKP',
+            'content'         => 'required_without:image|nullable|string',
+            'image'           => 'required_without:content|nullable|image|max:2048',
+            'options'         => 'required|array',
             'option_images.*' => 'nullable|image|max:2048', 
-            'explanation' => 'nullable|string',
-            'correct_answer' => 'nullable|string',
-            'tkp_scores' => 'nullable|array',
+            'explanation'     => 'nullable|string',
+            'correct_answer'  => 'nullable|string',
+            'tkp_scores'      => 'nullable|array',
         ], [
             'content.required_without' => 'Teks pertanyaan harus diisi jika tidak ada gambar.',
-            'image.required_without' => 'Gambar harus diunggah jika teks pertanyaan kosong.',
+            'image.required_without'   => 'Gambar harus diunggah jika teks pertanyaan kosong.',
         ]);
 
         $data = $request->except(['option_images', 'existing_option_images']);
@@ -43,7 +45,7 @@ class QuestionManagerController extends Controller
         // Mencegah error database jika kolom 'content' tidak boleh NULL di DB
         $data['content'] = $request->content ?? '';
 
-        // Handle Gambar Soal (Pertanyaan)
+        // Handle Gambar Soal (Pertanyaan Utama)
         if ($request->hasFile('image')) {
             $data['image'] = $request->file('image')->store('questions', 'public');
         }
@@ -71,23 +73,23 @@ class QuestionManagerController extends Controller
     public function update(Request $request, Tryout $tryout, Question $question)
     {
         $request->validate([
-            'type' => 'required|in:TWK,TIU,TKP',
-            'content' => 'required_without:image|nullable|string',
-            'image' => 'required_without:content|nullable|image|max:2048',
-            'options' => 'required|array',
+            'type'            => 'required|in:TWK,TIU,TKP',
+            'content'         => 'required_without:image|nullable|string',
+            'image'           => 'required_without:content|nullable|image|max:2048',
+            'options'         => 'required|array',
             'option_images.*' => 'nullable|image|max:2048',
-            'explanation' => 'nullable|string',
-            'correct_answer' => 'nullable|string',
-            'tkp_scores' => 'nullable|array',
+            'explanation'     => 'nullable|string',
+            'correct_answer'  => 'nullable|string',
+            'tkp_scores'      => 'nullable|array',
         ], [
             'content.required_without' => 'Teks pertanyaan harus diisi jika tidak ada gambar.',
-            'image.required_without' => 'Gambar harus diunggah jika teks pertanyaan kosong.',
+            'image.required_without'   => 'Gambar harus diunggah jika teks pertanyaan kosong.',
         ]);
 
         $data = $request->except(['option_images', 'existing_option_images']);
         $data['content'] = $request->content ?? '';
 
-        // Handle update Gambar Soal
+        // Handle update Gambar Soal Utama
         if ($request->hasFile('image')) {
             if ($question->image && Storage::disk('public')->exists($question->image)) {
                 Storage::disk('public')->delete($question->image);
@@ -101,11 +103,11 @@ class QuestionManagerController extends Controller
         if ($request->type === 'TIU') {
             foreach (['a', 'b', 'c', 'd', 'e'] as $key) {
                 if ($request->hasFile("option_images.{$key}")) {
-                    // Hapus gambar lama jika ada
+                    // Hapus gambar opsi lama jika ada
                     if (!empty($optionImagePaths[$key]) && Storage::disk('public')->exists($optionImagePaths[$key])) {
                         Storage::disk('public')->delete($optionImagePaths[$key]);
                     }
-                    // Simpan baru
+                    // Simpan gambar opsi baru
                     $optionImagePaths[$key] = $request->file("option_images.{$key}")->store('option_images', 'public');
                 }
             }
@@ -119,12 +121,12 @@ class QuestionManagerController extends Controller
 
     public function destroy(Tryout $tryout, Question $question)
     {
-        // Hapus Gambar Soal Utama
+        // Hapus file Gambar Soal Utama dari Storage
         if ($question->image && Storage::disk('public')->exists($question->image)) {
             Storage::disk('public')->delete($question->image);
         }
 
-        // Hapus file Gambar Opsi
+        // Hapus file Gambar Opsi dari Storage
         $optionImages = is_string($question->option_images) ? json_decode($question->option_images, true) : ($question->option_images ?? []);
         if (is_array($optionImages)) {
             foreach ($optionImages as $imgPath) {
@@ -161,7 +163,7 @@ class QuestionManagerController extends Controller
         $delimiter = (strpos($firstLine, ';') !== false) ? ';' : ',';
         rewind($handle);
 
-        fgetcsv($handle, 1000, $delimiter);
+        fgetcsv($handle, 1000, $delimiter); // Lewati header
 
         DB::beginTransaction();
         try {
