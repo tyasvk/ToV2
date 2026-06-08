@@ -51,7 +51,11 @@ const subtestLabel = computed(() => {
     return type || '-';
 });
 
-const answeredCount = computed(() => Object.keys(answers.value).length);
+const answeredCount = computed(() => {
+    if (!props.questions) return 0;
+    // Hanya hitung jawaban yang ID-nya benar-benar ada di daftar soal saat ini
+    return props.questions.filter(q => answers.value[q.id] !== undefined && answers.value[q.id] !== null && answers.value[q.id] !== '').length;
+});
 const unansweredCount = computed(() => (props.questions?.length || 0) - answeredCount.value);
 
 // --- 2. LOGIKA LIFECYCLE ---

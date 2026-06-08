@@ -39,6 +39,12 @@ const existingImages = ref({
     options: { a: null, b: null, c: null, d: null, e: null }
 });
 
+// State untuk Preview Gambar Baru secara Real-time
+const imagePreviews = ref({
+    question: null,
+    options: { a: null, b: null, c: null, d: null, e: null }
+});
+
 // Update list secara dinamis namun tetap melewati filter pemformatan
 watch(() => props.questions, (newVal) => {
     localQuestions.value = formatQuestions(newVal);
@@ -86,6 +92,20 @@ const form = useForm({
     explanation: ''
 });
 
+// Method Helper untuk menangani Preview File Input
+const handleImagePreview = (event, type, opt = null) => {
+    const file = event.target.files[0];
+    if (type === 'question') {
+        form.image = file || null;
+        if (imagePreviews.value.question) URL.revokeObjectURL(imagePreviews.value.question);
+        imagePreviews.value.question = file ? URL.createObjectURL(file) : null;
+    } else if (type === 'option') {
+        form.option_images[opt] = file || null;
+        if (imagePreviews.value.options[opt]) URL.revokeObjectURL(imagePreviews.value.options[opt]);
+        imagePreviews.value.options[opt] = file ? URL.createObjectURL(file) : null;
+    }
+};
+
 const openCreateModal = () => {
     form.reset();
     if (form.clearErrors) form.clearErrors(); 
@@ -104,6 +124,11 @@ const openCreateModal = () => {
         question: null,
         options: { a: null, b: null, c: null, d: null, e: null }
     };
+
+    imagePreviews.value = {
+        question: null,
+        options: { a: null, b: null, c: null, d: null, e: null }
+    };
     
     isModalOpen.value = true;
 };
@@ -116,7 +141,6 @@ const openEditModal = (q) => {
     form.content = q.content || '';
     form.image = null; 
     
-    // Karena sudah diformat oleh formatQuestions di awal, kita bisa langsung copy aman
     form.options = { ...q.options };
     form.option_images = { a: null, b: null, c: null, d: null, e: null }; 
     
@@ -127,6 +151,11 @@ const openEditModal = (q) => {
     existingImages.value = {
         question: q.image || null,
         options: { ...q.option_images }
+    };
+
+    imagePreviews.value = {
+        question: null,
+        options: { a: null, b: null, c: null, d: null, e: null }
     };
     
     isModalOpen.value = true;
@@ -257,12 +286,16 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                             <div class="col-span-1 md:col-span-2">
                                 <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Gambar Soal (Opsional jika isi teks)</label>
                                 
-                                <div v-if="form.id && existingImages.question" class="mb-3">
+                                <div v-if="imagePreviews.question" class="mb-3">
+                                    <p class="text-[10px] text-indigo-500 font-bold mb-1">PREVIEW GAMBAR BARU:</p>
+                                    <img :src="imagePreviews.question" class="h-24 rounded-lg border border-indigo-200 object-contain shadow-sm bg-indigo-50" alt="Preview Soal Baru" />
+                                </div>
+                                <div v-else-if="form.id && existingImages.question" class="mb-3">
                                     <p class="text-[10px] text-slate-500 font-bold mb-1">GAMBAR SAAT INI:</p>
                                     <img :src="`/storage/${existingImages.question}`" class="h-24 rounded-lg border border-slate-200 object-contain shadow-sm bg-white" alt="Gambar Soal" />
                                 </div>
 
-                                <input type="file" @input="form.image = $event.target.files[0]" accept="image/*" class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                                <input type="file" @change="e => handleImagePreview(e, 'question')" accept="image/*" class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
                                 <p v-if="form.id" class="text-[10px] text-slate-400 mt-1">Biarkan kosong jika tidak ingin mengubah gambar.</p>
                                 
                                 <div v-if="form.errors.image" class="text-red-500 text-[10px] mt-1">{{ form.errors.image }}</div>
@@ -279,25 +312,29 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                         <div class="space-y-3">
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Pilihan Jawaban</label>
                             <div v-for="opt in ['a', 'b', 'c', 'd', 'e']" :key="opt" class="flex flex-col gap-2 p-3 bg-white border border-slate-100 rounded-xl shadow-sm">
-    <div class="flex gap-3 items-center">
-        <div class="w-8 h-8 shrink-0 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-xs text-slate-500">{{ opt.toUpperCase() }}</div>
-        <input v-model="form.options[opt]" type="text" class="flex-1 border-slate-200 rounded-xl text-sm" :required="!form.option_images[opt] && !(existingImages.options && existingImages.options[opt])" />
-        <input v-if="form.type === 'TKP'" v-model="form.tkp_scores[opt]" type="number" placeholder="Poin" class="w-20 border-slate-200 rounded-xl text-sm text-center" />
-        <input v-else type="radio" :value="opt" v-model="form.correct_answer" class="text-indigo-600 focus:ring-indigo-500" required />
-    </div>
-    
-    <div class="pl-11 mt-1 border-t border-slate-50 pt-2">
-        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Gambar Opsi (Opsional)</label>
-        
-        <div v-if="form.id && existingImages.options && existingImages.options[opt]" class="mb-2">
-            <p class="text-[10px] text-slate-400 mb-1">Gambar saat ini:</p>
-            <img :src="`/storage/${existingImages.options[opt]}`" class="h-16 rounded border border-slate-200 object-contain shadow-sm bg-white" alt="Gambar Opsi" />
-        </div>
+                                <div class="flex gap-3 items-center">
+                                    <div class="w-8 h-8 shrink-0 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-xs text-slate-500">{{ opt.toUpperCase() }}</div>
+                                    <input v-model="form.options[opt]" type="text" class="flex-1 border-slate-200 rounded-xl text-sm" :required="!form.option_images[opt] && !imagePreviews.options[opt] && !(existingImages.options && existingImages.options[opt])" />
+                                    <input v-if="form.type === 'TKP'" v-model="form.tkp_scores[opt]" type="number" placeholder="Poin" class="w-20 border-slate-200 rounded-xl text-sm text-center" />
+                                    <input v-else type="radio" :value="opt" v-model="form.correct_answer" class="text-indigo-600 focus:ring-indigo-500" required />
+                                </div>
+                                
+                                <div class="pl-11 mt-1 border-t border-slate-50 pt-2">
+                                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Gambar Opsi (Opsional)</label>
+                                    
+                                    <div v-if="imagePreviews.options[opt]" class="mb-2">
+                                        <p class="text-[10px] text-indigo-500 font-bold mb-1">Preview Baru:</p>
+                                        <img :src="imagePreviews.options[opt]" class="h-16 rounded border border-indigo-200 object-contain shadow-sm bg-indigo-50" alt="Preview Opsi Baru" />
+                                    </div>
+                                    <div v-else-if="form.id && existingImages.options && existingImages.options[opt]" class="mb-2">
+                                        <p class="text-[10px] text-slate-400 mb-1">Gambar saat ini:</p>
+                                        <img :src="`/storage/${existingImages.options[opt]}`" class="h-16 rounded border border-slate-200 object-contain shadow-sm bg-white" alt="Gambar Opsi" />
+                                    </div>
 
-        <input type="file" @input="form.option_images[opt] = $event.target.files[0]" accept="image/*" class="w-full text-xs text-slate-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
-        <p v-if="form.id" class="text-[10px] text-slate-400 mt-1">Biarkan kosong jika tidak ingin mengubah gambar opsi ini.</p>
-    </div>
-</div>
+                                    <input type="file" @change="e => handleImagePreview(e, 'option', opt)" accept="image/*" class="w-full text-xs text-slate-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
+                                    <p v-if="form.id" class="text-[10px] text-slate-400 mt-1">Biarkan kosong jika tidak ingin mengubah gambar opsi ini.</p>
+                                </div>
+                            </div>
                         </div>
 
                         <div>
@@ -319,7 +356,6 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
 </template>
 
 <style scoped>
-/* PERUBAHAN 4: Styling tambahan agar format HTML / Gambar tidak bocor ukurannya */
 .html-content :deep(img) {
     max-height: 120px;
     width: auto;

@@ -13,6 +13,7 @@ class Question extends Model
         'content', 
         'image', 
         'options', 
+        'option_images', // <--- TAMBAHKAN INI DI SINI
         'correct_answer', 
         'tkp_scores', 
         'explanation',
