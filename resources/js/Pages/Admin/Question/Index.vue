@@ -4,6 +4,10 @@ import { Head, useForm, Link, router } from '@inertiajs/vue3';
 import { ref, watch, computed } from 'vue';
 import draggable from 'vuedraggable';
 
+// Import Vue Quill Editor & CSS-nya
+import { QuillEditor } from '@vueup/vue-quill';
+import '@vueup/vue-quill/dist/vue-quill.snow.css';
+
 const props = defineProps({
     tryout: Object,
     questions: Array
@@ -75,19 +79,17 @@ const handleImport = (event) => {
 
     // Kirim request ke backend menggunakan Inertia
     router.post(route('admin.tryouts.questions.import', props.tryout.id), formData, {
-        forceFormData: true, // Pastikan dikirim sebagai form-data (untuk file upload)
+        forceFormData: true,
         preserveScroll: true,
         onStart: () => {
-            // Opsional: Anda bisa tambahkan state loading di sini
             console.log('Mulai mengimpor...');
         },
         onSuccess: () => { 
             event.target.value = null; 
-            alert('Berhasil! Soal telah diimpor ke database.'); // Notifikasi sukses
+            alert('Berhasil! Soal telah diimpor ke database.'); 
         },
         onError: (errors) => {
             event.target.value = null;
-            // Tampilkan alert jika ada error dari Laravel (misal validasi file)
             alert('Gagal mengimpor file: \n' + Object.values(errors).join('\n'));
             console.error('Import errors:', errors);
         }
@@ -323,8 +325,21 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
 
                         <div>
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Pertanyaan (Opsional jika isi gambar)</label>
-                            <textarea v-model="form.content" rows="3" class="w-full border-slate-200 rounded-xl bg-slate-50 text-sm focus:border-indigo-500 focus:ring-indigo-500"></textarea>
-                            
+                            <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                                <QuillEditor 
+                                    theme="snow" 
+                                    :toolbar="[
+                                        ['bold', 'italic', 'underline'],
+                                        [{ 'script': 'sub'}, { 'script': 'super' }],
+                                        ['formula'],
+                                        ['clean']
+                                    ]"
+                                    v-model:content="form.content" 
+                                    contentType="html"
+                                    class="min-h-[120px] text-sm"
+                                    placeholder="Ketik soal atau rumus di sini..."
+                                />
+                            </div>
                             <div v-if="form.errors.content" class="text-red-500 text-[10px] mt-1">{{ form.errors.content }}</div>
                         </div>
 
@@ -358,7 +373,21 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
 
                         <div>
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Pembahasan</label>
-                            <textarea v-model="form.explanation" rows="2" class="w-full border-slate-200 rounded-xl bg-slate-50 text-sm"></textarea>
+                            <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                                <QuillEditor 
+                                    theme="snow" 
+                                    :toolbar="[
+                                        ['bold', 'italic', 'underline'],
+                                        [{ 'script': 'sub'}, { 'script': 'super' }],
+                                        ['formula'],
+                                        ['clean']
+                                    ]"
+                                    v-model:content="form.explanation" 
+                                    contentType="html"
+                                    class="min-h-[120px] text-sm"
+                                    placeholder="Ketik pembahasan soal di sini..."
+                                />
+                            </div>
                         </div>
                     </form>
 
@@ -387,5 +416,19 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
 .html-content :deep(p) {
     margin: 0;
     display: inline;
+}
+
+/* Modifikasi CSS untuk Quill Editor agar selaras dengan Tailwind UI kita */
+:deep(.ql-toolbar) {
+    border: none !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    background-color: #f8fafc;
+}
+:deep(.ql-container) {
+    border: none !important;
+    font-family: inherit;
+}
+:deep(.ql-editor) {
+    min-height: 120px;
 }
 </style>
