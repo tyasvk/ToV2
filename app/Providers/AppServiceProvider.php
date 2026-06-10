@@ -25,5 +25,8 @@ class AppServiceProvider extends ServiceProvider
     Gate::before(function ($user, $ability) {
         return $user->hasRole('admin') ? true : null;
     });
+    if (env('APP_ENV') !== 'local') {
+        \Illuminate\Support\Facades\URL::forceScheme('https');
+    }
 }
 }
