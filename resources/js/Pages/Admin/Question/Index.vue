@@ -65,13 +65,32 @@ const triggerImport = () => { fileInput.value.click(); };
 const handleImport = (event) => {
     const file = event.target.files[0];
     if (!file) return;
-    if (!confirm('Impor soal dari file ini?')) { event.target.value = null; return; }
+    if (!confirm('Impor soal dari file ini?')) { 
+        event.target.value = null; 
+        return; 
+    }
 
     const formData = new FormData();
     formData.append('file', file);
 
+    // Kirim request ke backend menggunakan Inertia
     router.post(route('admin.tryouts.questions.import', props.tryout.id), formData, {
-        onSuccess: () => { event.target.value = null; },
+        forceFormData: true, // Pastikan dikirim sebagai form-data (untuk file upload)
+        preserveScroll: true,
+        onStart: () => {
+            // Opsional: Anda bisa tambahkan state loading di sini
+            console.log('Mulai mengimpor...');
+        },
+        onSuccess: () => { 
+            event.target.value = null; 
+            alert('Berhasil! Soal telah diimpor ke database.'); // Notifikasi sukses
+        },
+        onError: (errors) => {
+            event.target.value = null;
+            // Tampilkan alert jika ada error dari Laravel (misal validasi file)
+            alert('Gagal mengimpor file: \n' + Object.values(errors).join('\n'));
+            console.error('Import errors:', errors);
+        }
     });
 };
 

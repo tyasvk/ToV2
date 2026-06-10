@@ -187,14 +187,14 @@ class QuestionManagerController extends Controller
         $delimiter = (strpos($firstLine, ';') !== false) ? ';' : ',';
         rewind($handle);
 
-        fgetcsv($handle, 1000, $delimiter); // Lewati header
+        fgetcsv($handle, 0, $delimiter); // Lewati header
 
         DB::beginTransaction();
         try {
             $count = 0;
             $maxOrder = $tryout->questions()->max('order') ?? 0;
 
-            while (($row = fgetcsv($handle, 1000, $delimiter)) !== FALSE) {
+            while (($row = fgetcsv($handle, 0, $delimiter)) !== FALSE) {
                 if (empty($row[0]) || empty($row[1])) continue;
 
                 $type = strtoupper(trim($row[0]));
