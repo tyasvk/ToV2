@@ -101,8 +101,17 @@ const getTkpPoint = (q, key) => {
     const kLow = String(key).toLowerCase(); // contoh: 'a'
     const kUp = String(key).toUpperCase();  // contoh: 'A'
     
-    // 1. Antisipasi jika Admin menyimpan poin dalam JSON string
-    // (misal Model lupa di-$casts menjadi array)
+    // 1. TAMBAHAN: Cek dari properti tkp_scores (sesuai backend TryoutController)
+    let tkpScoresObj = q.tkp_scores;
+    if (typeof tkpScoresObj === 'string') {
+        try { tkpScoresObj = JSON.parse(tkpScoresObj); } catch(e) { tkpScoresObj = {}; }
+    }
+    if (tkpScoresObj && typeof tkpScoresObj === 'object') {
+        if (tkpScoresObj[kLow] !== undefined) return Number(tkpScoresObj[kLow]);
+        if (tkpScoresObj[kUp] !== undefined) return Number(tkpScoresObj[kUp]);
+    }
+
+    // 2. Antisipasi jika Admin menyimpan poin dalam JSON string
     let pointObj = q.points;
     if (typeof pointObj === 'string') {
         try { pointObj = JSON.parse(pointObj); } catch(e) { pointObj = {}; }
@@ -112,7 +121,7 @@ const getTkpPoint = (q, key) => {
         try { nilaiObj = JSON.parse(nilaiObj); } catch(e) { nilaiObj = {}; }
     }
 
-    // 2. Cek jika poin berbentuk Object/Array (Kolom 'points' atau 'nilai')
+    // 3. Cek jika poin berbentuk Object/Array (Kolom 'points' atau 'nilai')
     if (pointObj && typeof pointObj === 'object') {
         if (pointObj[kLow] !== undefined) return Number(pointObj[kLow]);
         if (pointObj[kUp] !== undefined) return Number(pointObj[kUp]);
@@ -122,7 +131,7 @@ const getTkpPoint = (q, key) => {
         if (nilaiObj[kUp] !== undefined) return Number(nilaiObj[kUp]);
     }
 
-    // 3. Cek jika poin disimpan dalam kolom terpisah di database
+    // 4. Cek jika poin disimpan dalam kolom terpisah di database
     const possibleColumns = [
         `point_${kLow}`, `points_${kLow}`, `nilai_${kLow}`, `score_${kLow}`, 
         `option_${kLow}_point`, `option_${kLow}_nilai`,
@@ -352,7 +361,6 @@ const getBknOptionClass = (key) => {
                         </div>
                         
                         <div class="prose prose-sm max-w-none font-normal text-slate-700 leading-relaxed mb-6 whitespace-pre-wrap" v-html="currentQuestion.content"></div>
-                        <pre class="bg-gray-800 text-green-400 p-4 rounded text-xs mt-4">{{ currentQuestion }}</pre>
                         <div class="space-y-2">
                             <div v-for="(option, key) in currentQuestion.options" :key="key" 
                                  class="relative flex items-start gap-3 p-3 rounded-lg border transition-colors" 
@@ -367,7 +375,12 @@ const getBknOptionClass = (key) => {
                                     {{ option }}
                                 </div>
                                 
-                                <div v-if="isTKP" class="shrink-0 mt-0.5 ml-3 flex items-center">
+                                <div v-if="isTKP" class="shrink-0 mt-0.5 ml-3 flex items-center gap-2">
+                                    <span v-if="checkAnswer(currentQuestion, key).isUserKey" 
+                                          class="text-[9px] font-bold px-2 py-1 rounded text-white shadow-sm"
+                                          :class="getTkpPoint(currentQuestion, key) == 5 ? 'bg-emerald-500' : 'bg-rose-500'">
+                                        {{ getTkpPoint(currentQuestion, key) == 5 ? 'BENAR' : 'SALAH' }}
+                                    </span>
                                     <span class="text-[10px] font-bold px-2.5 py-1 rounded border"
                                           :class="getTkpPoint(currentQuestion, key) == 5 ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-slate-100 text-slate-500 border-slate-200'">
                                         {{ getTkpPoint(currentQuestion, key) }} Poin
@@ -584,7 +597,12 @@ const getBknOptionClass = (key) => {
                                         <div class="flex justify-between gap-3 items-start">
                                             <span class="text-[11px] sm:text-xs text-slate-600 font-normal leading-relaxed pt-1 block">{{ option }}</span>
                                             
-                                            <div v-if="isTKP" class="shrink-0 mt-0.5 ml-2">
+                                            <div v-if="isTKP" class="shrink-0 mt-0.5 ml-2 flex items-center gap-2">
+                                                <span v-if="checkAnswer(currentQuestion, key).isUserKey" 
+                                                      class="text-[9px] font-bold px-2 py-0.5 rounded text-white shadow-sm"
+                                                      :class="getTkpPoint(currentQuestion, key) == 5 ? 'bg-emerald-500' : 'bg-rose-500'">
+                                                    {{ getTkpPoint(currentQuestion, key) == 5 ? 'BENAR' : 'SALAH' }}
+                                                </span>
                                                 <span class="text-[10px] font-bold px-2 py-0.5 rounded border"
                                                       :class="getTkpPoint(currentQuestion, key) == 5 ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-slate-100 text-slate-600 border-slate-200'">
                                                     {{ getTkpPoint(currentQuestion, key) }} Poin
@@ -595,8 +613,7 @@ const getBknOptionClass = (key) => {
                                         <div class="mt-2 flex gap-1.5 flex-wrap items-center">
                                             <template v-if="isTKP">
                                                 <span v-if="getTkpPoint(currentQuestion, key) == 5" class="text-[9px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded uppercase tracking-wide">Poin Maksimal</span>
-                                                <span v-if="checkAnswer(currentQuestion, key).isUserKey && getTkpPoint(currentQuestion, key) < 5" class="text-[9px] font-medium text-rose-500 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded uppercase tracking-wide">Jawaban Anda</span>
-                                                <span v-if="checkAnswer(currentQuestion, key).isUserKey && getTkpPoint(currentQuestion, key) == 5" class="text-[9px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded uppercase tracking-wide">Jawaban Anda</span>
+                                                <span v-if="checkAnswer(currentQuestion, key).isUserKey" class="text-[9px] font-medium px-2 py-0.5 rounded uppercase tracking-wide" :class="getTkpPoint(currentQuestion, key) == 5 ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : 'text-rose-500 bg-rose-50 border-rose-200'">Jawaban Anda</span>
                                             </template>
                                             <template v-else>
                                                 <span v-if="checkAnswer(currentQuestion, key).isCorrectKey" class="text-[9px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded uppercase tracking-wide">Kunci Jawaban</span>
