@@ -41,7 +41,7 @@ const submitReport = () => {
         preserveScroll: true,
         onSuccess: () => {
             closeReportModal();
-            alert('Laporan berhasil dikirim. Tim kami akan segera meninjunya!');
+            alert('Laporan berhasil dikirim. Tim kami akan segera meninjaunya!');
         }
     });
 };
@@ -65,7 +65,7 @@ const getUserAnswer = (question) => {
     return null;
 };
 
-// --- 2. LOGIC MODIFIED ---
+// --- 2. LOGIC MODIFIED UNTUK PENGECEKAN JAWABAN ---
 const checkAnswer = (q, key = null) => {
     const userAns = getUserAnswer(q);
     const correctAns = q.correct_answer;
@@ -85,6 +85,61 @@ const hasAnswered = (q) => {
     return ans !== null && ans !== undefined && String(ans).trim() !== '';
 };
 
+// --- 3. HELPER KHUSUS TKP ---
+const isTKP = computed(() => {
+    const q = currentQuestion.value;
+    if (!q) return false;
+    const type = q.type?.toUpperCase();
+    const category = q.category?.toUpperCase();
+    return type === 'TKP' || category === 'TKP';
+});
+
+// SUPER ROBUST: Ambil poin otomatis dari berbagai macam struktur database Admin
+const getTkpPoint = (q, key) => {
+    if (!q || !key) return 0;
+    
+    const kLow = String(key).toLowerCase(); // contoh: 'a'
+    const kUp = String(key).toUpperCase();  // contoh: 'A'
+    
+    // 1. Antisipasi jika Admin menyimpan poin dalam JSON string
+    // (misal Model lupa di-$casts menjadi array)
+    let pointObj = q.points;
+    if (typeof pointObj === 'string') {
+        try { pointObj = JSON.parse(pointObj); } catch(e) { pointObj = {}; }
+    }
+    let nilaiObj = q.nilai;
+    if (typeof nilaiObj === 'string') {
+        try { nilaiObj = JSON.parse(nilaiObj); } catch(e) { nilaiObj = {}; }
+    }
+
+    // 2. Cek jika poin berbentuk Object/Array (Kolom 'points' atau 'nilai')
+    if (pointObj && typeof pointObj === 'object') {
+        if (pointObj[kLow] !== undefined) return Number(pointObj[kLow]);
+        if (pointObj[kUp] !== undefined) return Number(pointObj[kUp]);
+    }
+    if (nilaiObj && typeof nilaiObj === 'object') {
+        if (nilaiObj[kLow] !== undefined) return Number(nilaiObj[kLow]);
+        if (nilaiObj[kUp] !== undefined) return Number(nilaiObj[kUp]);
+    }
+
+    // 3. Cek jika poin disimpan dalam kolom terpisah di database
+    const possibleColumns = [
+        `point_${kLow}`, `points_${kLow}`, `nilai_${kLow}`, `score_${kLow}`, 
+        `option_${kLow}_point`, `option_${kLow}_nilai`,
+        `point_${kUp}`, `nilai_${kUp}`
+    ];
+
+    for (const col of possibleColumns) {
+        if (q[col] !== undefined && q[col] !== null) {
+            return Number(q[col]);
+        }
+    }
+
+    // Default jika benar-benar tidak ada di database
+    return 0; 
+};
+
+
 // --- COMPUTED ---
 const currentMode = computed(() => {
     if (props.mode) return props.mode;
@@ -103,16 +158,23 @@ const currentQuestion = computed(() => {
 });
 
 const subtestTopic = computed(() => {
-    const type = currentQuestion.value?.type;
+    const type = currentQuestion.value?.type?.toUpperCase();
     if (type === 'TWK') return 'Nasionalisme & Bela Negara';
     if (type === 'TIU') return 'Kemampuan Verbal & Logika';
     if (type === 'TKP') return 'Pelayanan Publik & Jejaring Kerja';
     return type || 'Tes Kompetensi';
 });
 
+// Mengecek jika di header perlu label BENAR atau SALAH
 const isUserCorrectHeader = computed(() => {
     const q = currentQuestion.value;
-    return q && checkAnswer(q);
+    if (!q) return false;
+    
+    if (isTKP.value) {
+        const ans = getUserAnswer(q);
+        return ans && getTkpPoint(q, ans) == 5;
+    }
+    return checkAnswer(q);
 });
 
 const isUnansweredHeader = computed(() => {
@@ -125,10 +187,36 @@ const goTo = (index) => { currentIndex.value = index; isSidebarOpen.value = fals
 const next = () => { if (currentIndex.value < (props.questions?.length - 1)) currentIndex.value++; };
 const prev = () => { if (currentIndex.value > 0) currentIndex.value--; };
 
+// --- LOGIKA STYLING BERSAMA (LINGKARAN A/B/C/D/E) ---
+const getCircleClass = (key) => {
+    const q = currentQuestion.value;
+    const { isCorrectKey, isUserKey } = checkAnswer(q, key);
+    
+    if (isTKP.value) {
+        const point = getTkpPoint(q, key);
+        if (point == 5) return 'bg-emerald-500 border-emerald-500 text-white'; // Jawaban poin 5 (Ideal)
+        if (isUserKey && point < 5) return 'bg-rose-500 border-rose-500 text-white'; // Dipilih user tapi bukan 5 poin
+        return 'bg-slate-50 border-slate-200 text-slate-500';
+    }
+
+    if (isCorrectKey) return 'bg-emerald-500 border-emerald-500 text-white';
+    if (isUserKey) return 'bg-rose-500 border-rose-500 text-white';
+    return 'bg-slate-50 border-slate-200 text-slate-500';
+};
+
+
 // --- STYLING HELPERS (MODERN) ---
 const getModernOptionClass = (key) => {
     const q = currentQuestion.value;
     const { isCorrectKey, isUserKey } = checkAnswer(q, key);
+
+    if (isTKP.value) {
+        const point = getTkpPoint(q, key);
+        if (isUserKey && point == 5) return 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-200'; 
+        if (isUserKey && point < 5) return 'border-rose-300 bg-rose-50'; 
+        if (!isUserKey && point == 5) return 'border-emerald-300 bg-emerald-50/50 border-dashed'; 
+        return 'border-slate-200 hover:border-slate-300 bg-white opacity-80';
+    }
 
     if (isCorrectKey) return 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-200'; 
     if (isUserKey && !isCorrectKey) return 'border-rose-300 bg-rose-50'; 
@@ -141,12 +229,21 @@ const getModernSidebarClass = (q, index) => {
     if (currentIndex.value === index) {
         return base + "bg-blue-50 text-blue-700 border-blue-400 ring-2 ring-blue-100 shadow-sm z-20";
     }
-    if (checkAnswer(q)) {
-        return base + "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100";
+    
+    const isTkpQ = q?.type?.toUpperCase() === 'TKP' || q?.category?.toUpperCase() === 'TKP';
+    
+    if (isTkpQ) {
+        if (hasAnswered(q)) {
+             const ans = getUserAnswer(q);
+             // Hijau jika poin = 5, Merah jika < 5
+             if (getTkpPoint(q, ans) == 5) return base + "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100";
+             else return base + "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100";
+        }
+    } else {
+        if (checkAnswer(q)) return base + "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100";
+        if (hasAnswered(q)) return base + "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100";
     }
-    if (hasAnswered(q)) {
-        return base + "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100";
-    }
+    
     return base + "bg-white text-slate-500 border-slate-200 hover:bg-slate-50";
 };
 
@@ -155,18 +252,34 @@ const getBknSidebarClass = (q, index) => {
     if (currentIndex.value === index) {
         return 'bg-blue-50 text-blue-700 ring-1 ring-blue-400 rounded border border-blue-400 z-10 shadow-sm';
     }
-    if (checkAnswer(q)) {
-        return 'bg-emerald-50 text-emerald-600 border border-emerald-200 rounded';
+    
+    const isTkpQ = q?.type?.toUpperCase() === 'TKP' || q?.category?.toUpperCase() === 'TKP';
+    
+    if (isTkpQ) {
+        if (hasAnswered(q)) {
+            const ans = getUserAnswer(q);
+            if (getTkpPoint(q, ans) == 5) return 'bg-emerald-50 text-emerald-600 border border-emerald-200 rounded';
+            else return 'bg-rose-50 text-rose-600 border border-rose-200 rounded';
+        }
+    } else {
+        if (checkAnswer(q)) return 'bg-emerald-50 text-emerald-600 border border-emerald-200 rounded';
+        if (hasAnswered(q)) return 'bg-rose-50 text-rose-600 border border-rose-200 rounded';
     }
-    if (hasAnswered(q)) {
-        return 'bg-rose-50 text-rose-600 border border-rose-200 rounded';
-    }
+    
     return 'bg-white text-slate-500 border border-slate-200 rounded hover:bg-slate-50';
 };
 
 const getBknOptionClass = (key) => {
     const q = currentQuestion.value;
     const { isCorrectKey, isUserKey } = checkAnswer(q, key);
+
+    if (isTKP.value) {
+        const point = getTkpPoint(q, key);
+        if (isUserKey && point == 5) return 'bg-emerald-50/50 border-emerald-300 ring-1 ring-emerald-100';
+        if (isUserKey && point < 5) return 'bg-rose-50/50 border-rose-300 ring-1 ring-rose-100';
+        if (!isUserKey && point == 5) return 'bg-emerald-50/20 border-emerald-200 border-dashed';
+        return 'bg-white border-slate-200';
+    }
 
     if (isCorrectKey) return 'bg-emerald-50/50 border-emerald-300 ring-1 ring-emerald-100';
     if (isUserKey && !isCorrectKey) return 'bg-rose-50/50 border-rose-300 ring-1 ring-rose-100';
@@ -239,16 +352,14 @@ const getBknOptionClass = (key) => {
                         </div>
                         
                         <div class="prose prose-sm max-w-none font-normal text-slate-700 leading-relaxed mb-6 whitespace-pre-wrap" v-html="currentQuestion.content"></div>
-                        
+                        <pre class="bg-gray-800 text-green-400 p-4 rounded text-xs mt-4">{{ currentQuestion }}</pre>
                         <div class="space-y-2">
                             <div v-for="(option, key) in currentQuestion.options" :key="key" 
                                  class="relative flex items-start gap-3 p-3 rounded-lg border transition-colors" 
                                  :class="getModernOptionClass(key)">
                                 
                                 <div class="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-medium shrink-0 border mt-0.5" 
-                                     :class="checkAnswer(currentQuestion, key).isCorrectKey 
-                                        ? 'bg-emerald-500 border-emerald-500 text-white' 
-                                        : (checkAnswer(currentQuestion, key).isUserKey ? 'bg-rose-500 border-rose-500 text-white' : 'bg-slate-50 border-slate-200 text-slate-500')">
+                                     :class="getCircleClass(key)">
                                     {{ key.toUpperCase() }}
                                 </div>
                                 
@@ -256,12 +367,21 @@ const getBknOptionClass = (key) => {
                                     {{ option }}
                                 </div>
                                 
-                                <div v-if="checkAnswer(currentQuestion, key).isCorrectKey" class="text-emerald-500 shrink-0 mt-1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                                <div v-if="isTKP" class="shrink-0 mt-0.5 ml-3 flex items-center">
+                                    <span class="text-[10px] font-bold px-2.5 py-1 rounded border"
+                                          :class="getTkpPoint(currentQuestion, key) == 5 ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-slate-100 text-slate-500 border-slate-200'">
+                                        {{ getTkpPoint(currentQuestion, key) }} Poin
+                                    </span>
                                 </div>
-                                <div v-else-if="checkAnswer(currentQuestion, key).isUserKey" class="text-rose-500 shrink-0 mt-1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>
-                                </div>
+                                <template v-else>
+                                    <div v-if="checkAnswer(currentQuestion, key).isCorrectKey" class="text-emerald-500 shrink-0 mt-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                                    </div>
+                                    <div v-else-if="checkAnswer(currentQuestion, key).isUserKey" class="text-rose-500 shrink-0 mt-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>
+                                    </div>
+                                </template>
+
                             </div>
                         </div>
                     </div>
@@ -315,10 +435,10 @@ const getBknOptionClass = (key) => {
                     
                     <div class="p-4 bg-slate-50/50 border-t border-slate-100 text-[10px] font-normal space-y-2 shrink-0">
                         <div class="flex items-center gap-2">
-                            <div class="w-3 h-3 rounded-full bg-emerald-100 border border-emerald-200"></div> <span class="text-slate-600">Benar</span>
+                            <div class="w-3 h-3 rounded-full bg-emerald-100 border border-emerald-200"></div> <span class="text-slate-600">Benar (TKP 5 Poin)</span>
                         </div>
                         <div class="flex items-center gap-2">
-                            <div class="w-3 h-3 rounded-full bg-rose-100 border border-rose-200"></div> <span class="text-slate-600">Salah</span>
+                            <div class="w-3 h-3 rounded-full bg-rose-100 border border-rose-200"></div> <span class="text-slate-600">Salah (TKP &lt; 5 Poin)</span>
                         </div>
                         <div class="flex items-center gap-2">
                             <div class="w-3 h-3 rounded-full bg-white border border-slate-200"></div> <span class="text-slate-600">Kosong</span>
@@ -382,8 +502,8 @@ const getBknOptionClass = (key) => {
                 </div>
 
                 <div class="p-4 bg-slate-50 border-t border-slate-200 text-[10px] space-y-2 shrink-0">
-                    <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-emerald-50 border border-emerald-200"></div> <span class="text-slate-600">Benar</span></div>
-                    <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-rose-50 border border-rose-200"></div> <span class="text-slate-600">Salah</span></div>
+                    <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-emerald-50 border border-emerald-200"></div> <span class="text-slate-600">Benar (TKP 5 Poin)</span></div>
+                    <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-rose-50 border border-rose-200"></div> <span class="text-slate-600">Salah (TKP &lt; 5 Poin)</span></div>
                     <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-white border border-slate-200"></div> <span class="text-slate-600">Kosong</span></div>
                 </div>
             </aside>
@@ -456,17 +576,32 @@ const getBknOptionClass = (key) => {
                                      :class="getBknOptionClass(key)">
                                     
                                     <div class="w-6 h-6 rounded-full border flex items-center justify-center shrink-0 mt-0.5 font-medium text-[10px] sm:text-xs" 
-                                         :class="checkAnswer(currentQuestion, key).isCorrectKey 
-                                            ? 'bg-emerald-500 border-emerald-500 text-white' 
-                                            : (checkAnswer(currentQuestion, key).isUserKey ? 'bg-rose-500 border-rose-500 text-white' : 'border-slate-300 text-slate-500 bg-slate-50')">
+                                         :class="getCircleClass(key)">
                                         {{ key.toUpperCase() }}
                                     </div>
                                     
                                     <div class="flex-1">
-                                        <span class="text-[11px] sm:text-xs text-slate-600 font-normal leading-relaxed pt-1 block">{{ option }}</span>
-                                        <div class="mt-2 flex gap-1.5 flex-wrap">
-                                            <span v-if="checkAnswer(currentQuestion, key).isCorrectKey" class="text-[9px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded uppercase tracking-wide">Kunci Jawaban</span>
-                                            <span v-if="checkAnswer(currentQuestion, key).isUserKey && !checkAnswer(currentQuestion, key).isCorrectKey" class="text-[9px] font-medium text-rose-500 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded uppercase tracking-wide">Jawaban Anda</span>
+                                        <div class="flex justify-between gap-3 items-start">
+                                            <span class="text-[11px] sm:text-xs text-slate-600 font-normal leading-relaxed pt-1 block">{{ option }}</span>
+                                            
+                                            <div v-if="isTKP" class="shrink-0 mt-0.5 ml-2">
+                                                <span class="text-[10px] font-bold px-2 py-0.5 rounded border"
+                                                      :class="getTkpPoint(currentQuestion, key) == 5 ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-slate-100 text-slate-600 border-slate-200'">
+                                                    {{ getTkpPoint(currentQuestion, key) }} Poin
+                                                </span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mt-2 flex gap-1.5 flex-wrap items-center">
+                                            <template v-if="isTKP">
+                                                <span v-if="getTkpPoint(currentQuestion, key) == 5" class="text-[9px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded uppercase tracking-wide">Poin Maksimal</span>
+                                                <span v-if="checkAnswer(currentQuestion, key).isUserKey && getTkpPoint(currentQuestion, key) < 5" class="text-[9px] font-medium text-rose-500 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded uppercase tracking-wide">Jawaban Anda</span>
+                                                <span v-if="checkAnswer(currentQuestion, key).isUserKey && getTkpPoint(currentQuestion, key) == 5" class="text-[9px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded uppercase tracking-wide">Jawaban Anda</span>
+                                            </template>
+                                            <template v-else>
+                                                <span v-if="checkAnswer(currentQuestion, key).isCorrectKey" class="text-[9px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded uppercase tracking-wide">Kunci Jawaban</span>
+                                                <span v-if="checkAnswer(currentQuestion, key).isUserKey && !checkAnswer(currentQuestion, key).isCorrectKey" class="text-[9px] font-medium text-rose-500 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded uppercase tracking-wide">Jawaban Anda</span>
+                                            </template>
                                         </div>
                                     </div>
                                 </div>
