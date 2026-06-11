@@ -96,9 +96,6 @@ class TryoutManagerController extends Controller
     }
 
     /**
-     * Menampilkan hasil pengerjaan (leaderboard) untuk suatu tryout
-     */
-/**
      * Menampilkan hasil pengerjaan (leaderboard) untuk suatu tryout dengan Pencarian & Paginasi
      */
     public function results(Request $request, Tryout $tryout)
@@ -188,9 +185,8 @@ class TryoutManagerController extends Controller
         return back()->with('success', 'Data pengerjaan peserta berhasil dihapus. Peserta sekarang dapat mengikuti ujian kembali.');
     }
 
-public function recalculate(Tryout $tryout)
+    public function recalculate(Tryout $tryout)
     {
-        
         // 1. Ambil semua soal dari tryout ini
         $questions = \App\Models\Question::where('tryout_id', $tryout->id)->get()->keyBy('id');
 
@@ -239,27 +235,52 @@ public function recalculate(Tryout $tryout)
                                 if ($category === 'TIU') $tiuScore += 5;
                             }
                         } 
-                        // -- LOGIKA SKOR TKP --
+                        // -- LOGIKA SKOR TKP (SUDAH DIPERBAIKI) --
                         elseif ($category === 'TKP') {
-                            if (!empty($question->points)) {
-                                $points = is_string($question->points) ? json_decode($question->points, true) : $question->points;
-                                if (is_array($points) && isset($points[$userChoice])) {
-                                    $tkpScore += (int) $points[$userChoice];
+                            $foundScore = false;
+
+                            // 1. Cek dari kolom `tkp_scores` (Sesuai dengan standard Controller Ujian)
+                            if (!empty($question->tkp_scores)) {
+                                $tkpScoresMap = is_string($question->tkp_scores) ? json_decode($question->tkp_scores, true) : $question->tkp_scores;
+                                if (is_array($tkpScoresMap)) {
+                                    if (isset($tkpScoresMap[$userChoice])) {
+                                        $tkpScore += (int) $tkpScoresMap[$userChoice];
+                                        $foundScore = true;
+                                    } elseif (isset($tkpScoresMap[strtolower($userChoice)])) {
+                                        $tkpScore += (int) $tkpScoresMap[strtolower($userChoice)];
+                                        $foundScore = true;
+                                    }
                                 }
-                            } else {
-                                // Mengecek SEMUA kemungkinan penamaan kolom nilai TKP di database Anda
+                            }
+
+                            // 2. Fallback: Cek properti `points`
+                            if (!$foundScore && !empty($question->points)) {
+                                $pointsMap = is_string($question->points) ? json_decode($question->points, true) : $question->points;
+                                if (is_array($pointsMap)) {
+                                    if (isset($pointsMap[$userChoice])) {
+                                        $tkpScore += (int) $pointsMap[$userChoice];
+                                        $foundScore = true;
+                                    } elseif (isset($pointsMap[strtolower($userChoice)])) {
+                                        $tkpScore += (int) $pointsMap[strtolower($userChoice)];
+                                        $foundScore = true;
+                                    }
+                                }
+                            }
+                            
+                            // 3. Fallback: Mengecek penamaan kolom nilai terpisah di database (point_a, dll)
+                            if (!$foundScore) {
                                 $possibleColumns = [
-                                    'point_' . strtolower($userChoice), // point_a
-                                    'poin_' . strtolower($userChoice),  // poin_a
-                                    'score_' . strtolower($userChoice), // score_a
-                                    'skor_' . strtolower($userChoice),  // skor_a
-                                    strtolower($userChoice),            // a, b, c, d, e
+                                    'point_' . strtolower($userChoice),
+                                    'poin_' . strtolower($userChoice), 
+                                    'score_' . strtolower($userChoice), 
+                                    'skor_' . strtolower($userChoice),  
+                                    strtolower($userChoice),            
                                 ];
 
                                 foreach ($possibleColumns as $col) {
                                     if (isset($question->$col)) {
                                         $tkpScore += (int) $question->$col;
-                                        break; // Hentikan loop jika kolom ditemukan
+                                        break; 
                                     }
                                 }
                             }
