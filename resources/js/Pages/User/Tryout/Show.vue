@@ -42,28 +42,23 @@ const props = defineProps({
                 <div class="lg:col-span-2 space-y-5">
                     
                     <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                        <div class="relative h-44 md:h-60 bg-slate-50 border-b border-slate-100 flex items-center justify-center overflow-hidden">
-                            <img 
-                                :src="props.tryout.image_url || '/images/logo.png'" 
-                                class="w-full h-full transition-transform duration-700 hover:scale-101"
-                                :class="props.tryout.image_url ? 'object-cover' : 'object-contain p-6 object-center max-h-40 md:max-h-48'"
-                                @error="(e) => { e.target.src = '/images/logo.png'; e.target.className = 'w-full h-full object-contain p-6 object-center max-h-40 md:max-h-48'; }"
-                            >
-                            <div class="absolute top-4 left-4">
-                                <span :class="props.tryout.price > 0 ? 'bg-amber-500' : 'bg-emerald-500'" class="px-3 py-1 rounded-lg text-[10px] font-medium text-white uppercase tracking-widest shadow-sm">
+                        <!-- BAGIAN GAMBAR DIHAPUS, BADGE DIPINDAH KE ATAS JUDUL -->
+                        <div class="p-5 md:p-6 space-y-4">
+                            <div class="flex items-center gap-2">
+                                <span :class="props.tryout.price > 0 ? 'bg-amber-500' : 'bg-emerald-500'" class="px-3 py-1.5 rounded-lg text-[10px] font-bold text-white uppercase tracking-widest shadow-sm">
                                     {{ props.tryout.price > 0 ? 'PREMIUM ACCESS' : 'FREE ACCESS' }}
                                 </span>
                             </div>
-                        </div>
 
-                        <div class="p-5 md:p-6 space-y-3">
-                            <h1 class="text-xl md:text-2xl text-slate-900 uppercase tracking-tight leading-snug font-medium">
-                                {{ props.tryout.title }}
-                            </h1>
-                            <div class="h-px bg-slate-100 w-full"></div>
-                            <p class="text-xs md:text-sm text-slate-600 font-normal leading-relaxed italic pt-1">
-                                {{ props.tryout.description || 'Wujudkan impianmu menjadi Abdi Negara! Terus berlatih, pantang menyerah, dan raih NIP tahun ini bersama simulasi CAT modern kami.' }}
-                            </p>
+                            <div class="space-y-3">
+                                <h1 class="text-xl md:text-2xl text-slate-900 uppercase tracking-tight leading-snug font-bold">
+                                    {{ props.tryout.title }}
+                                </h1>
+                                <div class="h-px bg-slate-100 w-full"></div>
+                                <p class="text-xs md:text-sm text-slate-600 font-normal leading-relaxed italic pt-1">
+                                    {{ props.tryout.description || 'Wujudkan impianmu menjadi Abdi Negara! Terus berlatih, pantang menyerah, dan raih NIP tahun ini bersama simulasi CAT modern kami.' }}
+                                </p>
+                            </div>
                         </div>
                     </div>
 

@@ -64,6 +64,7 @@ const getAttemptCount = (tryout) => {
     <AuthenticatedLayout>
         <div class="animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-7xl mx-auto">
             
+            <!-- TAMPILAN MOBILE -->
             <div class="block md:hidden px-4 py-6 space-y-5">
                 
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col gap-4 text-center">
@@ -122,15 +123,10 @@ const getAttemptCount = (tryout) => {
                     <div 
                         v-for="tryout in filteredTryouts" 
                         :key="tryout.id"
-                        class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col"
+                        class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col p-4 gap-3"
                     >
-                        <div class="relative h-36 bg-slate-100 overflow-hidden border-b border-slate-100">
-                            <img 
-                                :src="tryout.image_url || '/images/logo.png'" 
-                                class="w-full h-full object-cover object-center"
-                                @error="(e) => { e.target.src = '/images/logo.png'; e.target.className = 'w-full h-full object-contain object-top pt-4 px-4 pb-12 bg-slate-50'; }"
-                            >
-                            <div class="absolute top-2.5 left-2.5 flex gap-1.5">
+                        <div class="flex justify-between items-start">
+                            <div class="flex flex-wrap gap-1.5">
                                 <span :class="tryout.price > 0 || tryout.is_paid ? 'bg-amber-500' : 'bg-emerald-500'" class="px-2 py-1 text-white rounded-md text-[10px] font-bold uppercase tracking-widest shadow-sm">
                                     {{ tryout.price > 0 || tryout.is_paid ? 'PREMIUM' : 'GRATIS' }}
                                 </span>
@@ -138,85 +134,77 @@ const getAttemptCount = (tryout) => {
                                     TERSEDIA
                                 </span>
                             </div>
-                            
-                            <div class="absolute bottom-2.5 left-2.5 right-2.5">
-                                <div class="bg-slate-900/80 backdrop-blur-sm border border-white/10 rounded-lg p-2 flex items-center gap-2">
-                                    <div class="w-6 h-6 bg-white/20 rounded flex items-center justify-center text-white shrink-0 text-xs">
-                                        {{ activeTab === 'my_tryouts' ? '📝' : '📋' }}
-                                    </div>
-                                    <div class="flex flex-col min-w-0 flex-1">
-                                        <template v-if="activeTab === 'my_tryouts'">
-                                            <span class="text-[8px] text-slate-300 uppercase tracking-widest leading-none mb-0.5">Batas Ujian: Maks 3x</span>
-                                            <span class="text-[10px] truncate font-bold tracking-wide leading-none" :class="getAttemptCount(tryout) >= 3 ? 'text-amber-300' : 'text-white'">
-                                                Dikerjakan: {{ getAttemptCount(tryout) }} / 3 Kali
-                                            </span>
-                                        </template>
-                                        <template v-else>
-                                            <span class="text-[8px] text-slate-300 uppercase tracking-widest leading-none mb-0.5">Akses Ujian</span>
-                                            <span class="text-[10px] text-white truncate font-bold tracking-wide leading-none">Sistem CAT Reguler</span>
-                                        </template>
-                                    </div>
-                                </div>
+                            <div class="w-7 h-7 bg-slate-50 border border-slate-100 rounded-lg flex items-center justify-center text-slate-500 shrink-0 text-xs">
+                                {{ activeTab === 'my_tryouts' ? '📝' : '📋' }}
                             </div>
                         </div>
 
-                        <div class="p-4 flex flex-col gap-3">
-                            <div>
-                                <h2 class="text-sm font-bold text-slate-900 leading-snug uppercase line-clamp-2 mb-1.5">
-                                    {{ tryout.title }}
-                                </h2>
-                                <p class="text-[11px] text-slate-500 font-normal leading-relaxed line-clamp-2">
-                                    {{ tryout.description || 'Wujudkan impianmu menjadi Abdi Negara! Terus berlatih, pantang menyerah, dan raih NIP tahun ini.' }}
-                                </p>
+                        <div class="bg-slate-50 border border-slate-100 rounded-lg p-2.5 flex flex-col gap-0.5">
+                            <template v-if="activeTab === 'my_tryouts'">
+                                <span class="text-[9px] text-slate-500 uppercase tracking-widest font-semibold">Batas Ujian: Maks 3x</span>
+                                <span class="text-[11px] truncate font-bold tracking-wide" :class="getAttemptCount(tryout) >= 3 ? 'text-amber-600' : 'text-slate-800'">
+                                    Dikerjakan: {{ getAttemptCount(tryout) }} / 3 Kali
+                                </span>
+                            </template>
+                            <template v-else>
+                                <span class="text-[9px] text-slate-500 uppercase tracking-widest font-semibold">Akses Ujian</span>
+                                <span class="text-[11px] text-slate-800 truncate font-bold tracking-wide">Sistem CAT Reguler</span>
+                            </template>
+                        </div>
+
+                        <!-- KONTEN JUDUL TANPA DESKRIPSI -->
+                        <div>
+                            <h2 class="text-sm font-bold text-slate-900 leading-snug uppercase line-clamp-2">
+                                {{ tryout.title }}
+                            </h2>
+                        </div>
+
+                        <div class="flex flex-wrap gap-2 pt-1">
+                            <div class="flex items-center gap-1.5 text-slate-600 bg-slate-50 border border-slate-200 px-2 py-1 rounded text-[10px] font-medium">
+                                <span class="text-blue-500">📄</span> {{ tryout.questions_count || 110 }} Soal
+                            </div>
+                            <div class="flex items-center gap-1.5 text-slate-600 bg-slate-50 border border-slate-200 px-2 py-1 rounded text-[10px] font-medium">
+                                <span class="text-orange-500">⏰</span> {{ tryout.duration || 100 }} Menit
+                            </div>
+                        </div>
+
+                        <div class="pt-3 mt-1 border-t border-slate-100 flex items-center justify-between gap-3 w-full">
+                            <div class="flex flex-col shrink-0">
+                                <span class="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">Biaya Akses</span>
+                                <span class="text-xs font-bold text-slate-800 tracking-tight">
+                                    <template v-if="activeTab === 'my_tryouts'">
+                                        <span class="text-emerald-600 text-[11px] uppercase font-bold">Milik Saya</span>
+                                    </template>
+                                    <template v-else>
+                                        {{ tryout.price > 0 ? `Rp ${Number(tryout.price).toLocaleString('id-ID')}` : 'GRATIS' }}
+                                    </template>
+                                </span>
                             </div>
 
-                            <div class="flex flex-wrap gap-2 pt-1">
-                                <div class="flex items-center gap-1.5 text-slate-600 bg-slate-50 border border-slate-200 px-2 py-1 rounded text-[10px] font-medium">
-                                    <span class="text-blue-500">📄</span> {{ tryout.questions_count || 110 }} Soal
-                                </div>
-                                <div class="flex items-center gap-1.5 text-slate-600 bg-slate-50 border border-slate-200 px-2 py-1 rounded text-[10px] font-medium">
-                                    <span class="text-orange-500">⏰</span> {{ tryout.duration || 100 }} Menit
-                                </div>
-                            </div>
-
-                            <div class="pt-3 mt-1 border-t border-slate-100 flex items-center justify-between gap-3 w-full">
-                                <div class="flex flex-col shrink-0">
-                                    <span class="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">Biaya Akses</span>
-                                    <span class="text-xs font-bold text-slate-800 tracking-tight">
-                                        <template v-if="activeTab === 'my_tryouts'">
-                                            <span class="text-emerald-600 text-[11px] uppercase font-bold">Milik Saya</span>
-                                        </template>
-                                        <template v-else>
-                                            {{ tryout.price > 0 ? `Rp ${Number(tryout.price).toLocaleString('id-ID')}` : 'GRATIS' }}
-                                        </template>
-                                    </span>
-                                </div>
-
-                                <template v-if="activeTab === 'my_tryouts'">
-                                    <Link 
-                                        v-if="getAttemptCount(tryout) >= 3"
-                                        :href="route('tryout.history.detail', tryout.id)"
-                                        class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-[11px] uppercase font-bold tracking-wider active:scale-95 shadow-sm text-center shrink-0"
-                                    >
-                                        Riwayat
-                                    </Link>
-                                    <Link 
-                                        v-else
-                                        :href="route('tryout.wait', tryout.id)"
-                                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-[11px] uppercase font-bold tracking-wider active:scale-95 shadow-sm text-center shrink-0"
-                                    >
-                                        Mulai
-                                    </Link>
-                                </template>
-                                <template v-else>
-                                    <Link 
-                                        :href="route('tryout.show', tryout.id)"
-                                        class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-[11px] uppercase font-bold tracking-wider active:scale-95 shadow-sm text-center shrink-0"
-                                    >
-                                        Detail
-                                    </Link>
-                                </template>
-                            </div>
+                            <template v-if="activeTab === 'my_tryouts'">
+                                <Link 
+                                    v-if="getAttemptCount(tryout) >= 3"
+                                    :href="route('tryout.history.detail', tryout.id)"
+                                    class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-[11px] uppercase font-bold tracking-wider active:scale-95 shadow-sm text-center shrink-0"
+                                >
+                                    Riwayat
+                                </Link>
+                                <Link 
+                                    v-else
+                                    :href="route('tryout.wait', tryout.id)"
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-[11px] uppercase font-bold tracking-wider active:scale-95 shadow-sm text-center shrink-0"
+                                >
+                                    Mulai
+                                </Link>
+                            </template>
+                            <template v-else>
+                                <Link 
+                                    :href="route('tryout.show', tryout.id)"
+                                    class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-[11px] uppercase font-bold tracking-wider active:scale-95 shadow-sm text-center shrink-0"
+                                >
+                                    Detail
+                                </Link>
+                            </template>
                         </div>
                     </div>
                 </div>
@@ -244,7 +232,7 @@ const getAttemptCount = (tryout) => {
                 </div>
             </div>
 
-
+            <!-- TAMPILAN DESKTOP -->
             <div class="hidden md:block space-y-8 px-4 py-8">
                 
                 <div class="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-row items-center justify-between gap-5 relative overflow-hidden">
@@ -305,53 +293,44 @@ const getAttemptCount = (tryout) => {
                     <div 
                         v-for="tryout in filteredTryouts" 
                         :key="tryout.id"
-                        class="group bg-white border border-slate-200 rounded-[1.5rem] overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex flex-col"
+                        class="group bg-white border border-slate-200 rounded-[1.5rem] overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex flex-col p-4"
                     >
-                        <div class="relative h-32 bg-slate-100 overflow-hidden border-b border-slate-100 font-sans">
-                            <img 
-                                :src="tryout.image_url || '/images/logo.png'" 
-                                class="w-full h-full group-hover:scale-105 transition-transform duration-700"
-                                :class="tryout.image_url ? 'object-cover object-center' : 'object-contain object-top pt-2 px-2 pb-10 bg-slate-50/50'"
-                                @error="(e) => { e.target.src = '/images/logo.png'; e.target.className = 'w-full h-full object-contain object-top pt-2 px-2 pb-10 bg-slate-50/50'; }"
-                            >
-                            <div class="absolute top-2 left-2 flex gap-1">
-                                <span :class="tryout.price > 0 || tryout.is_paid ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'" class="px-2 py-0.5 rounded text-[8px] uppercase tracking-widest shadow-sm border border-white/15 font-medium">
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="flex flex-wrap gap-1">
+                                <span :class="tryout.price > 0 || tryout.is_paid ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'" class="px-2 py-0.5 rounded text-[8px] uppercase tracking-widest shadow-sm font-medium">
                                     {{ tryout.price > 0 || tryout.is_paid ? 'PREMIUM' : 'GRATIS' }}
                                 </span>
-                                <span v-if="activeTab === 'my_tryouts'" class="px-2 py-0.5 rounded text-[8px] uppercase tracking-widest bg-blue-600 text-white shadow-sm border border-white/15 font-medium">
+                                <span v-if="activeTab === 'my_tryouts'" class="px-2 py-0.5 rounded text-[8px] uppercase tracking-widest bg-blue-600 text-white shadow-sm font-medium">
                                     TERSEDIA
                                 </span>
                             </div>
-                            
-                            <div class="absolute bottom-2 left-2 right-2">
-                                <div class="bg-slate-900/70 backdrop-blur-md border border-white/10 rounded-lg p-1.5 flex items-center gap-1.5">
-                                    <div class="w-5 h-5 bg-white/20 rounded flex items-center justify-center text-white shrink-0 shadow-sm text-xs">
-                                        {{ activeTab === 'my_tryouts' ? '📝' : '📋' }}
-                                    </div>
-                                    <div class="flex flex-col min-w-0 flex-1">
-                                        <template v-if="activeTab === 'my_tryouts'">
-                                            <span class="text-[7px] text-slate-300 uppercase tracking-widest leading-none">Batas Ujian: Maks 3x</span>
-                                            <span class="text-[9px] truncate font-medium tracking-wide leading-none mt-0.5" :class="getAttemptCount(tryout) >= 3 ? 'text-amber-300' : 'text-white'">
-                                                Dikerjakan: {{ getAttemptCount(tryout) }} / 3 Kali
-                                            </span>
-                                        </template>
-                                        <template v-else>
-                                            <span class="text-[7px] text-slate-300 uppercase tracking-widest leading-none">Akses Ujian</span>
-                                            <span class="text-[9px] text-white truncate font-medium tracking-wide leading-none mt-0.5">Sistem CAT Reguler</span>
-                                        </template>
-                                    </div>
-                                </div>
+                            <div class="w-6 h-6 bg-slate-50 border border-slate-100 rounded-md flex items-center justify-center text-slate-500 shrink-0 text-xs">
+                                {{ activeTab === 'my_tryouts' ? '📝' : '📋' }}
                             </div>
                         </div>
 
-                        <div class="p-4 flex-1 flex flex-col justify-between space-y-4">
-                            <div class="space-y-2">
-                                <h2 class="text-sm font-medium text-slate-900 leading-tight tracking-tight group-hover:text-blue-600 transition-colors uppercase line-clamp-2">
-                                    {{ tryout.title }}
-                                </h2>
-                                <p class="text-[10px] text-slate-500 font-normal leading-relaxed italic">
-                                    {{ tryout.description || 'Wujudkan impianmu menjadi Abdi Negara! Terus berlatih, pantang menyerah, dan raih NIP tahun ini.' }}
-                                </p>
+                        <div class="flex-1 flex flex-col justify-between space-y-4">
+                            <div class="space-y-3">
+                                
+                                <div class="bg-slate-50 border border-slate-100 rounded-xl p-2.5 flex flex-col gap-0.5">
+                                    <template v-if="activeTab === 'my_tryouts'">
+                                        <span class="text-[8px] text-slate-500 uppercase tracking-widest font-semibold">Batas Ujian: Maks 3x</span>
+                                        <span class="text-[10px] truncate font-bold tracking-wide" :class="getAttemptCount(tryout) >= 3 ? 'text-amber-600' : 'text-slate-800'">
+                                            Dikerjakan: {{ getAttemptCount(tryout) }} / 3 Kali
+                                        </span>
+                                    </template>
+                                    <template v-else>
+                                        <span class="text-[8px] text-slate-500 uppercase tracking-widest font-semibold">Akses Ujian</span>
+                                        <span class="text-[10px] text-slate-800 truncate font-bold tracking-wide">Sistem CAT Reguler</span>
+                                    </template>
+                                </div>
+
+                                <!-- KONTEN JUDUL TANPA DESKRIPSI -->
+                                <div>
+                                    <h2 class="text-sm font-medium text-slate-900 leading-tight tracking-tight group-hover:text-blue-600 transition-colors uppercase line-clamp-2">
+                                        {{ tryout.title }}
+                                    </h2>
+                                </div>
 
                                 <div class="flex flex-wrap gap-1.5 pt-1">
                                     <div class="flex items-center gap-1 text-slate-500 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded text-[9px] font-normal">
