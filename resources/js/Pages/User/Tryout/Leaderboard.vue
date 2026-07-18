@@ -1,8 +1,6 @@
 <script setup>
 import { Head, router } from '@inertiajs/vue3';
-import { computed, ref, watch } from 'lodash';
-import { debounce } from 'lodash';
-import { computed as vueComputed, ref as vueRef, watch as vueWatch } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
     tryout: Object,
@@ -11,31 +9,12 @@ const props = defineProps({
     filters: Object,
 });
 
-const safeRankings = vueComputed(() => props.rankings || []);
-const safeFilters = vueComputed(() => props.filters || {});
-const safeTryout = vueComputed(() => props.tryout || {});
+const safeRankings = computed(() => props.rankings || []);
+const safeTryout = computed(() => props.tryout || {});
 
-const search = vueRef(safeFilters.value.search || '');
-const scope = vueRef(safeFilters.value.scope || 'nasional');
-
-// Minta Data Ke Backend (Dijamin aman karena dicegat oleh @submit.prevent)
-const updateParams = debounce(() => {
-    router.get(window.location.pathname, { 
-        search: search.value,
-        scope: scope.value 
-    }, { 
-        preserveState: true, 
-        preserveScroll: true,
-        replace: true 
-    });
-}, 500);
-
-vueWatch(search, updateParams);
-
-const changeScope = (newScope) => {
-    scope.value = newScope;
-    updateParams();
-};
+// State lokal, tidak lagi menembak request ke server
+const search = ref('');
+const scope = ref('nasional');
 
 const goBack = () => {
     if (window.history.length > 1) {
@@ -59,8 +38,7 @@ const isFemale = (user) => {
 const getDuration = (user) => {
     if (!user) return '-';
     let dur = user.duration || 0;
-    if (!dur || dur === '00:00:00' || dur === 0 || dur === '0') return '-';
-
+    if (!dur || dur === 0 || dur === '0') return '-';
     if (!isNaN(dur) && Number(dur) > 0) {
         const val = Number(dur);
         const h = Math.floor(val / 3600);
@@ -71,21 +49,75 @@ const getDuration = (user) => {
     return '-';
 };
 
-const itemsPerPage = vueRef(25);
-const currentPage = vueRef(1);
+// 1. Urutkan Nilai Secara Absolut (Aturan CPNS)
+const baseRanked = computed(() => {
+    let sorted = [...safeRankings.value];
+    sorted.sort((a, b) => {
+        if (a.is_passed !== b.is_passed) return b.is_passed - a.is_passed;
+        if (b.score !== a.score) return b.score - a.score;
+        if (b.tkp !== a.tkp) return b.tkp - a.tkp;
+        if (b.tiu !== a.tiu) return b.tiu - a.tiu;
+        if (b.twk !== a.twk) return b.twk - a.twk;
+        return a.duration - b.duration; // Jika nilai sama persis, yang lebih cepat menang
+    });
+    return sorted;
+});
 
-vueWatch([itemsPerPage, search, scope], () => {
+// 2. Filter Provinsi & Buat Nomor Peringkat
+const scopeRanked = computed(() => {
+    let list = baseRanked.value;
+    
+    // Jika tab provinsi dipilih, saring data yang provinsinya sama dengan milik user
+    if (scope.value === 'provinsi' && props.my_rank?.province_code) {
+        list = list.filter(u => u.province_code === props.my_rank.province_code);
+    }
+    
+    // Terapkan nomor ranking 1, 2, 3, dst
+    return list.map((user, index) => ({
+        ...user,
+        displayRank: index + 1 
+    }));
+});
+
+// 3. Terapkan Pencarian Nama/Instansi
+const finalRankings = computed(() => {
+    let list = scopeRanked.value;
+    if (search.value) {
+        const q = search.value.toLowerCase();
+        list = list.filter(user => 
+            (user.name && user.name.toLowerCase().includes(q)) ||
+            (getAgency(user).toLowerCase().includes(q))
+        );
+    }
+    return list;
+});
+
+// 4. Sinkronisasi Peringkat Anda secara Realtime
+const activeMyRank = computed(() => {
+    if (!props.my_rank) return null;
+    const meInScope = scopeRanked.value.find(u => u.is_me);
+    return {
+        ...props.my_rank,
+        rank: meInScope ? meInScope.displayRank : '-'
+    };
+});
+
+const itemsPerPage = ref(25);
+const currentPage = ref(1);
+
+// Reset ke halaman 1 jika ada perubahan filter
+watch([itemsPerPage, search, scope], () => {
     currentPage.value = 1;
 });
 
-const totalPages = vueComputed(() => {
-    return Math.ceil(safeRankings.value.length / itemsPerPage.value);
+const totalPages = computed(() => {
+    return Math.ceil(finalRankings.value.length / itemsPerPage.value) || 1;
 });
 
-const paginatedRankings = vueComputed(() => {
+const paginatedRankings = computed(() => {
     const start = (currentPage.value - 1) * itemsPerPage.value;
     const end = start + itemsPerPage.value;
-    return safeRankings.value.slice(start, end);
+    return finalRankings.value.slice(start, end);
 });
 </script>
 
@@ -100,8 +132,11 @@ const paginatedRankings = vueComputed(() => {
                     <button type="button" @click="goBack" class="sm:hidden p-1.5 -ml-1.5 text-slate-500 hover:bg-slate-100 rounded-md transition-colors">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                     </button>
+                    <div class="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg hidden sm:flex items-center justify-center border border-blue-100 shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                    </div>
                     <div class="min-w-0">
-                        <h1 class="font-medium text-slate-800 text-[13px] sm:text-sm leading-none">Papan Peringkat Klasemen</h1>
+                        <h1 class="font-medium text-slate-800 text-[13px] sm:text-sm leading-none">Papan Peringkat Klasemen V2</h1>
                         <p class="text-[10px] text-slate-500 mt-1 uppercase tracking-wide truncate max-w-[200px] sm:max-w-md">{{ safeTryout.title || 'Memuat Data...' }}</p>
                     </div>
                 </div>
@@ -116,8 +151,7 @@ const paginatedRankings = vueComputed(() => {
 
             <div class="relative z-10 space-y-6 pt-1">
                 
-                <!-- KUNCI ANTI BUG REDIRECT ADA DI SINI: form @submit.prevent -->
-                <form @submit.prevent="updateParams" class="bg-white/95 backdrop-blur-sm p-3 sm:p-4 rounded-2xl sm:rounded-xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-4">
+                <div class="bg-white/95 backdrop-blur-sm p-3 sm:p-4 rounded-2xl sm:rounded-xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-4">
                     
                     <div class="relative w-full sm:max-w-xs shrink-0 order-2 sm:order-1">
                         <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -125,112 +159,111 @@ const paginatedRankings = vueComputed(() => {
                         </div>
                         <input 
                             v-model="search"
-                            type="search" 
+                            type="text" 
                             class="block w-full pl-9 pr-4 py-2.5 sm:py-2.5 border border-slate-200 rounded-xl bg-slate-50 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white text-xs sm:text-sm transition-all" 
-                            placeholder="Cari nama peserta..." 
+                            placeholder="Cari nama atau instansi..." 
                         />
                     </div>
 
                     <div class="flex bg-slate-100 p-1 rounded-xl w-full sm:w-auto border border-slate-200 shrink-0 order-1 sm:order-2">
                         <button 
                             type="button"
-                            @click="changeScope('nasional')"
+                            @click="scope = 'nasional'"
                             class="px-3 sm:px-5 py-2.5 sm:py-2 rounded-lg text-[11px] sm:text-sm font-bold sm:font-medium transition-all w-1/2 sm:w-auto text-center"
                             :class="scope === 'nasional' ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-700'"
                         >Nasional</button>
                         <button 
                             type="button"
-                            @click="changeScope('provinsi')"
+                            @click="scope = 'provinsi'"
                             class="px-3 sm:px-5 py-2.5 sm:py-2 rounded-lg text-[11px] sm:text-sm font-bold sm:font-medium transition-all w-1/2 sm:w-auto text-center truncate"
                             :class="scope === 'provinsi' ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-700'"
-                        >Provinsi {{ safeFilters.user_province ? `(${safeFilters.user_province})` : '' }}</button>
+                        >Provinsi {{ activeMyRank && activeMyRank.province_code ? `(${activeMyRank.province_code})` : '' }}</button>
                     </div>
-                </form>
+                </div>
 
                 <!-- TOP 3 PODIUM -->
-                <div v-if="!search && safeRankings.length > 0" class="flex flex-wrap sm:flex-nowrap justify-center items-stretch gap-3 sm:gap-6 pt-4 sm:pt-6 pb-2">
-                    
+                <div v-if="!search && finalRankings.length > 0" class="flex flex-wrap sm:flex-nowrap justify-center items-stretch gap-3 sm:gap-6 pt-4 sm:pt-6 pb-2">
                     <!-- Podium 2 -->
-                    <div v-if="safeRankings[1]" class="order-2 sm:order-1 flex flex-col items-center w-[46%] sm:w-44 mt-auto">
+                    <div v-if="finalRankings[1]" class="order-2 sm:order-1 flex flex-col items-center w-[46%] sm:w-44 mt-auto">
                         <div class="relative mb-3 z-10">
-                            <img v-if="safeRankings[1].avatar" :src="'/storage/'+safeRankings[1].avatar" class="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-[3px] border-slate-200 shadow-sm bg-white object-cover">
-                            <div v-else class="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-[3px] border-slate-200 shadow-sm flex items-center justify-center" :class="isFemale(safeRankings[1]) ? 'bg-rose-50 text-rose-300' : 'bg-slate-100 text-slate-400'">
+                            <img v-if="finalRankings[1].avatar" :src="'/storage/'+finalRankings[1].avatar" class="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-[3px] border-slate-200 shadow-sm bg-white object-cover">
+                            <div v-else class="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-[3px] border-slate-200 shadow-sm flex items-center justify-center" :class="isFemale(finalRankings[1]) ? 'bg-rose-50 text-rose-300' : 'bg-slate-100 text-slate-400'">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 sm:h-10 sm:w-10" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" /></svg>
                             </div>
                             <div class="absolute -bottom-2 sm:-bottom-3 left-1/2 transform -translate-x-1/2 bg-slate-200 text-slate-700 text-[10px] sm:text-xs font-medium px-2.5 py-0.5 rounded-full shadow-sm border border-white">#2</div>
                         </div>
                         <div class="w-full h-full flex flex-col bg-white p-3 sm:p-4 rounded-xl shadow-sm text-center border border-slate-200 border-t-[3px] border-t-slate-300">
-                            <h3 class="font-medium text-slate-800 text-xs sm:text-sm break-words">{{ safeRankings[1].name }}</h3>
-                            <p class="text-[9px] text-slate-500 mt-1 leading-tight break-words">{{ getAgency(safeRankings[1]) }}</p>
+                            <h3 class="font-medium text-slate-800 text-xs sm:text-sm break-words">{{ finalRankings[1].name }}</h3>
+                            <p class="text-[9px] text-slate-500 mt-1 leading-tight break-words">{{ getAgency(finalRankings[1]) }}</p>
                             <div class="mt-auto pt-2">
-                                <div class="text-slate-700 font-medium text-lg sm:text-xl tabular-nums leading-none">{{ safeRankings[1].score }}</div>
-                                <span v-if="safeRankings[1].is_passed" class="inline-block mt-1.5 text-[9px] bg-emerald-50 border border-emerald-100 text-emerald-600 px-2 py-0.5 rounded uppercase tracking-wider font-medium">Lulus</span>
+                                <div class="text-slate-700 font-medium text-lg sm:text-xl tabular-nums leading-none">{{ finalRankings[1].score }}</div>
+                                <span v-if="finalRankings[1].is_passed" class="inline-block mt-1.5 text-[9px] bg-emerald-50 border border-emerald-100 text-emerald-600 px-2 py-0.5 rounded uppercase tracking-wider font-medium">Lulus</span>
                             </div>
                         </div>
                     </div>
 
                     <!-- Podium 1 -->
-                    <div v-if="safeRankings[0]" class="order-1 sm:order-2 flex flex-col items-center w-full sm:w-56 mb-4 sm:mb-0 sm:-mt-8 z-20">
+                    <div v-if="finalRankings[0]" class="order-1 sm:order-2 flex flex-col items-center w-full sm:w-56 mb-4 sm:mb-0 sm:-mt-8 z-20">
                         <div class="relative mb-3">
                             <div class="absolute -top-6 sm:-top-8 left-1/2 transform -translate-x-1/2 text-amber-400 drop-shadow-sm">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 sm:h-8 sm:w-8" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
                             </div>
-                            <img v-if="safeRankings[0].avatar" :src="'/storage/'+safeRankings[0].avatar" class="w-20 h-20 sm:w-28 sm:h-28 rounded-full border-[3px] border-amber-300 shadow-md bg-white object-cover">
-                            <div v-else class="w-20 h-20 sm:w-28 sm:h-28 rounded-full border-[3px] border-amber-300 shadow-md flex items-center justify-center" :class="isFemale(safeRankings[0]) ? 'bg-rose-100 text-rose-400' : 'bg-amber-50 text-amber-400'">
+                            <img v-if="finalRankings[0].avatar" :src="'/storage/'+finalRankings[0].avatar" class="w-20 h-20 sm:w-28 sm:h-28 rounded-full border-[3px] border-amber-300 shadow-md bg-white object-cover">
+                            <div v-else class="w-20 h-20 sm:w-28 sm:h-28 rounded-full border-[3px] border-amber-300 shadow-md flex items-center justify-center" :class="isFemale(finalRankings[0]) ? 'bg-rose-100 text-rose-400' : 'bg-amber-50 text-amber-400'">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 sm:h-14 sm:w-14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" /></svg>
                             </div>
                             <div class="absolute -bottom-2 sm:-bottom-3 left-1/2 transform -translate-x-1/2 bg-amber-300 text-amber-900 text-xs sm:text-sm font-medium px-3.5 py-0.5 rounded-full shadow-sm border border-white">#1</div>
                         </div>
                         <div class="w-full h-full flex flex-col bg-white p-4 sm:p-5 rounded-2xl shadow-md text-center border border-slate-200 border-t-[4px] border-t-amber-400 sm:scale-105 transition-transform">
-                            <h3 class="font-medium text-slate-800 text-sm sm:text-base break-words">{{ safeRankings[0].name }}</h3>
-                            <p class="text-[10px] text-slate-500 mt-1.5 mb-1.5 leading-tight break-words">{{ getAgency(safeRankings[0]) }}</p>
+                            <h3 class="font-medium text-slate-800 text-sm sm:text-base break-words">{{ finalRankings[0].name }}</h3>
+                            <p class="text-[10px] text-slate-500 mt-1.5 mb-1.5 leading-tight break-words">{{ getAgency(finalRankings[0]) }}</p>
                             <div class="mt-auto pt-2">
-                                <div class="text-blue-700 font-medium text-2xl sm:text-3xl tabular-nums leading-none">{{ safeRankings[0].score }}</div>
-                                <span v-if="safeRankings[0].is_passed" class="inline-block mt-2 text-[9px] sm:text-[10px] bg-emerald-50 border border-emerald-100 text-emerald-600 px-2 py-0.5 rounded uppercase tracking-wider font-medium">Lulus SKD</span>
+                                <div class="text-blue-700 font-medium text-2xl sm:text-3xl tabular-nums leading-none">{{ finalRankings[0].score }}</div>
+                                <span v-if="finalRankings[0].is_passed" class="inline-block mt-2 text-[9px] sm:text-[10px] bg-emerald-50 border border-emerald-100 text-emerald-600 px-2 py-0.5 rounded uppercase tracking-wider font-medium">Lulus SKD</span>
                             </div>
                         </div>
                     </div>
 
                     <!-- Podium 3 -->
-                    <div v-if="safeRankings[2]" class="order-3 flex flex-col items-center w-[46%] sm:w-44 mt-auto">
+                    <div v-if="finalRankings[2]" class="order-3 flex flex-col items-center w-[46%] sm:w-44 mt-auto">
                         <div class="relative mb-3 z-10">
-                            <img v-if="safeRankings[2].avatar" :src="'/storage/'+safeRankings[2].avatar" class="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-[3px] border-orange-100 shadow-sm bg-white object-cover">
-                            <div v-else class="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-[3px] border-orange-100 shadow-sm flex items-center justify-center" :class="isFemale(safeRankings[2]) ? 'bg-rose-50 text-rose-300' : 'bg-orange-50 text-orange-300'">
+                            <img v-if="finalRankings[2].avatar" :src="'/storage/'+finalRankings[2].avatar" class="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-[3px] border-orange-100 shadow-sm bg-white object-cover">
+                            <div v-else class="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-[3px] border-orange-100 shadow-sm flex items-center justify-center" :class="isFemale(finalRankings[2]) ? 'bg-rose-50 text-rose-300' : 'bg-orange-50 text-orange-300'">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 sm:h-10 sm:w-10" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" /></svg>
                             </div>
                             <div class="absolute -bottom-2 sm:-bottom-3 left-1/2 transform -translate-x-1/2 bg-orange-100 text-orange-800 text-[10px] sm:text-xs font-medium px-2.5 py-0.5 rounded-full shadow-sm border border-white">#3</div>
                         </div>
                         <div class="w-full h-full flex flex-col bg-white p-3 sm:p-4 rounded-xl shadow-sm text-center border border-slate-200 border-t-[3px] border-t-orange-200">
-                            <h3 class="font-medium text-slate-800 text-xs sm:text-sm break-words">{{ safeRankings[2].name }}</h3>
-                            <p class="text-[9px] text-slate-500 mt-1 leading-tight break-words">{{ getAgency(safeRankings[2]) }}</p>
+                            <h3 class="font-medium text-slate-800 text-xs sm:text-sm break-words">{{ finalRankings[2].name }}</h3>
+                            <p class="text-[9px] text-slate-500 mt-1 leading-tight break-words">{{ getAgency(finalRankings[2]) }}</p>
                             <div class="mt-auto pt-2">
-                                <div class="text-slate-700 font-medium text-lg sm:text-xl tabular-nums leading-none">{{ safeRankings[2].score }}</div>
-                                <span v-if="safeRankings[2].is_passed" class="inline-block mt-1.5 text-[9px] bg-emerald-50 border border-emerald-100 text-emerald-600 px-2 py-0.5 rounded uppercase tracking-wider font-medium">Lulus</span>
+                                <div class="text-slate-700 font-medium text-lg sm:text-xl tabular-nums leading-none">{{ finalRankings[2].score }}</div>
+                                <span v-if="finalRankings[2].is_passed" class="inline-block mt-1.5 text-[9px] bg-emerald-50 border border-emerald-100 text-emerald-600 px-2 py-0.5 rounded uppercase tracking-wider font-medium">Lulus</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- My Rank Floater -->
-                <div v-if="my_rank" class="sticky top-[4.5rem] sm:top-[4.8rem] z-30 px-1 sm:px-0">
+                <div v-if="activeMyRank" class="sticky top-[4.5rem] sm:top-[4.8rem] z-30 px-1 sm:px-0">
                     <div class="bg-white/95 backdrop-blur-sm border border-blue-200 text-slate-700 p-3.5 sm:p-4 rounded-xl shadow-[0_4px_15px_-3px_rgba(30,96,170,0.1)] flex items-center justify-between ring-1 ring-blue-50 transition-all">
                         <div class="flex items-center gap-3 sm:gap-4 overflow-hidden">
                             <div class="bg-blue-50 border border-blue-100 text-blue-700 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center font-medium text-base sm:text-lg tabular-nums shrink-0 shadow-sm">
-                                {{ my_rank.rank || '-' }}
+                                {{ activeMyRank.rank || '-' }}
                             </div>
                             <div class="min-w-0">
                                 <div class="text-[9px] sm:text-[10px] text-slate-500 uppercase font-medium tracking-wide">
                                     Peringkat {{ scope === 'nasional' ? 'Nasional' : 'Provinsi' }} Anda
                                 </div>
                                 <div class="font-medium text-slate-800 text-[11px] sm:text-sm flex flex-wrap items-center gap-1.5 sm:gap-2 mt-0.5 truncate">
-                                    {{ my_rank.name }} (Saya)
-                                    <span v-if="my_rank.is_passed" class="text-[9px] bg-emerald-100 border border-emerald-200 text-emerald-700 px-1.5 py-0.5 rounded tracking-wide uppercase">Lulus</span>
+                                    {{ activeMyRank.name }} (Saya)
+                                    <span v-if="activeMyRank.is_passed" class="text-[9px] bg-emerald-100 border border-emerald-200 text-emerald-700 px-1.5 py-0.5 rounded tracking-wide uppercase">Lulus</span>
                                     <span v-else class="text-[9px] bg-rose-100 border border-rose-200 text-rose-700 px-1.5 py-0.5 rounded tracking-wide uppercase">Gagal</span>
                                 </div>
                             </div>
                         </div>
                         <div class="text-right shrink-0 ml-2">
-                            <div class="text-xl sm:text-2xl font-medium tabular-nums leading-none text-blue-700">{{ my_rank.score }}</div>
+                            <div class="text-xl sm:text-2xl font-medium tabular-nums leading-none text-blue-700">{{ activeMyRank.score }}</div>
                         </div>
                     </div>
                 </div>
@@ -324,7 +357,7 @@ const paginatedRankings = vueComputed(() => {
                         <p class="font-medium text-slate-600">Data peserta tidak ditemukan.</p>
                     </div>
 
-                    <div v-if="safeRankings.length > 0" class="flex flex-col sm:flex-row justify-between items-center gap-4 p-4 border-t border-slate-200 bg-slate-50">
+                    <div v-if="finalRankings.length > 0" class="flex flex-col sm:flex-row justify-between items-center gap-4 p-4 border-t border-slate-200 bg-slate-50">
                         <div class="flex items-center gap-2 text-[11px] sm:text-xs text-slate-500 font-medium">
                             <span>Tampilkan:</span>
                             <select v-model="itemsPerPage" class="border border-slate-300 rounded-md text-[11px] sm:text-xs py-1.5 pl-2 pr-6 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm outline-none cursor-pointer">
