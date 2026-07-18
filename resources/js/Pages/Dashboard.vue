@@ -96,11 +96,11 @@ onUnmounted(() => {
     <AuthenticatedLayout>
         <div class="max-w-4xl mx-auto animate-in fade-in slide-in-from-top-4 duration-700">
 
-            <!-- Container Utama: Merged Mobile (default) & Desktop (md:) -->
-            <div class="px-4 py-6 space-y-5 md:px-2.5 md:py-3 md:space-y-4">
+            <!-- Container Utama: Menggunakan flex-col dan gap agar bisa pakai class "order-*" -->
+            <div class="px-4 py-6 flex flex-col gap-5 md:px-2.5 md:py-3 md:gap-4">
                 
-                <!-- CARD 1: PROFILE & MOTIVASI -->
-                <div class="bg-white rounded-2xl md:rounded-xl border border-slate-200 shadow-sm overflow-hidden relative">
+                <!-- CARD 1: PROFILE & MOTIVASI (Selalu Urutan 1) -->
+                <div class="order-1 bg-white rounded-2xl md:rounded-xl border border-slate-200 shadow-sm overflow-hidden relative">
                     <div class="absolute top-0 right-0 w-[150px] md:w-[200px] h-[150px] md:h-[200px] bg-blue-50 rounded-full blur-[40px] md:blur-[60px] pointer-events-none -mr-10 md:-mr-16 -mt-10 md:-mt-16"></div>
                     <div class="absolute bottom-0 left-0 w-[100px] md:w-[150px] h-[100px] md:h-[150px] bg-slate-50 rounded-full blur-[30px] md:blur-[40px] pointer-events-none -ml-10 md:-ml-16 -mb-10 md:-mb-16"></div>
 
@@ -162,8 +162,8 @@ onUnmounted(() => {
                     </div>
                 </div>
 
-                <!-- CARD 2: UJIAN AKTIF (BERJALAN) -->
-                <div v-if="activeExam && activeTimeLeft > 0" class="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 p-0.5 rounded-2xl md:rounded-xl shadow-sm animate-pulse-slow">
+                <!-- CARD 2: UJIAN AKTIF (BERJALAN) (Urutan 3 di Mobile, 2 di Desktop) -->
+                <div v-if="activeExam && activeTimeLeft > 0" class="order-3 md:order-2 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 p-0.5 rounded-2xl md:rounded-xl shadow-sm animate-pulse-slow">
                     <div class="bg-white p-4 md:p-3.5 rounded-[14px] md:rounded-[10px] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-3 text-left">
                         <div class="flex items-start gap-3">
                             <div class="p-2 bg-amber-50 rounded-lg text-amber-500 shrink-0 md:mt-0.5">
@@ -194,8 +194,8 @@ onUnmounted(() => {
                     </div>
                 </div>
 
-                <!-- CARD 3: PENGUMUMAN -->
-                <div v-if="announcement" class="bg-amber-50/80 border border-amber-200 rounded-2xl md:rounded-xl p-4 md:p-3.5 shadow-sm flex items-start gap-3 relative overflow-hidden">
+                <!-- CARD 3: PENGUMUMAN (Urutan 4 di Mobile, 3 di Desktop) -->
+                <div v-if="announcement" class="order-4 md:order-3 bg-amber-50/80 border border-amber-200 rounded-2xl md:rounded-xl p-4 md:p-3.5 shadow-sm flex items-start gap-3 relative overflow-hidden">
                     <div class="absolute left-0 top-0 bottom-0 w-1.5 md:w-1 bg-amber-400"></div>
                     <div class="shrink-0 text-amber-500 bg-amber-100 p-2 md:p-1.5 rounded-xl md:rounded-lg md:mt-0.5">
                         <svg class="w-5 h-5 md:w-4 md:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -208,8 +208,8 @@ onUnmounted(() => {
                     </div>
                 </div>
 
-                <!-- CARD 4: STATISTIK WIDGET -->
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-2 lg:gap-3">
+                <!-- CARD 4: STATISTIK WIDGET (Urutan 5 di Mobile, 4 di Desktop) -->
+                <div class="order-5 md:order-4 grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-2 lg:gap-3">
                     
                     <!-- Wallet -->
                     <Link :href="route('wallet.index')" class="col-span-2 md:col-span-1 bg-white p-4 md:p-2.5 lg:p-3.5 rounded-2xl md:rounded-xl border border-slate-200 shadow-sm flex items-center justify-between md:justify-start gap-3 md:hover:border-blue-300 transition-transform md:transition-colors group active:scale-95 md:active:scale-100">
@@ -248,8 +248,8 @@ onUnmounted(() => {
                     </div>
                 </div>
 
-                <!-- CARD 5: REKOMENDASI TRYOUT -->
-                <div class="space-y-3 md:space-y-2.5 pt-2 md:pt-0">
+                <!-- CARD 5: REKOMENDASI TRYOUT (Urutan 2 di Mobile, 5 di Desktop) -->
+                <div class="order-2 md:order-5 space-y-3 md:space-y-2.5 pt-2 md:pt-0">
                     <div class="flex items-center justify-between px-1">
                         <h3 class="font-bold md:font-medium text-xs md:text-[10px] lg:text-xs text-slate-900 uppercase tracking-wider md:tracking-[0.15em]">
                             Rekomendasi Paket<span class="hidden md:inline"> Tryout</span>
