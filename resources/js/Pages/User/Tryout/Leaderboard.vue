@@ -19,10 +19,10 @@ const search = ref(safeFilters.value.search || '');
 const scope = ref(safeFilters.value.scope || 'nasional');
 
 // Update request untuk pencarian/filter
+// Update request untuk pencarian/filter
 const updateParams = debounce(() => {
-    if (!safeTryout.value.id) return;
-    
-    router.get(route('tryout.leaderboard', safeTryout.value.id), { 
+    // window.location.pathname akan selalu mengambil rute spesifik saat ini
+    router.get(window.location.pathname, { 
         search: search.value,
         scope: scope.value 
     }, { 
