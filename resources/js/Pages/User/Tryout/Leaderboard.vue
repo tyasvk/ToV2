@@ -18,15 +18,20 @@ const safeTryout = computed(() => props.tryout || {});
 const search = ref(safeFilters.value.search || '');
 const scope = ref(safeFilters.value.scope || 'nasional');
 
-// --- PERBAIKAN BUG REDIRECT (GUNAKAN ROUTER.RELOAD) ---
+// --- PERBAIKAN MUTLAK BUG REDIRECT ---
 const updateParams = debounce(() => {
-    // router.reload() menjamin request tetap di halaman saat ini 
-    // tanpa terpengaruh oleh konfigurasi domain/APP_URL yang salah di VPS
-    router.reload({ 
-        data: {
-            search: search.value,
-            scope: scope.value 
-        },
+    // 1. Pastikan ID Tryout ada agar URL tidak rusak
+    if (!safeTryout.value.id) return;
+    
+    // 2. Tulis URL secara manual/hardcode tanpa mengandalkan helper route() atau window.location
+    // Format URL: /tryouts/1/leaderboard
+    const targetUrl = `/tryouts/${safeTryout.value.id}/leaderboard`;
+
+    // 3. Eksekusi request menggunakan Inertia
+    router.get(targetUrl, { 
+        search: search.value,
+        scope: scope.value 
+    }, { 
         preserveState: true, 
         preserveScroll: true,
         replace: true 
@@ -40,7 +45,7 @@ const goBack = () => {
     if (window.history.length > 1) {
         window.history.back();
     } else {
-        router.visit(route('dashboard'));
+        router.visit('/dashboard'); // Hardcode juga untuk keamanan
     }
 };
 
@@ -55,11 +60,9 @@ const isFemale = (user) => {
     return g == 2 || g == '2' || g === 'Perempuan';
 };
 
-// --- HELPER PARSING TANGGAL LEBIH AKURAT ---
 const parseSafeDate = (dateVal) => {
     if (!dateVal) return new Date(NaN);
     if (typeof dateVal === 'string') {
-        // Jika format stringnya 'YYYY-MM-DD HH:mm:ss', ubah spasi jadi 'T' agar standar ISO
         if (dateVal.includes(' ') && !dateVal.includes('T')) {
             return new Date(dateVal.replace(' ', 'T'));
         }
@@ -68,11 +71,9 @@ const parseSafeDate = (dateVal) => {
     return new Date(dateVal);
 };
 
-// --- HELPER DURASI PENGERJAAN ---
 const getDuration = (user) => {
     if (!user) return '-';
     
-    // PRIORITAS 1: Hitung manual dari created_at dan completed_at (Paling Akurat)
     if (user.created_at && user.completed_at) {
         const start = parseSafeDate(user.created_at);
         const end = parseSafeDate(user.completed_at);
@@ -88,12 +89,9 @@ const getDuration = (user) => {
         }
     }
 
-    // PRIORITAS 2: Gunakan data durasi bawaan backend (jika dikirim)
     let dur = user.duration || user.waktu_pengerjaan;
-    
     if (!dur || dur === '00:00:00' || dur === 0 || dur === '0') return '-';
 
-    // Jika format HH:MM:SS
     if (typeof dur === 'string' && dur.includes(':')) {
         const parts = dur.split(':');
         if (parts.length === 3) {
@@ -105,7 +103,6 @@ const getDuration = (user) => {
         }
     }
 
-    // Jika format detik (integer)
     if (!isNaN(dur) && Number(dur) > 0) {
         const val = Number(dur);
         const h = Math.floor(val / 3600);
