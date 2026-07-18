@@ -691,19 +691,39 @@ public function leaderboard(Request $request, Tryout $tryout)
         $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80; 
         $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
 
-        // 1. Ambil seluruh riwayat pengerjaan beserta data penggunanya
+        // Ambil parameter dari request Vue
+        $search = trim($request->search);
+        $scope = $request->scope ?? 'nasional';
+        $userProvince = $user->province_code;
+
+        // 1. Ambil pengerjaan PERTAMA dari setiap user (Filter Pengerjaan Awal)
         $allAttempts = ExamAttempt::with('user')
             ->where('tryout_id', $tryout->id)
+            ->orderBy('created_at', 'asc')
             ->get();
 
-     // 2. Kelompokkan berdasarkan pengguna, lalu saring untuk HANYA MENGAMBIL PENGERJAAN PERTAMA tiap pengguna
-        $bestAttempts = $allAttempts->groupBy('user_id')->map(function ($userAttempts) {
-            // Urutkan berdasarkan waktu pengerjaan dari yang paling lama (paling awal)
-            return $userAttempts->sortBy('created_at')->first(); 
-        })->values();
+        // Kelompokkan dan ambil yang paling pertama
+        $firstAttempts = $allAttempts->groupBy('user_id')->map->first()->values();
 
-        // 3. Urutkan seluruh nilai terbaik tersebut untuk membuat Papan Klasemen
-        $rankings = $bestAttempts->sortByDesc(function($a) use ($pgTwk, $pgTiu, $pgTkp) {
+        // 2. Terapkan Filter Scope (Provinsi / Nasional)
+        if ($scope === 'provinsi' && $userProvince) {
+            $firstAttempts = $firstAttempts->filter(function ($a) use ($userProvince) {
+                return $a->user && $a->user->province_code === $userProvince;
+            });
+        }
+
+        // 3. Terapkan Filter Pencarian (Nama / Instansi)
+        if (!empty($search)) {
+            $searchLower = strtolower($search);
+            $firstAttempts = $firstAttempts->filter(function ($a) use ($searchLower) {
+                $name = $a->user ? strtolower($a->user->name) : '';
+                $agency = $a->user ? strtolower($a->user->agency_name ?? $a->user->instansi ?? '') : '';
+                return str_contains($name, $searchLower) || str_contains($agency, $searchLower);
+            });
+        }
+
+        // 4. Urutkan nilai untuk Papan Peringkat
+        $rankings = $firstAttempts->sortByDesc(function($a) use ($pgTwk, $pgTiu, $pgTkp) {
             $isPassed = ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp) ? 1 : 0;
             return sprintf('%d-%03d-%03d-%03d-%03d', $isPassed, $a->total_score, $a->tkp_score, $a->tiu_score, $a->twk_score);
         })
@@ -711,24 +731,20 @@ public function leaderboard(Request $request, Tryout $tryout)
         ->map(function($a, $i) use ($pgTwk, $pgTiu, $pgTkp) {
             return [
                 'id' => $a->id,
-                'rank' => $i + 1, 
-                
+                'rank' => $i + 1, // Peringkat dinamis sesuai filter
                 'name' => $a->user ? $a->user->name : 'User', 
                 'avatar' => $a->user ? $a->user->avatar : null,
-                'agency_name' => $a->user ? $a->user->agency_name : null, 
+                'agency_name' => $a->user ? ($a->user->agency_name ?? $a->user->instansi) : null, 
                 'province_code' => $a->user ? $a->user->province_code : null,
                 'gender' => $a->user ? $a->user->gender : null, 
-                
                 'score' => $a->total_score, 
                 'twk' => $a->twk_score, 
                 'tiu' => $a->tiu_score, 
                 'tkp' => $a->tkp_score, 
                 'is_passed' => ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp), 
-                
                 'duration' => $a->created_at 
                     ? max(1, \Carbon\Carbon::parse($a->created_at)->diffInSeconds($a->completed_at ?? $a->updated_at ?? $a->created_at))
                     : 0,
-                
                 'is_me' => $a->user_id === auth()->id()
             ];
         });
@@ -736,7 +752,12 @@ public function leaderboard(Request $request, Tryout $tryout)
         return Inertia::render('User/Tryout/Leaderboard', [
             'tryout' => $tryout, 
             'rankings' => $rankings, 
-            'my_rank' => $rankings->firstWhere('is_me', true)
+            'my_rank' => $rankings->firstWhere('is_me', true),
+            'filters' => [
+                'search' => $search,
+                'scope' => $scope,
+                'user_province' => $userProvince
+            ]
         ]);
     }
 
