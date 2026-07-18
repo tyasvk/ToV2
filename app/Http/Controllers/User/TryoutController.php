@@ -265,7 +265,7 @@ class TryoutController extends Controller
     // ===================================================================
     // PERBAIKAN MUTLAK: Mengunci Hitungan Detik dari Selisih Waktu Riil
     // ===================================================================
-    public function result(ExamAttempt $attempt)
+public function result(ExamAttempt $attempt)
     {
         if ($attempt->user_id !== auth()->id()) abort(403);
         
@@ -276,17 +276,47 @@ class TryoutController extends Controller
             ? route('tryout-akbar.wait', $tryout->id) 
             : route('tryout.history.detail', $tryout->id); 
 
-        $rank = ExamAttempt::where('tryout_id', $tryout->id)
-            ->where('total_score', '>', $attempt->total_score)
-            ->count() + 1;
-
-        $totalParticipants = ExamAttempt::where('tryout_id', $tryout->id)
-            ->distinct('user_id')
-            ->count();
-
         $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65;
         $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80;
         $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
+
+        // =====================================================================
+        // PERBAIKAN LOGIKA PERINGKAT: HANYA DIADU DENGAN PERCOBAAN PERTAMA
+        // =====================================================================
+        
+        // 1. Ambil HANYA pengerjaan PERTAMA dari setiap user untuk tryout ini
+        $firstAttempts = ExamAttempt::where('tryout_id', $tryout->id)
+            ->orderBy('created_at', 'asc')
+            ->get()
+            ->groupBy('user_id')
+            ->map(function ($userAttempts) {
+                return $userAttempts->first(); // Ambil riwayat paling awal
+            });
+
+        // Total peserta asli (jumlah orang, bukan jumlah percobaan)
+        $totalParticipants = $firstAttempts->count();
+
+        // 2. Format skor pengerjaan kita saat ini untuk perbandingan
+        $currentPassed = ($attempt->twk_score >= $pgTwk && $attempt->tiu_score >= $pgTiu && $attempt->tkp_score >= $pgTkp) ? 1 : 0;
+        $currentScoreString = sprintf('%d-%03d-%03d-%03d-%03d', $currentPassed, $attempt->total_score, $attempt->tkp_score, $attempt->tiu_score, $attempt->twk_score);
+
+        // 3. Hitung Peringkat (Bandingkan dengan percobaan pertama orang lain)
+        $rank = 1;
+        foreach ($firstAttempts as $userId => $firstAttempt) {
+            // Jangan membandingkan dengan riwayat diri sendiri agar peringkat tidak dobel
+            if ($userId === $attempt->user_id) {
+                continue; 
+            }
+
+            $isPassed = ($firstAttempt->twk_score >= $pgTwk && $firstAttempt->tiu_score >= $pgTiu && $firstAttempt->tkp_score >= $pgTkp) ? 1 : 0;
+            $compareScoreString = sprintf('%d-%03d-%03d-%03d-%03d', $isPassed, $firstAttempt->total_score, $firstAttempt->tkp_score, $firstAttempt->tiu_score, $firstAttempt->twk_score);
+
+            // Jika nilai percobaan pertama orang lain lebih tinggi, peringkat kita turun (bertambah 1)
+            if (strcmp($compareScoreString, $currentScoreString) > 0) {
+                $rank++;
+            }
+        }
+        // =====================================================================
 
         $scoreDetails = [
             ['category' => 'Tes Wawasan Kebangsaan (TWK)', 'score' => $attempt->twk_score, 'passing_grade' => $pgTwk, 'is_passed' => $attempt->twk_score >= $pgTwk],
@@ -299,15 +329,12 @@ class TryoutController extends Controller
         // Hitung total detik pengerjaan asli dari selisih waktu murni database
         $durationSeconds = 0;
         if ($attempt->created_at && $attempt->completed_at) {
-            $durationSeconds = Carbon::parse($attempt->created_at)->diffInSeconds($attempt->completed_at);
+            $durationSeconds = \Carbon\Carbon::parse($attempt->created_at)->diffInSeconds($attempt->completed_at);
         }
         
         $maxDurationLimit = ($tryout->duration ?? 110) * 60;
         
-        // JIKA TERJADI TABRAKAN TIMEZONE (Waktu melonjak melebihi durasi maksimal tryout atau minus)
-        // Paksa hitungan menggunakan sisa waktu riil yang tersimpan di sistem agar tidak bisa dimanipulasi
         if ($durationSeconds > $maxDurationLimit || $durationSeconds <= 0) {
-            // Jika data sisa waktu tidak terbaca, gunakan durasi acak simulasi normal pengerjaan cepat (misal: 45 detik)
             $durationSeconds = 45; 
         }
         
@@ -582,38 +609,66 @@ public function finish(Request $request, Tryout $tryout)
 
 // Menjadi
 public function history()
-{
-    $attempts = ExamAttempt::where('user_id', auth()->id())
-        ->with('tryout')
-        ->latest()
-        ->get();
+    {
+        $attempts = ExamAttempt::where('user_id', auth()->id())
+            ->with('tryout')
+            ->latest()
+            ->get();
 
-    $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65; 
-    $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80; 
-    $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
+        $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65; 
+        $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80; 
+        $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
 
-    $histories = $attempts->map(function ($attempt) use ($pgTwk, $pgTiu, $pgTkp) {
-        $attempt->is_passed = ($attempt->twk_score >= $pgTwk && $attempt->tiu_score >= $pgTiu && $attempt->tkp_score >= $pgTkp);
+        // Optimasi: Ambil pengerjaan pertama secara massal untuk menghindari query lambat (N+1)
+        $tryoutIds = $attempts->pluck('tryout_id')->unique();
+        $firstAttemptsByTryout = collect();
         
-        // Menghitung peringkat secara dinamis (Pengecekan 'status' dihapus)
-        $attempt->rank = ExamAttempt::where('tryout_id', $attempt->tryout_id)
-            ->where('total_score', '>', $attempt->total_score)
-            ->count() + 1;
+        foreach ($tryoutIds as $tId) {
+            $firstAttemptsByTryout[$tId] = ExamAttempt::where('tryout_id', $tId)
+                ->orderBy('created_at', 'asc')
+                ->get()
+                ->groupBy('user_id')
+                ->map->first();
+        }
 
-        return $attempt;
-    });
+        $histories = $attempts->map(function ($attempt) use ($pgTwk, $pgTiu, $pgTkp, $firstAttemptsByTryout) {
+            $attempt->is_passed = ($attempt->twk_score >= $pgTwk && $attempt->tiu_score >= $pgTiu && $attempt->tkp_score >= $pgTkp);
+            
+            // Ambil seluruh percobaan pertama dari database yang dicache sebelumnya
+            $firstAttempts = $firstAttemptsByTryout[$attempt->tryout_id] ?? collect();
+            
+            $currentPassed = $attempt->is_passed ? 1 : 0;
+            $currentScoreString = sprintf('%d-%03d-%03d-%03d-%03d', $currentPassed, $attempt->total_score, $attempt->tkp_score, $attempt->tiu_score, $attempt->twk_score);
 
-    $stats = [
-        'total' => $histories->count(),
-        'average_score' => $histories->count() > 0 ? round($histories->avg('total_score')) : 0,
-        'passed' => $histories->where('is_passed', true)->count(),
-    ];
+            $rank = 1;
+            foreach ($firstAttempts as $userId => $firstAttempt) {
+                // Abaikan percobaan diri sendiri
+                if ($userId === $attempt->user_id) continue;
 
-    return Inertia::render('User/Tryout/History', [
-        'histories' => $histories,
-        'stats' => $stats
-    ]);
-}
+                $isPassed = ($firstAttempt->twk_score >= $pgTwk && $firstAttempt->tiu_score >= $pgTiu && $firstAttempt->tkp_score >= $pgTkp) ? 1 : 0;
+                $compareScoreString = sprintf('%d-%03d-%03d-%03d-%03d', $isPassed, $firstAttempt->total_score, $firstAttempt->tkp_score, $firstAttempt->tiu_score, $firstAttempt->twk_score);
+
+                // Jika nilai pertama orang lain lebih tinggi, rank bertambah
+                if (strcmp($compareScoreString, $currentScoreString) > 0) {
+                    $rank++;
+                }
+            }
+
+            $attempt->rank = $rank;
+            return $attempt;
+        });
+
+        $stats = [
+            'total' => $histories->count(),
+            'average_score' => $histories->count() > 0 ? round($histories->avg('total_score')) : 0,
+            'passed' => $histories->where('is_passed', true)->count(),
+        ];
+
+        return Inertia::render('User/Tryout/History', [
+            'histories' => $histories,
+            'stats' => $stats
+        ]);
+    }
 
     public function review(ExamAttempt $attempt) 
     {
@@ -641,13 +696,10 @@ public function leaderboard(Request $request, Tryout $tryout)
             ->where('tryout_id', $tryout->id)
             ->get();
 
-        // 2. Kelompokkan berdasarkan pengguna, lalu saring untuk HANYA MENGAMBIL NILAI TERBAIK tiap pengguna
-        $bestAttempts = $allAttempts->groupBy('user_id')->map(function ($userAttempts) use ($pgTwk, $pgTiu, $pgTkp) {
-            return $userAttempts->sortByDesc(function ($a) use ($pgTwk, $pgTiu, $pgTkp) {
-                // Prioritaskan yang Lulus (1) di atas yang Tidak Lulus (0), disusul total_score, tkp, tiu, dan twk
-                $isPassed = ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp) ? 1 : 0;
-                return sprintf('%d-%03d-%03d-%03d-%03d', $isPassed, $a->total_score, $a->tkp_score, $a->tiu_score, $a->twk_score);
-            })->first(); // Ambil 1 pengerjaan terbaik saja dari koleksi riwayat user ini
+     // 2. Kelompokkan berdasarkan pengguna, lalu saring untuk HANYA MENGAMBIL PENGERJAAN PERTAMA tiap pengguna
+        $bestAttempts = $allAttempts->groupBy('user_id')->map(function ($userAttempts) {
+            // Urutkan berdasarkan waktu pengerjaan dari yang paling lama (paling awal)
+            return $userAttempts->sortBy('created_at')->first(); 
         })->values();
 
         // 3. Urutkan seluruh nilai terbaik tersebut untuk membuat Papan Klasemen

@@ -172,10 +172,11 @@ const paginatedRankings = computed(() => {
 
     <div class="min-h-screen bg-slate-50 font-sans text-slate-700 flex flex-col pb-16">
         
+        <!-- Navigation Top Bar -->
         <nav class="bg-white border-b border-slate-200 px-4 md:px-6 py-3 sticky top-0 z-50 shadow-sm backdrop-blur-xl bg-white/90">
             <div class="max-w-5xl mx-auto flex justify-between items-center">
                 <div class="flex items-center gap-2 sm:gap-3">
-                    <button @click="goBack" class="sm:hidden p-1.5 -ml-1.5 text-slate-500 hover:bg-slate-100 rounded-md transition-colors">
+                    <button type="button" @click="goBack" class="sm:hidden p-1.5 -ml-1.5 text-slate-500 hover:bg-slate-100 rounded-md transition-colors">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                         </svg>
@@ -194,7 +195,7 @@ const paginatedRankings = computed(() => {
                     </div>
                 </div>
                 
-                <button @click="goBack" class="text-[10px] sm:text-[11px] font-medium text-slate-600 hover:text-blue-600 transition-colors uppercase tracking-wide flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-blue-200 hover:bg-blue-50 rounded-md shadow-sm shrink-0">
+                <button type="button" @click="goBack" class="text-[10px] sm:text-[11px] font-medium text-slate-600 hover:text-blue-600 transition-colors uppercase tracking-wide flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-blue-200 hover:bg-blue-50 rounded-md shadow-sm shrink-0">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
@@ -204,13 +205,17 @@ const paginatedRankings = computed(() => {
         </nav>
 
         <main class="flex-1 max-w-5xl mx-auto w-full px-3 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-6 relative">
+            <!-- Background Decoration -->
             <div class="absolute top-0 left-0 right-0 h-48 sm:h-64 bg-gradient-to-b from-[#1e60aa] to-slate-50 z-0 -mx-4 sm:-mx-8"></div>
 
             <div class="relative z-10 space-y-6 pt-1">
+                
+                <!-- Filter Section -->
                 <div class="bg-white/95 backdrop-blur-sm p-3 sm:p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
                     
                     <div class="flex bg-slate-100 p-1 rounded-lg w-full md:w-auto border border-slate-200 shrink-0">
                         <button 
+                            type="button"
                             @click="scope = 'nasional'"
                             class="px-3 sm:px-5 py-2 rounded-md text-[11px] sm:text-sm font-medium transition-colors w-1/2 md:w-auto text-center"
                             :class="scope === 'nasional' ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'"
@@ -218,6 +223,7 @@ const paginatedRankings = computed(() => {
                             Nasional
                         </button>
                         <button 
+                            type="button"
                             @click="scope = 'provinsi'"
                             class="px-3 sm:px-5 py-2 rounded-md text-[11px] sm:text-sm font-medium transition-colors w-1/2 md:w-auto text-center truncate"
                             :class="scope === 'provinsi' ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'"
@@ -241,8 +247,10 @@ const paginatedRankings = computed(() => {
                     </div>
                 </div>
 
+                <!-- TOP 3 PODIUM -->
                 <div v-if="!search && sortedRankings.length > 0" class="flex flex-wrap sm:flex-nowrap justify-center items-stretch gap-3 sm:gap-6 pt-4 sm:pt-6 pb-2">
                     
+                    <!-- Podium 2 -->
                     <div v-if="sortedRankings[1]" class="order-2 sm:order-1 flex flex-col items-center w-[46%] sm:w-44 mt-auto">
                         <div class="relative mb-3 z-10">
                             <img v-if="sortedRankings[1].avatar" :src="'/storage/'+sortedRankings[1].avatar" class="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-[3px] border-slate-200 shadow-sm bg-white object-cover">
@@ -267,6 +275,7 @@ const paginatedRankings = computed(() => {
                         </div>
                     </div>
 
+                    <!-- Podium 1 -->
                     <div v-if="sortedRankings[0]" class="order-1 sm:order-2 flex flex-col items-center w-full sm:w-56 mb-4 sm:mb-0 sm:-mt-8 z-20">
                         <div class="relative mb-3">
                             <div class="absolute -top-6 sm:-top-8 left-1/2 transform -translate-x-1/2 text-amber-400 drop-shadow-sm">
@@ -294,6 +303,7 @@ const paginatedRankings = computed(() => {
                         </div>
                     </div>
 
+                    <!-- Podium 3 -->
                     <div v-if="sortedRankings[2]" class="order-3 flex flex-col items-center w-[46%] sm:w-44 mt-auto">
                         <div class="relative mb-3 z-10">
                             <img v-if="sortedRankings[2].avatar" :src="'/storage/'+sortedRankings[2].avatar" class="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-[3px] border-orange-100 shadow-sm bg-white object-cover">
@@ -319,6 +329,7 @@ const paginatedRankings = computed(() => {
                     </div>
                 </div>
 
+                <!-- My Rank Floater -->
                 <div v-if="my_rank" class="sticky top-[4.5rem] sm:top-[4.8rem] z-30 px-1 sm:px-0">
                     <div class="bg-white/95 backdrop-blur-sm border border-blue-200 text-slate-700 p-3.5 sm:p-4 rounded-xl shadow-[0_4px_15px_-3px_rgba(30,96,170,0.1)] flex items-center justify-between ring-1 ring-blue-50 transition-all">
                         <div class="flex items-center gap-3 sm:gap-4 overflow-hidden">
@@ -350,88 +361,95 @@ const paginatedRankings = computed(() => {
                     </div>
                 </div>
 
+                <!-- Tabel Peringkat Bersatu (Mobile-First Unified DOM) -->
                 <div class="bg-white rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-8">
                     
+                    <!-- Table Header (Hanya tampil di Desktop) -->
                     <div class="hidden sm:grid grid-cols-12 gap-4 p-4 bg-slate-50/80 border-b border-slate-200 text-[11px] font-medium text-slate-500 uppercase tracking-wider items-center">
                         <div class="col-span-1 text-center">#</div>
                         <div class="col-span-5">Peserta & Instansi</div>
-                        <div class="col-span-1 text-center">TWK</div>
-                        <div class="col-span-1 text-center">TIU</div>
-                        <div class="col-span-1 text-center">TKP</div>
-                        <div class="col-span-1 text-center">Total</div>
-                        <div class="col-span-2 text-right">Waktu</div>
+                        
+                        <div class="col-span-6 grid grid-cols-5">
+                            <div class="col-span-1 text-center">TWK</div>
+                            <div class="col-span-1 text-center">TIU</div>
+                            <div class="col-span-1 text-center">TKP</div>
+                            <div class="col-span-1 text-center">Total</div>
+                            <div class="col-span-1 text-right">Waktu</div>
+                        </div>
                     </div>
 
                     <div v-if="paginatedRankings.length > 0">
                         <div v-for="(user, index) in paginatedRankings" :key="'rank-' + user.id + '-' + index" 
-                            class="p-4 sm:px-4 sm:py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
+                            class="p-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
                             :class="{'bg-blue-50/30 hover:bg-blue-50/50': user.is_me}">
                             
+                            <!-- Unified Row -->
                             <div class="flex flex-col sm:grid sm:grid-cols-12 sm:gap-4 sm:items-center">
                                 
-                                <div class="hidden sm:block sm:col-span-1 text-center">
-                                    <span class="font-medium text-slate-400 text-xs sm:text-sm tabular-nums">{{ user.displayRank || '-' }}</span>
-                                </div>
-
-                                <div class="flex items-center gap-2.5 sm:gap-3 sm:col-span-5 mb-2 sm:mb-0">
-                                    <div class="sm:hidden w-6 text-center shrink-0">
-                                        <span class="font-medium text-slate-400 text-xs tabular-nums">{{ user.displayRank || '-' }}</span>
+                                <!-- Kiri: Rank & Profil -->
+                                <div class="sm:col-span-6 flex items-center justify-between sm:justify-start gap-3 min-w-0 mb-2 sm:mb-0">
+                                    <div class="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                                        <div class="w-6 text-center shrink-0 font-medium text-slate-400 text-xs sm:text-sm tabular-nums">
+                                            {{ user.displayRank || '-' }}
+                                        </div>
+                                        
+                                        <img v-if="user.avatar" :src="'/storage/'+user.avatar" class="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-slate-200 object-cover shrink-0">
+                                        <div v-else class="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-slate-200 flex items-center justify-center shrink-0" :class="isFemale(user) ? 'bg-rose-50 text-rose-300' : 'bg-slate-100 text-slate-400'">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" /></svg>
+                                        </div>
+                                        
+                                        <div class="min-w-0 flex-1">
+                                            <div class="text-[12px] sm:text-[13px] font-medium text-slate-700 truncate flex items-center gap-1.5">
+                                                {{ user.name }}
+                                                <span v-if="user.is_me" class="text-[9px] bg-blue-100 border border-blue-200 text-blue-700 px-1.5 py-0.5 rounded tracking-wide uppercase shrink-0">Anda</span>
+                                            </div>
+                                            <div class="text-[10px] text-slate-500 truncate mt-0.5">
+                                                {{ getAgency(user) }}
+                                            </div>
+                                            <div class="text-[9px] sm:text-[10px] flex flex-wrap items-center gap-1.5 mt-0.5">
+                                                <span v-if="user.is_passed" class="text-emerald-600 font-medium border border-emerald-100 bg-emerald-50 px-1 rounded uppercase tracking-wide">Lulus SKD</span>
+                                                <span v-else class="text-rose-500 font-medium border border-rose-100 bg-rose-50 px-1 rounded uppercase tracking-wide">Gagal</span>
+                                            </div>
+                                        </div>
                                     </div>
                                     
-                                    <img v-if="user.avatar" :src="'/storage/'+user.avatar" class="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-slate-200 object-cover shrink-0">
-                                    <div v-else class="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-slate-200 flex items-center justify-center shrink-0" :class="isFemale(user) ? 'bg-rose-50 text-rose-300' : 'bg-slate-100 text-slate-400'">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" /></svg>
+                                    <!-- Mobile Total Score (Hanya tampil di HP) -->
+                                    <div class="sm:hidden text-lg font-medium text-blue-700 tabular-nums leading-none">
+                                        {{ user.score }}
                                     </div>
+                                </div>
+
+                                <!-- Kanan: Skor & Durasi Waktu -->
+                                <div class="sm:col-span-6 flex items-center justify-between sm:grid sm:grid-cols-5 pl-[2.8rem] sm:pl-0 pt-1 sm:pt-0">
                                     
-                                    <div class="min-w-0 flex-1">
-                                        <div class="text-[12px] sm:text-[13px] font-medium text-slate-700 truncate flex items-center gap-1.5">
-                                            {{ user.name }}
-                                            <span v-if="user.is_me" class="text-[9px] bg-blue-100 border border-blue-200 text-blue-700 px-1.5 py-0.5 rounded tracking-wide uppercase shrink-0">Anda</span>
+                                    <!-- Grid Nilai (TWK, TIU, TKP) -->
+                                    <div class="flex items-center gap-4 sm:contents text-[11px] sm:text-xs">
+                                        <div class="sm:col-span-1 text-center">
+                                            <span class="sm:hidden text-[9px] text-slate-400 mr-1 uppercase">TWK</span>
+                                            <span class="font-medium tabular-nums" :class="user.twk >= 65 ? 'text-slate-600' : 'text-rose-500'" title="TWK">{{ user.twk }}</span>
                                         </div>
-                                        <div class="text-[10px] text-slate-500 truncate mt-0.5">
-                                            {{ getAgency(user) }}
+                                        <div class="sm:col-span-1 text-center">
+                                            <span class="sm:hidden text-[9px] text-slate-400 mr-1 uppercase">TIU</span>
+                                            <span class="font-medium tabular-nums" :class="user.tiu >= 80 ? 'text-slate-600' : 'text-rose-500'" title="TIU">{{ user.tiu }}</span>
                                         </div>
-                                        <div class="text-[9px] sm:text-[10px] flex flex-wrap items-center gap-1.5 mt-0.5">
-                                            <span v-if="user.is_passed" class="text-emerald-600 font-medium border border-emerald-100 bg-emerald-50 px-1 rounded uppercase tracking-wide">Lulus SKD</span>
-                                            <span v-else class="text-rose-500 font-medium border border-rose-100 bg-rose-50 px-1 rounded uppercase tracking-wide">Gagal</span>
+                                        <div class="sm:col-span-1 text-center">
+                                            <span class="sm:hidden text-[9px] text-slate-400 mr-1 uppercase">TKP</span>
+                                            <span class="font-medium tabular-nums" :class="user.tkp >= 166 ? 'text-slate-600' : 'text-rose-500'" title="TKP">{{ user.tkp }}</span>
                                         </div>
                                     </div>
-                                    
-                                    <div class="sm:hidden ml-auto text-right shrink-0">
-                                        <div class="text-lg font-medium text-blue-700 tabular-nums leading-none">{{ user.score }}</div>
+
+                                    <!-- Total Skor (Hanya tampil di Desktop) -->
+                                    <div class="hidden sm:block sm:col-span-1 text-center">
+                                        <span class="text-sm font-medium text-blue-700 tabular-nums">{{ user.score }}</span>
                                     </div>
-                                </div>
 
-                                <div class="hidden sm:block sm:col-span-1 text-center">
-                                    <span class="text-xs font-medium tabular-nums" :class="user.twk >= 65 ? 'text-slate-600' : 'text-rose-500'" title="TWK">{{ user.twk }}</span>
-                                </div>
-                                <div class="hidden sm:block sm:col-span-1 text-center">
-                                    <span class="text-xs font-medium tabular-nums" :class="user.tiu >= 80 ? 'text-slate-600' : 'text-rose-500'" title="TIU">{{ user.tiu }}</span>
-                                </div>
-                                <div class="hidden sm:block sm:col-span-1 text-center">
-                                    <span class="text-xs font-medium tabular-nums" :class="user.tkp >= 166 ? 'text-slate-600' : 'text-rose-500'" title="TKP">{{ user.tkp }}</span>
-                                </div>
-                                
-                                <div class="hidden sm:block sm:col-span-1 text-center">
-                                    <div class="text-sm font-medium text-blue-700 tabular-nums">{{ user.score }}</div>
-                                </div>
-
-                                <div class="hidden sm:flex sm:col-span-2 items-center justify-end text-[10px] sm:text-[11px] text-slate-500 tabular-nums font-medium">
-                                    {{ getDuration(user) }}
-                                </div>
-
-                                <div class="sm:hidden pl-[2.8rem] flex items-center justify-between pt-1">
-                                    <div class="flex gap-4 items-center">
-                                        <span class="text-[11px] font-medium tabular-nums" :class="user.twk >= 65 ? 'text-slate-600' : 'text-rose-500'" title="Skor TWK">{{ user.twk }}</span>
-                                        <span class="text-[11px] font-medium tabular-nums" :class="user.tiu >= 80 ? 'text-slate-600' : 'text-rose-500'" title="Skor TIU">{{ user.tiu }}</span>
-                                        <span class="text-[11px] font-medium tabular-nums" :class="user.tkp >= 166 ? 'text-slate-600' : 'text-rose-500'" title="Skor TKP">{{ user.tkp }}</span>
-                                    </div>
-                                    <div class="text-[10px] text-slate-400 tabular-nums text-right flex gap-1 font-medium items-center">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    <!-- Durasi Waktu -->
+                                    <div class="sm:col-span-1 text-[10px] sm:text-[11px] text-slate-400 sm:text-slate-500 font-medium flex items-center justify-end gap-1 tabular-nums text-right">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                         {{ getDuration(user) }}
                                     </div>
                                 </div>
-
+                                
                             </div>
                         </div>
                     </div>
@@ -456,14 +474,14 @@ const paginatedRankings = computed(() => {
                         </div>
                         
                         <div class="flex items-center gap-1.5 sm:gap-2">
-                            <button @click="currentPage--" :disabled="currentPage === 1" class="px-3 py-1.5 border border-slate-300 rounded-md text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] sm:text-xs font-medium transition-colors bg-white shadow-sm">
+                            <button type="button" @click="currentPage--" :disabled="currentPage === 1" class="px-3 py-1.5 border border-slate-300 rounded-md text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] sm:text-xs font-medium transition-colors bg-white shadow-sm">
                                 Sebelumnya
                             </button>
                             <span class="text-[11px] sm:text-xs text-slate-500 font-medium px-2">
                                 Hal {{ currentPage }} / {{ totalPages || 1 }}
                                 <span class="hidden sm:inline">({{ sortedRankings.length }} Total)</span>
                             </span>
-                            <button @click="currentPage++" :disabled="currentPage >= totalPages" class="px-3 py-1.5 border border-slate-300 rounded-md text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] sm:text-xs font-medium transition-colors bg-white shadow-sm">
+                            <button type="button" @click="currentPage++" :disabled="currentPage >= totalPages" class="px-3 py-1.5 border border-slate-300 rounded-md text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] sm:text-xs font-medium transition-colors bg-white shadow-sm">
                                 Selanjutnya
                             </button>
                         </div>
