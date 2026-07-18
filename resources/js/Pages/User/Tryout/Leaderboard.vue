@@ -18,14 +18,15 @@ const safeTryout = computed(() => props.tryout || {});
 const search = ref(safeFilters.value.search || '');
 const scope = ref(safeFilters.value.scope || 'nasional');
 
-// Update request untuk pencarian/filter
-// Update request untuk pencarian/filter
+// --- PERBAIKAN BUG REDIRECT (GUNAKAN ROUTER.RELOAD) ---
 const updateParams = debounce(() => {
-    // window.location.pathname akan selalu mengambil rute spesifik saat ini
-    router.get(window.location.pathname, { 
-        search: search.value,
-        scope: scope.value 
-    }, { 
+    // router.reload() menjamin request tetap di halaman saat ini 
+    // tanpa terpengaruh oleh konfigurasi domain/APP_URL yang salah di VPS
+    router.reload({ 
+        data: {
+            search: search.value,
+            scope: scope.value 
+        },
         preserveState: true, 
         preserveScroll: true,
         replace: true 
@@ -205,34 +206,15 @@ const paginatedRankings = computed(() => {
         </nav>
 
         <main class="flex-1 max-w-5xl mx-auto w-full px-3 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-6 relative">
-            <!-- Background Decoration -->
             <div class="absolute top-0 left-0 right-0 h-48 sm:h-64 bg-gradient-to-b from-[#1e60aa] to-slate-50 z-0 -mx-4 sm:-mx-8"></div>
 
             <div class="relative z-10 space-y-6 pt-1">
                 
-                <!-- Filter Section -->
-                <div class="bg-white/95 backdrop-blur-sm p-3 sm:p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
+                <!-- Filter Section (Redesigned) -->
+                <div class="bg-white/95 backdrop-blur-sm p-3 sm:p-4 rounded-2xl sm:rounded-xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-4">
                     
-                    <div class="flex bg-slate-100 p-1 rounded-lg w-full md:w-auto border border-slate-200 shrink-0">
-                        <button 
-                            type="button"
-                            @click="scope = 'nasional'"
-                            class="px-3 sm:px-5 py-2 rounded-md text-[11px] sm:text-sm font-medium transition-colors w-1/2 md:w-auto text-center"
-                            :class="scope === 'nasional' ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'"
-                        >
-                            Nasional
-                        </button>
-                        <button 
-                            type="button"
-                            @click="scope = 'provinsi'"
-                            class="px-3 sm:px-5 py-2 rounded-md text-[11px] sm:text-sm font-medium transition-colors w-1/2 md:w-auto text-center truncate"
-                            :class="scope === 'provinsi' ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'"
-                        >
-                            Provinsi {{ safeFilters.user_province ? `(${safeFilters.user_province})` : '' }}
-                        </button>
-                    </div>
-
-                    <div class="relative w-full md:max-w-xs shrink-0">
+                    <!-- Search Bar -->
+                    <div class="relative w-full sm:max-w-xs shrink-0 order-2 sm:order-1">
                         <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                             <svg class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -240,10 +222,30 @@ const paginatedRankings = computed(() => {
                         </div>
                         <input 
                             v-model="search"
-                            type="text" 
-                            class="block w-full pl-9 pr-4 py-2 sm:py-2.5 border border-slate-200 rounded-lg bg-slate-50 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:bg-white text-xs sm:text-sm transition-colors" 
+                            type="search" 
+                            class="block w-full pl-9 pr-4 py-2.5 sm:py-2.5 border border-slate-200 rounded-xl bg-slate-50 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white text-xs sm:text-sm transition-all" 
                             placeholder="Cari nama peserta..." 
                         />
+                    </div>
+
+                    <!-- Scope Toggles -->
+                    <div class="flex bg-slate-100 p-1 rounded-xl w-full sm:w-auto border border-slate-200 shrink-0 order-1 sm:order-2">
+                        <button 
+                            type="button"
+                            @click="scope = 'nasional'"
+                            class="px-3 sm:px-5 py-2.5 sm:py-2 rounded-lg text-[11px] sm:text-sm font-bold sm:font-medium transition-all w-1/2 sm:w-auto text-center"
+                            :class="scope === 'nasional' ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-700'"
+                        >
+                            Nasional
+                        </button>
+                        <button 
+                            type="button"
+                            @click="scope = 'provinsi'"
+                            class="px-3 sm:px-5 py-2.5 sm:py-2 rounded-lg text-[11px] sm:text-sm font-bold sm:font-medium transition-all w-1/2 sm:w-auto text-center truncate"
+                            :class="scope === 'provinsi' ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-700'"
+                        >
+                            Provinsi {{ safeFilters.user_province ? `(${safeFilters.user_province})` : '' }}
+                        </button>
                     </div>
                 </div>
 
@@ -380,7 +382,7 @@ const paginatedRankings = computed(() => {
 
                     <div v-if="paginatedRankings.length > 0">
                         <div v-for="(user, index) in paginatedRankings" :key="'rank-' + user.id + '-' + index" 
-                            class="p-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
+                            class="p-4 sm:px-4 sm:py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
                             :class="{'bg-blue-50/30 hover:bg-blue-50/50': user.is_me}">
                             
                             <!-- Unified Row -->
