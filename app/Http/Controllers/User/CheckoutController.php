@@ -122,6 +122,43 @@ class CheckoutController extends Controller
         ]);
     }
 
+    public function processBundle(Request $request)
+{
+    $request->validate([
+        'tryout_ids' => 'required|array|min:3',
+        'tryout_ids.*' => 'exists:tryouts,id',
+    ], [
+        'tryout_ids.min' => 'Anda harus memilih minimal 3 tryout untuk paket bundling.'
+    ]);
+
+    $selectedTryouts = Tryout::whereIn('id', $request->tryout_ids)->get();
+    
+    $totalPrice = $selectedTryouts->sum('price');
+    // Opsional: Terapkan diskon bundling di sini jika ada
+
+    DB::transaction(function () use ($selectedTryouts, $totalPrice, $request) {
+        // Buat transaksi utama di tabel transactions[cite: 1]
+        $transaction = Transaction::create([
+            'user_id' => auth()->id(),
+            'total_amount' => $totalPrice,
+            'status' => 'pending',
+            'type' => 'bundling', 
+            'payment_method' => $request->payment_method ?? 'transfer',
+        ]);
+
+        // Catat setiap tryout ke tabel purchases[cite: 1]
+        foreach ($selectedTryouts as $tryout) {
+            Purchase::create([
+                'transaction_id' => $transaction->id,
+                'tryout_id' => $tryout->id,
+                'price' => $tryout->price,
+            ]);
+        }
+    });
+
+    return redirect()->route('user.transaction.detail')->with('success', 'Berhasil membuat pesanan bundling!');
+}
+
 public function process(Request $request, Transaction $transaction)
     {
         $request->validate(['payment_method' => 'required|in:wallet,midtrans']);

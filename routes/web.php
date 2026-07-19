@@ -108,6 +108,12 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     Route::get('/tryouts/{tryout}/exam-bkn', [UserTryoutController::class, 'examBkn'])->name('tryout.exam.bkn');
     Route::post('/tryouts/{tryout}/finish', [UserTryoutController::class, 'finish'])->name('tryout.finish');
 
+    // Menampilkan halaman bundling
+    Route::get('/bundling', [TryoutController::class, 'bundlingIndex'])->name('user.bundling.index');
+    
+    // Memproses checkout bundling
+    Route::post('/bundling/checkout', [CheckoutController::class, 'processBundle'])->name('user.bundling.checkout');
+
     // --- HASIL & RIWAYAT ---
     Route::get('/tryouts/result/{attempt}', [UserTryoutController::class, 'result'])->name('tryout.result');
     Route::get('/tryouts/review/{attempt}', [UserTryoutController::class, 'review'])->name('tryout.review');

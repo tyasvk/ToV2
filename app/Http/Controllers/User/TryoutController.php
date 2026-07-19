@@ -684,6 +684,19 @@ public function history()
         return Inertia::render('User/Tryout/Review', ['attempt' => $attempt, 'questions' => $questions, 'tryout' => $attempt->tryout]);
     }
 
+public function bundlingIndex()
+{
+    // Mengambil tryout yang batas waktunya (end_date) sudah lewat
+    $archivedTryouts = Tryout::where('end_date', '<', now())
+        ->select('id', 'title', 'price', 'end_date')
+        ->orderBy('end_date', 'desc')
+        ->get();
+
+    return Inertia::render('User/Bundling/Index', [
+        'tryouts' => $archivedTryouts
+    ]);
+}
+
 public function leaderboard(Request $request, Tryout $tryout)
     {
         $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65; 
