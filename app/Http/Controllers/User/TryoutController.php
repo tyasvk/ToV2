@@ -685,17 +685,25 @@ public function history()
     }
 
 public function bundlingIndex()
-{
-    // Mengambil tryout yang batas waktunya (end_date) sudah lewat
-    $archivedTryouts = Tryout::where('end_date', '<', now())
-        ->select('id', 'title', 'price', 'end_date')
-        ->orderBy('end_date', 'desc')
-        ->get();
+    {
+        // Mengambil tryout untuk halaman bundling
+        $archivedTryouts = Tryout::query()
+            ->where('is_published', true) // Wajib pastikan tryout sudah di-publish
+            ->where(function ($query) {
+                // Mengecualikan tryout event khusus (sesuaikan dengan logika di index)
+                $query->whereNotIn('type', ['akbar', 'adidaya'])
+                      ->orWhereNull('type');
+            })
+            // KOMENTARI ATAU HAPUS kode di bawah jika Anda ingin tryout yang masih aktif (baru dibuat) juga muncul di halaman bundling
+            // ->where('end_date', '<', now()) 
+            ->select('id', 'title', 'price', 'end_date', 'created_at')
+            ->orderBy('created_at', 'desc') // Mengurutkan dari yang terbaru dibuat
+            ->get();
 
-    return Inertia::render('User/Bundling/Index', [
-        'tryouts' => $archivedTryouts
-    ]);
-}
+        return Inertia::render('User/Bundling/Index', [
+            'tryouts' => $archivedTryouts
+        ]);
+    }
 
 public function leaderboard(Request $request, Tryout $tryout)
     {
