@@ -91,7 +91,7 @@ class TryoutController extends Controller
     }
 
     /**
-     * Proses Pendaftaran Tryout (Validasi Diskon Grup & Voucher Afiliasi)
+     * Proses Pendaftaran Tryout Tunggal
      */
     public function processRegistration(Request $request, Tryout $tryout)
     {
@@ -237,7 +237,7 @@ class TryoutController extends Controller
                     $q->whereIn('status', ['paid', 'success'])
                       ->where(function($sq) use ($userId, $userEmail) {
                           $sq->where('user_id', $userId)
-                            ->orWhereJsonContains('participants_data', $userEmail);
+                             ->orWhereJsonContains('participants_data', $userEmail);
                       });
                 });
 
@@ -262,10 +262,7 @@ class TryoutController extends Controller
         ]);
     }
 
-    // ===================================================================
-    // PERBAIKAN MUTLAK: Mengunci Hitungan Detik dari Selisih Waktu Riil
-    // ===================================================================
-public function result(ExamAttempt $attempt)
+    public function result(ExamAttempt $attempt)
     {
         if ($attempt->user_id !== auth()->id()) abort(403);
         
@@ -280,30 +277,21 @@ public function result(ExamAttempt $attempt)
         $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80;
         $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
 
-        // =====================================================================
-        // PERBAIKAN LOGIKA PERINGKAT: HANYA DIADU DENGAN PERCOBAAN PERTAMA
-        // =====================================================================
-        
-        // 1. Ambil HANYA pengerjaan PERTAMA dari setiap user untuk tryout ini
         $firstAttempts = ExamAttempt::where('tryout_id', $tryout->id)
             ->orderBy('created_at', 'asc')
             ->get()
             ->groupBy('user_id')
             ->map(function ($userAttempts) {
-                return $userAttempts->first(); // Ambil riwayat paling awal
+                return $userAttempts->first(); 
             });
 
-        // Total peserta asli (jumlah orang, bukan jumlah percobaan)
         $totalParticipants = $firstAttempts->count();
 
-        // 2. Format skor pengerjaan kita saat ini untuk perbandingan
         $currentPassed = ($attempt->twk_score >= $pgTwk && $attempt->tiu_score >= $pgTiu && $attempt->tkp_score >= $pgTkp) ? 1 : 0;
         $currentScoreString = sprintf('%d-%03d-%03d-%03d-%03d', $currentPassed, $attempt->total_score, $attempt->tkp_score, $attempt->tiu_score, $attempt->twk_score);
 
-        // 3. Hitung Peringkat (Bandingkan dengan percobaan pertama orang lain)
         $rank = 1;
         foreach ($firstAttempts as $userId => $firstAttempt) {
-            // Jangan membandingkan dengan riwayat diri sendiri agar peringkat tidak dobel
             if ($userId === $attempt->user_id) {
                 continue; 
             }
@@ -311,12 +299,10 @@ public function result(ExamAttempt $attempt)
             $isPassed = ($firstAttempt->twk_score >= $pgTwk && $firstAttempt->tiu_score >= $pgTiu && $firstAttempt->tkp_score >= $pgTkp) ? 1 : 0;
             $compareScoreString = sprintf('%d-%03d-%03d-%03d-%03d', $isPassed, $firstAttempt->total_score, $firstAttempt->tkp_score, $firstAttempt->tiu_score, $firstAttempt->twk_score);
 
-            // Jika nilai percobaan pertama orang lain lebih tinggi, peringkat kita turun (bertambah 1)
             if (strcmp($compareScoreString, $currentScoreString) > 0) {
                 $rank++;
             }
         }
-        // =====================================================================
 
         $scoreDetails = [
             ['category' => 'Tes Wawasan Kebangsaan (TWK)', 'score' => $attempt->twk_score, 'passing_grade' => $pgTwk, 'is_passed' => $attempt->twk_score >= $pgTwk],
@@ -326,7 +312,6 @@ public function result(ExamAttempt $attempt)
 
         $attempt->status = $attempt->is_passed ? 'lulus' : 'tidak_lulus';
 
-        // Hitung total detik pengerjaan asli dari selisih waktu murni database
         $durationSeconds = 0;
         if ($attempt->created_at && $attempt->completed_at) {
             $durationSeconds = \Carbon\Carbon::parse($attempt->created_at)->diffInSeconds($attempt->completed_at);
@@ -451,7 +436,7 @@ public function result(ExamAttempt $attempt)
         return Inertia::render('User/Tryout/Wait', ['tryout' => $tryout->loadCount('questions')]);
     }
 
-public function examBkn(Tryout $tryout)
+    public function examBkn(Tryout $tryout)
     {
         $check = $this->validateAccess($tryout);
         if (!$check['allowed']) return redirect()->route($check['route'], $tryout->id)->with('error', $check['message']);
@@ -477,7 +462,6 @@ public function examBkn(Tryout $tryout)
             ]);
         }
 
-        // KUNCI ABSOLUT: Hitung selisih detik murni dari created_at awal ke waktu SEKARANG (now)
         $durationSeconds = ($tryout->duration ?? 100) * 60;
         $elapsedSeconds = now()->diffInSeconds($attempt->created_at, true); 
         $serverTimeLeft = (int) ($durationSeconds - $elapsedSeconds);
@@ -522,7 +506,6 @@ public function examBkn(Tryout $tryout)
             ]);
         }
 
-        // KUNCI ABSOLUT: Hitung selisih detik murni dari created_at awal ke waktu SEKARANG (now)
         $durationSeconds = ($tryout->duration ?? 100) * 60;
         $elapsedSeconds = now()->diffInSeconds($attempt->created_at, true);
         $serverTimeLeft = (int) ($durationSeconds - $elapsedSeconds);
@@ -541,37 +524,34 @@ public function examBkn(Tryout $tryout)
         ]);
     }   
 
-public function incrementPenalty(Tryout $tryout)
-{
-    $attempt = ExamAttempt::where('user_id', auth()->id())
-        ->where('tryout_id', $tryout->id)
-        ->whereNull('completed_at')
-        ->first();
+    public function incrementPenalty(Tryout $tryout)
+    {
+        $attempt = ExamAttempt::where('user_id', auth()->id())
+            ->where('tryout_id', $tryout->id)
+            ->whereNull('completed_at')
+            ->first();
 
-    if ($attempt) {
-        $attempt->increment('left_count');
-        
-        // Jika kesempatan habis saat dipanggil
-        if ($attempt->left_count >= 3) {
-            $attempt->update(['completed_at' => now()]);
-            return response()->json(['status' => 'kicked']);
+        if ($attempt) {
+            $attempt->increment('left_count');
+            
+            if ($attempt->left_count >= 3) {
+                $attempt->update(['completed_at' => now()]);
+                return response()->json(['status' => 'kicked']);
+            }
         }
+
+        return response()->json(['status' => 'ok']);
     }
 
-    return response()->json(['status' => 'ok']);
-}
-
-public function finish(Request $request, Tryout $tryout)
+    public function finish(Request $request, Tryout $tryout)
     {
         $user = auth()->user();
         
-        // Cari sesi attempt aktif yang dibuat di awal halaman tadi
         $attempt = ExamAttempt::where('user_id', $user->id)
             ->where('tryout_id', $tryout->id)
             ->whereNull('completed_at')
             ->first();
 
-        // Antisipasi jika data attempt sudah terkunci otomatis oleh sistem/tidak ditemukan
         if (!$attempt) {
             return redirect()->route('tryout.history.detail', $tryout->id)
                 ->with('error', 'Sesi ujian Anda telah berakhir atau sudah tersimpan sebelumnya.');
@@ -594,7 +574,6 @@ public function finish(Request $request, Tryout $tryout)
             }
         }
 
-        // Lakukan UPDATE data, bukan membuat data baru (mencegah double attempts)
         $attempt->update([
             'answers' => $answers, 
             'twk_score' => $twk, 
@@ -607,8 +586,7 @@ public function finish(Request $request, Tryout $tryout)
         return redirect()->route('tryout.result', $attempt->id);
     }
 
-// Menjadi
-public function history()
+    public function history()
     {
         $attempts = ExamAttempt::where('user_id', auth()->id())
             ->with('tryout')
@@ -619,7 +597,6 @@ public function history()
         $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80; 
         $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
 
-        // Optimasi: Ambil pengerjaan pertama secara massal untuk menghindari query lambat (N+1)
         $tryoutIds = $attempts->pluck('tryout_id')->unique();
         $firstAttemptsByTryout = collect();
         
@@ -634,7 +611,6 @@ public function history()
         $histories = $attempts->map(function ($attempt) use ($pgTwk, $pgTiu, $pgTkp, $firstAttemptsByTryout) {
             $attempt->is_passed = ($attempt->twk_score >= $pgTwk && $attempt->tiu_score >= $pgTiu && $attempt->tkp_score >= $pgTkp);
             
-            // Ambil seluruh percobaan pertama dari database yang dicache sebelumnya
             $firstAttempts = $firstAttemptsByTryout[$attempt->tryout_id] ?? collect();
             
             $currentPassed = $attempt->is_passed ? 1 : 0;
@@ -642,13 +618,11 @@ public function history()
 
             $rank = 1;
             foreach ($firstAttempts as $userId => $firstAttempt) {
-                // Abaikan percobaan diri sendiri
                 if ($userId === $attempt->user_id) continue;
 
                 $isPassed = ($firstAttempt->twk_score >= $pgTwk && $firstAttempt->tiu_score >= $pgTiu && $firstAttempt->tkp_score >= $pgTkp) ? 1 : 0;
                 $compareScoreString = sprintf('%d-%03d-%03d-%03d-%03d', $isPassed, $firstAttempt->total_score, $firstAttempt->tkp_score, $firstAttempt->tiu_score, $firstAttempt->twk_score);
 
-                // Jika nilai pertama orang lain lebih tinggi, rank bertambah
                 if (strcmp($compareScoreString, $currentScoreString) > 0) {
                     $rank++;
                 }
@@ -684,20 +658,25 @@ public function history()
         return Inertia::render('User/Tryout/Review', ['attempt' => $attempt, 'questions' => $questions, 'tryout' => $attempt->tryout]);
     }
 
-public function bundlingIndex()
+    public function bundlingIndex()
     {
-        // Mengambil tryout untuk halaman bundling
+        $user = auth()->user();
+
         $archivedTryouts = Tryout::query()
-            ->where('is_published', true) // Wajib pastikan tryout sudah di-publish
+            ->where('is_published', true) 
             ->where(function ($query) {
-                // Mengecualikan tryout event khusus (sesuaikan dengan logika di index)
                 $query->whereNotIn('type', ['akbar', 'adidaya'])
                       ->orWhereNull('type');
             })
-            // KOMENTARI ATAU HAPUS kode di bawah jika Anda ingin tryout yang masih aktif (baru dibuat) juga muncul di halaman bundling
-            // ->where('end_date', '<', now()) 
+            ->whereDoesntHave('transactions', function($q) use ($user) {
+                $q->whereIn('status', ['paid', 'success'])
+                  ->where(function($subQuery) use ($user) {
+                      $subQuery->where('user_id', $user->id)
+                               ->orWhereJsonContains('participants_data', $user->email);
+                  });
+            })
             ->select('id', 'title', 'price', 'end_date', 'created_at')
-            ->orderBy('created_at', 'desc') // Mengurutkan dari yang terbaru dibuat
+            ->orderBy('created_at', 'desc') 
             ->get();
 
         return Inertia::render('User/Bundling/Index', [
@@ -705,22 +684,105 @@ public function bundlingIndex()
         ]);
     }
 
-public function leaderboard(Request $request, Tryout $tryout)
+/**
+     * Proses Checkout Bundling Tryout (Mendukung Dompet & Midtrans)
+     */
+    public function processBundlingCheckout(Request $request)
+    {
+        // 1. Validasi input, termasuk pilihan metode pembayaran
+        $request->validate([
+            'tryout_ids' => 'required|array|min:3',
+            'tryout_ids.*' => 'required|exists:tryouts,id',
+            'payment_method' => 'required|in:wallet,midtrans'
+        ]);
+
+        $user = auth()->user();
+        $tryouts = \App\Models\Tryout::whereIn('id', $request->tryout_ids)->get();
+        $totalAmount = $tryouts->sum('price');
+        $baseInvoice = 'BNDL-' . strtoupper(\Illuminate\Support\Str::random(10));
+
+        // ==========================================
+        // JIKA MEMILIH DOMPET (WALLET)
+        // ==========================================
+        if ($request->payment_method === 'wallet') {
+            if ($user->balance < $totalAmount) {
+                return back()->withErrors(['message' => 'Saldo dompet tidak mencukupi untuk membeli paket bundling ini.']);
+            }
+
+            \Illuminate\Support\Facades\DB::transaction(function () use ($user, $tryouts, $totalAmount, $baseInvoice) {
+                // Potong saldo
+                $user->decrement('balance', $totalAmount);
+                
+                // Catat di riwayat dompet
+                \App\Models\WalletTransaction::create([
+                    'user_id' => $user->id, 
+                    'type' => 'debit', 
+                    'amount' => $totalAmount, 
+                    'description' => 'Pembelian Bundling Tryout (' . $tryouts->count() . ' item)', 
+                    'status' => 'success', 
+                    'proof_payment' => 'WALLET-SYSTEM'
+                ]);
+                
+                // Buat transaksi lunas untuk masing-masing tryout
+                foreach ($tryouts as $tryout) {
+                    \App\Models\Transaction::create([
+                        'user_id' => $user->id, 
+                        'tryout_id' => $tryout->id, 
+                        'invoice_code' => $baseInvoice . '-' . $tryout->id, 
+                        'unit_price' => $tryout->price, 
+                        'qty' => 1, 
+                        'amount' => $tryout->price, 
+                        'participants_data' => [$user->email], 
+                        'status' => 'paid',
+                        'metadata' => [
+                            'is_bundling' => true,
+                            'bundle_group' => $baseInvoice, 
+                            'base_price' => $tryout->price
+                        ]
+                    ]);
+                }
+            });
+
+            // Langsung arahkan ke Tryout Saya karena sudah lunas
+            return redirect()->route('tryout.index')->with('success', 'Paket bundling berhasil dibeli dengan Saldo Dompet!');
+        }
+
+        // ==========================================
+        // JIKA MEMILIH MIDTRANS / QRIS
+        // ==========================================
+        $transaction = \App\Models\Transaction::create([
+            'user_id' => $user->id, 
+            'tryout_id' => $tryouts->first()->id, 
+            'invoice_code' => $baseInvoice, 
+            'unit_price' => $totalAmount, 
+            'qty' => 1, 
+            'amount' => $totalAmount, 
+            'participants_data' => [$user->email], 
+            'status' => 'pending', 
+            'metadata' => [
+                'is_bundling' => true,
+                'bundled_tryout_ids' => $request->tryout_ids, 
+                'base_price' => $totalAmount
+            ]
+        ]);
+
+        // Arahkan ke halaman Checkout khusus Midtrans
+        return redirect()->route('checkout.show', $transaction->id);
+    }
+
+    public function leaderboard(Request $request, Tryout $tryout)
     {
         $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65; 
         $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80; 
         $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
 
-        // 1. Ambil SEMUA riwayat pengerjaan, urutkan dari waktu paling awal
         $allAttempts = ExamAttempt::with('user')
             ->where('tryout_id', $tryout->id)
             ->orderBy('created_at', 'asc')
             ->get();
 
-        // 2. Filter HANYA Pengerjaan PERTAMA tiap user
         $firstAttempts = $allAttempts->groupBy('user_id')->map->first()->values();
 
-        // 3. Format data (Tidak perlu di-sort di sini, Vue yang akan mengurutkan)
         $rankings = $firstAttempts->map(function($a) use ($pgTwk, $pgTiu, $pgTkp) {
             $isPassed = ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp);
             return [
@@ -778,15 +840,13 @@ public function leaderboard(Request $request, Tryout $tryout)
         return Inertia::render('User/Tryout/CollectiveRegister', ['tryout' => $tryout]);
     }
 
-public function checkEmail(Request $request)
+    public function checkEmail(Request $request)
     {
-        // 1. Validasi request, pastikan tryout_id juga dikirim dari Vue
         $request->validate([
             'email' => 'required|email',
             'tryout_id' => 'required|exists:tryouts,id'
         ]);
 
-        // 2. Cari pengguna berdasarkan email
         $user = \App\Models\User::where('email', $request->email)->first();
 
         if (!$user) {
@@ -796,23 +856,18 @@ public function checkEmail(Request $request)
             ], 404);
         }
 
-        // 3. CEK TRANSAKSI: Apakah user ini sudah pernah membeli tryout ini dan lunas?
         $hasPurchased = \App\Models\Transaction::where('user_id', $user->id)
             ->where('tryout_id', $request->tryout_id)
             ->whereIn('status', ['paid', 'success'])
             ->exists();
 
-        // Cek juga jika dia adalah pembuat tim / ada di dalam tim transaksi lunas (opsional, jika data tim disimpan di JSON metadata)
-        // $inOtherTeam = \App\Models\Transaction::where('tryout_id', $request->tryout_id)->whereJsonContains('metadata->team_members', $user->email)->whereIn('status', ['paid', 'success'])->exists();
-
         if ($hasPurchased) {
             return response()->json([
                 'status' => 'already_purchased',
                 'message' => 'Email ini sudah memiliki tryout ini.'
-            ], 400); // Kode 400 memicu blok catch() di frontend (berwarna merah)
+            ], 400); 
         }
 
-        // 4. Jika aman, kembalikan data user
         return response()->json([
             'status' => 'success',
             'message' => 'Email tersedia.',
@@ -824,9 +879,6 @@ public function checkEmail(Request $request)
         ], 200);
     }
 
-    // ==========================================
-    // FUNGSI CEK VOUCHER REAL-TIME (AJAX)
-    // ==========================================
     public function checkVoucher(Request $request)
     {
         $code = trim($request->voucher_code);
@@ -847,9 +899,6 @@ public function checkEmail(Request $request)
         return response()->json(['valid' => true, 'message' => 'Kode valid.']);
     }
 
-    /**
-     * Menyimpan laporan soal dari user
-     */
     public function reportQuestion(\Illuminate\Http\Request $request)
     {
         $request->validate([

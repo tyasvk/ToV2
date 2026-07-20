@@ -90,6 +90,8 @@ public function index()
         }
     }
 
+    
+
  public function claimVoucher(Request $request)
     {
         $request->validate([
@@ -167,48 +169,68 @@ public function index()
     /**
      * Method Baru: Bayar Transaksi Pending dari History
      */
-public function payPending(WalletTransaction $transaction)
+public function payPending(\App\Models\Transaction $transaction)
     {
-        // 1. Validasi Kepemilikan & Status
-        if ($transaction->user_id !== auth()->id()) {
-            abort(403);
-        }
+        // 1. Validasi
         if ($transaction->status !== 'pending') {
-            return back()->withErrors(['message' => 'Transaksi ini sudah tidak pending.']);
+            return back()->withErrors(['message' => 'Transaksi ini tidak berstatus pending.']);
         }
 
-        // 2. Konfigurasi Midtrans
-        Config::$serverKey = config('services.midtrans.server_key');
-        Config::$isProduction = config('services.midtrans.is_production');
-        Config::$isSanitized = true;
-        Config::$is3ds = true;
-
-        // 3. BUAT ORDER ID BARU UNTUK MENGHINDARI ERROR "ORDER_ID SUDAH DIGUNAKAN"
-        // Kita tambahkan suffix '-R' dan timestamp agar Midtrans menganggap ini order valid yang baru
-        $newOrderId = $transaction->proof_payment . '-R' . time(); 
-
-        $params = [
-            'transaction_details' => [
-                'order_id' => $newOrderId, // Gunakan ID Baru
-                'gross_amount' => (int) $transaction->amount,
-            ],
-            'customer_details' => [
-                'first_name' => auth()->user()->name,
-                'email' => auth()->user()->email,
-            ],
-        ];
-
-        try {
-            $snapToken = Snap::getSnapToken($params);
-            
-            // 4. Update order_id (proof_payment) lama di database dengan yang baru
-            $transaction->update(['proof_payment' => $newOrderId]);
-
-            // Kirim token kembali ke frontend
-            return back()->with('snapToken', $snapToken);
-            
-        } catch (\Exception $e) {
-            return back()->withErrors(['message' => 'Error Midtrans: ' . $e->getMessage()]);
+        $user = auth()->user();
+        if ($user->balance < $transaction->amount) {
+            return back()->withErrors(['message' => 'Saldo dompet Anda tidak mencukupi.']);
         }
+
+        // 2. Lakukan Pembayaran dengan Database Transaction
+        \Illuminate\Support\Facades\DB::transaction(function () use ($user, $transaction) {
+            // Potong saldo
+            $user->decrement('balance', $transaction->amount);
+            
+            // Catat pengeluaran di dompet
+            \App\Models\WalletTransaction::create([
+                'user_id' => $user->id,
+                'type' => 'debit',
+                'amount' => $transaction->amount,
+                'description' => 'Pembayaran Invoice: ' . $transaction->invoice_code,
+                'status' => 'success',
+                'proof_payment' => 'WALLET-SYSTEM'
+            ]);
+
+            // Ubah status transaksi utama menjadi lunas
+            $transaction->update(['status' => 'paid']);
+
+            // =========================================================
+            // TAMBAHKAN LOGIKA BUNDLING DI SINI (SETELAH LUNAS)
+            // =========================================================
+            if (isset($transaction->metadata['is_bundling']) && $transaction->metadata['is_bundling']) {
+                $bundledIds = $transaction->metadata['bundled_tryout_ids'] ?? [];
+                
+                // Buang ID pertama dari array, karena itu sudah ada di $transaction utama
+                $otherIds = array_diff($bundledIds, [$transaction->tryout_id]);
+                
+                // Looping untuk mendaftarkan sisa tryout ke "Tryout Saya"
+                foreach ($otherIds as $tId) {
+                    \App\Models\Transaction::create([
+                        'user_id' => $transaction->user_id,
+                        'tryout_id' => $tId,
+                        'invoice_code' => $transaction->invoice_code . '-' . $tId,
+                        'unit_price' => 0, // Set 0 karena harga sudah dibayar di transaksi gabungan
+                        'qty' => 1,
+                        'amount' => 0,
+                        'participants_data' => $transaction->participants_data,
+                        'status' => 'paid',
+                        'metadata' => [
+                            'is_bundling_member' => true,
+                            'parent_invoice' => $transaction->invoice_code
+                        ]
+                    ]);
+                }
+            }
+            // =========================================================
+            
+        });
+
+        // 3. Redirect ke Halaman Tryout
+        return redirect()->route('tryout.index')->with('success', 'Pembayaran berhasil dilakukan!');
     }
 }

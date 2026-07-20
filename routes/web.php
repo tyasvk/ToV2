@@ -111,8 +111,8 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     // Menampilkan halaman bundling
     Route::get('/bundling', [TryoutController::class, 'bundlingIndex'])->name('user.bundling.index');
     
-    // Memproses checkout bundling
-    Route::post('/bundling/checkout', [CheckoutController::class, 'processBundle'])->name('user.bundling.checkout');
+    // Memproses checkout bundling (DIPERBARUI KE TRYOUTCONTROLLER)
+    Route::post('/bundling/checkout', [TryoutController::class, 'processBundlingCheckout'])->name('user.bundling.checkout');
 
     // --- HASIL & RIWAYAT ---
     Route::get('/tryouts/result/{attempt}', [UserTryoutController::class, 'result'])->name('tryout.result');
@@ -215,7 +215,6 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->name('vouchers.destroy');
 });
 
-
 // ==========================================
 // RUTE BEBAS AKSES (WEBHOOK MIDTRANS)
 // ==========================================
@@ -223,6 +222,5 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
 // agar server Midtrans dapat mengirimkan notifikasi ke sini tanpa hambatan.
 //Route::post('/midtrans/callback', [MidtransCallbackController::class, 'handle'])
  //   ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-
 
 require __DIR__.'/auth.php';
