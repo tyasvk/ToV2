@@ -269,48 +269,49 @@ onUnmounted(() => {
                     </div>
                 </div>
 
-                <!-- CARD 5: REKOMENDASI TRYOUT -->
-                <div class="order-3 md:order-6 space-y-3 md:space-y-2.5 pt-2 md:pt-0">
-                    <div class="flex items-center justify-between px-1">
-                        <h3 class="font-bold md:font-medium text-xs md:text-[10px] lg:text-xs text-slate-900 uppercase tracking-wider md:tracking-[0.15em]">
-                            Rekomendasi Paket<span class="hidden md:inline"> Tryout</span>
-                        </h3>
-                        <Link :href="route('tryout.index')" class="text-[11px] md:text-[10px] font-bold md:font-medium text-blue-600 uppercase tracking-wider md:hover:text-blue-700 transition">Lihat Semua →</Link>
-                    </div>
+              <!-- CARD 5: REKOMENDASI TRYOUT -->
+<div class="order-3 md:order-6 space-y-3 md:space-y-2.5 pt-2 md:pt-0">
+    <div class="flex items-center justify-between px-1">
+        <h3 class="font-bold md:font-medium text-xs md:text-[10px] lg:text-xs text-slate-900 uppercase tracking-wider md:tracking-[0.15em]">
+            Rekomendasi Paket<span class="hidden md:inline"> Tryout</span>
+        </h3>
+        <Link :href="route('tryout.index')" class="text-[11px] md:text-[10px] font-bold md:font-medium text-blue-600 uppercase tracking-wider md:hover:text-blue-700 transition">Lihat Semua →</Link>
+    </div>
 
-                    <div v-if="unpurchased_tryouts && unpurchased_tryouts.length > 0" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-3 pb-8 md:pb-6">
-                        <div v-for="tryout in unpurchased_tryouts" :key="tryout.id" class="bg-white rounded-2xl md:rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between group">
-                            
-                            <div class="p-3 bg-slate-50 border-b border-slate-200/60 flex items-center justify-between">
-                                <div class="w-8 h-8 md:w-6 md:h-6 bg-slate-900 rounded-lg md:rounded-md flex items-center justify-center text-white font-bold md:font-medium text-xs md:text-[9px] shadow-sm">TO</div>
-                                <span class="text-[9px] md:text-[8px] font-bold md:font-medium text-blue-600 bg-blue-50 border border-blue-100 px-2 md:px-1.5 py-1 md:py-0.5 rounded-md md:rounded uppercase tracking-wider">Tersedia</span>
-                            </div>
-                            
-                            <div class="p-4 flex flex-col justify-between flex-1 gap-3 md:gap-0">
-                                <div>
-                                    <h4 class="font-bold md:font-medium text-sm md:text-xs lg:text-sm text-slate-900 leading-tight uppercase mb-1 md:mb-1.5 tracking-tight md:group-hover:text-blue-600 transition-colors line-clamp-2 md:line-clamp-1">{{ tryout.title }}</h4>
-                                    <p class="text-[11px] text-slate-500 md:text-slate-400 font-normal leading-relaxed line-clamp-2 md:mb-4">{{ tryout.description || 'Paket simulasi terbaru untuk mematangkan persiapan tes Anda.' }}</p>
-                                </div>
-                                
-                                <Link :href="route('tryout.show', tryout.id)" class="block w-full text-center bg-blue-50 text-blue-700 md:text-blue-600 border border-blue-200 md:border-blue-100 py-3 md:py-2 rounded-xl md:rounded-lg font-bold md:font-medium text-[11px] md:text-[10px] lg:text-xs uppercase tracking-wider md:hover:bg-blue-600 md:hover:text-white transition-colors shadow-sm active:scale-95 mt-1 md:mt-0">
-                                    Lihat Detail & Beli
-                                </Link>
-                            </div>
-
-                        </div>
-                    </div>
-
-                    <!-- State Kosong / Sudah Dibeli Semua -->
-                    <div v-else class="bg-white border-2 md:border border-dashed md:border-solid border-slate-200 rounded-2xl md:rounded-xl p-8 md:p-6 text-center shadow-sm flex flex-col items-center">
-                        <div class="text-3xl mb-2 md:hidden">📭</div>
-                        <div class="hidden md:flex w-9 h-9 bg-slate-50 border border-slate-100 rounded-full items-center justify-center mb-2">
-                            <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                            </svg>
-                        </div>
-                        <p class="text-xs text-slate-500 md:text-slate-400 font-medium md:font-normal leading-relaxed md:leading-normal">Anda sudah memiliki semua tryout yang tersedia<span class="hidden md:inline"> saat ini</span>.</p>
-                    </div>
+    <div v-if="unpurchased_tryouts && unpurchased_tryouts.length > 0" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-3 pb-8 md:pb-6">
+        <div v-for="tryout in unpurchased_tryouts" :key="tryout.id" class="bg-white rounded-2xl md:rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between group">
+            
+            <div class="p-3 bg-slate-50 border-b border-slate-200/60 flex items-center justify-between">
+                <div class="w-8 h-8 md:w-6 md:h-6 bg-slate-900 rounded-lg md:rounded-md flex items-center justify-center text-white font-bold md:font-medium text-xs md:text-[9px] shadow-sm">TO</div>
+                <span class="text-[9px] md:text-[8px] font-bold md:font-medium text-blue-600 bg-blue-50 border border-blue-100 px-2 md:px-1.5 py-1 md:py-0.5 rounded-md md:rounded uppercase tracking-wider">Tersedia</span>
+            </div>
+            
+            <div class="p-4 flex flex-col justify-between flex-1 gap-3 md:gap-0">
+                <div>
+                    <!-- H4 di bawah ini sudah dihapus line-clamp-nya agar teks otomatis turun ke bawah -->
+                    <h4 class="font-bold md:font-medium text-sm md:text-xs lg:text-sm text-slate-900 leading-tight uppercase mb-1 md:mb-1.5 tracking-tight md:group-hover:text-blue-600 transition-colors">{{ tryout.title }}</h4>
+                    <p class="text-[11px] text-slate-500 md:text-slate-400 font-normal leading-relaxed line-clamp-2 md:mb-4">{{ tryout.description || 'Paket simulasi terbaru untuk mematangkan persiapan tes Anda.' }}</p>
                 </div>
+                
+                <Link :href="route('tryout.show', tryout.id)" class="block w-full text-center bg-blue-50 text-blue-700 md:text-blue-600 border border-blue-200 md:border-blue-100 py-3 md:py-2 rounded-xl md:rounded-lg font-bold md:font-medium text-[11px] md:text-[10px] lg:text-xs uppercase tracking-wider md:hover:bg-blue-600 md:hover:text-white transition-colors shadow-sm active:scale-95 mt-1 md:mt-0">
+                    Lihat Detail & Beli
+                </Link>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- State Kosong / Sudah Dibeli Semua -->
+    <div v-else class="bg-white border-2 md:border border-dashed md:border-solid border-slate-200 rounded-2xl md:rounded-xl p-8 md:p-6 text-center shadow-sm flex flex-col items-center">
+        <div class="text-3xl mb-2 md:hidden">📭</div>
+        <div class="hidden md:flex w-9 h-9 bg-slate-50 border border-slate-100 rounded-full items-center justify-center mb-2">
+            <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+        </div>
+        <p class="text-xs text-slate-500 md:text-slate-400 font-medium md:font-normal leading-relaxed md:leading-normal">Anda sudah memiliki semua tryout yang tersedia<span class="hidden md:inline"> saat ini</span>.</p>
+    </div>
+</div>
 
             </div>
         </div>
