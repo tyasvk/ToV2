@@ -9,6 +9,20 @@ const props = defineProps({
     filters: Object
 });
 
+const handlePerPageChange = (newPerPage) => {
+    router.get(
+        window.location.pathname, // <-- Mengunci path saat ini (/admin/tryouts)
+        { 
+            per_page: newPerPage,
+            search: search.value // sertakan kata kunci pencarian jika ada
+        },
+        { 
+            preserveState: true,
+            preserveScroll: true,
+            replace: true 
+        }
+    )
+}
 // --- FITUR PENCARIAN & PAGINATION SIZE ---
 const search = ref(props.filters?.search || '');
 // Pastikan dipaksa menjadi Number agar sinkron dengan :value dropdown
