@@ -1,5 +1,4 @@
 <script setup>
-import { ref, computed } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 
@@ -7,38 +6,20 @@ const props = defineProps({
     histories: {
         type: Array,
         default: () => []
-    },
-    stats: {
-        type: Object,
-        default: () => ({
-            total: 0,
-            average_score: 0,
-            passed: 0
-        })
     }
 });
 
-// Fitur Limit Data (10, 50, 100, Semua)
-const itemsPerPage = ref(10);
-
-const displayedHistories = computed(() => {
-    if (itemsPerPage.value === 'all') {
-        return props.histories;
-    }
-    return props.histories.slice(0, itemsPerPage.value);
-});
-
-// Format tanggal
-const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('id-ID', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    }).replace('.', ':');
+// Format Tanggal Minimalis: "27 Jul 2026 • 08:00 WIB"
+const formatDateTime = (dateStr) => {
+    if (!dateStr) return '-';
+    // Mengatasi bug Safari dengan mengubah spasi menjadi T
+    const safeDateStr = dateStr.includes(' ') ? dateStr.replace(' ', 'T') : dateStr;
+    const date = new Date(safeDateStr);
+    
+    return new Intl.DateTimeFormat('id-ID', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+    }).format(date).replace(/\./g, ':').replace(',', ' •') + ' WIB';
 };
 </script>
 
@@ -46,145 +27,120 @@ const formatDate = (dateString) => {
     <Head title="Riwayat Tryout - CPNS Nusantara" />
 
     <AuthenticatedLayout>
-        <div class="space-y-5 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-5xl mx-auto px-4 md:px-3 py-6 md:py-8">
+        <div class="animate-in fade-in duration-500 max-w-5xl mx-auto px-4 py-6 md:py-10 space-y-6">
             
-            <!-- Header Box -->
-            <div class="bg-white p-5 md:p-6 rounded-2xl md:rounded-[2rem] border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-5 relative overflow-hidden">
-                <div class="absolute right-0 top-0 w-32 md:w-64 h-32 md:h-64 bg-blue-50 rounded-full blur-[40px] md:blur-[60px] pointer-events-none -mr-10 md:-mr-20 -mt-10 md:-mt-20"></div>
-
-                <div class="relative z-10 space-y-1 md:space-y-1.5 text-center md:text-left">
-                    <h1 class="text-xl md:text-2xl text-slate-900 tracking-tight uppercase font-bold md:font-medium">Riwayat Simulasi</h1>
-                    <p class="text-[11px] md:text-sm text-slate-500 font-medium md:font-normal">Pantau nilai TWK, TIU, TKP dan peringkat Anda.</p>
-                </div>
-
-                <!-- Dropdown Limit Terintegrasi -->
-                <div v-if="histories.length > 10" class="flex items-center gap-3 w-full md:w-auto relative z-10">
-                    <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl pl-3 md:pl-4 pr-2 py-1.5 md:py-2 w-full md:w-auto shadow-sm transition-all focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:bg-white focus-within:border-blue-500">
-                        <span class="text-[10px] md:text-xs text-slate-500 font-bold md:font-normal whitespace-nowrap">Tampilkan:</span>
-                        <select v-model="itemsPerPage" class="text-[10px] md:text-xs bg-transparent border-none text-slate-800 font-bold md:font-medium focus:ring-0 py-0 pl-1 pr-6 cursor-pointer outline-none w-full">
-                            <option :value="10">10 Riwayat</option>
-                            <option :value="50">50 Riwayat</option>
-                            <option :value="100">100 Riwayat</option>
-                            <option value="all">Semua Riwayat</option>
-                        </select>
-                    </div>
-                </div>
+            <!-- HEADER -->
+            <div class="flex flex-col gap-1 border-b border-slate-200 pb-4">
+                <h1 class="text-lg md:text-xl font-medium text-slate-900 tracking-tight uppercase">Riwayat Pengerjaan</h1>
+                <p class="text-[11px] md:text-xs text-slate-500 font-normal">Evaluasi hasil, skor, dan pembahasan simulasi ujian Anda.</p>
             </div>
 
-            <!-- Stats Grid -->
-            <div class="grid grid-cols-3 gap-3 md:gap-4">
-                <div class="bg-white border border-slate-200 rounded-xl md:rounded-[1.5rem] p-3 md:p-6 flex flex-col items-center justify-center text-center shadow-sm">
-                    <span class="text-[8px] md:text-[10px] text-slate-400 font-bold md:font-medium uppercase tracking-widest md:tracking-wider mb-0.5 md:mb-1">Dikerjakan</span>
-                    <span class="text-xl md:text-3xl font-bold md:font-medium text-slate-800 tracking-tight">{{ stats.total || 0 }}</span>
-                </div>
-                
-                <div class="bg-white border border-slate-200 rounded-xl md:rounded-[1.5rem] p-3 md:p-6 flex flex-col items-center justify-center text-center shadow-sm">
-                    <span class="text-[8px] md:text-[10px] text-slate-400 font-bold md:font-medium uppercase tracking-widest md:tracking-wider mb-0.5 md:mb-1">Rata-rata</span>
-                    <span class="text-xl md:text-3xl font-bold md:font-medium text-blue-600 tracking-tight">{{ stats.average_score || '0' }}</span>
-                </div>
-
-                <div class="bg-white border border-slate-200 rounded-xl md:rounded-[1.5rem] p-3 md:p-6 flex flex-col items-center justify-center text-center shadow-sm">
-                    <span class="text-[8px] md:text-[10px] text-slate-400 font-bold md:font-medium uppercase tracking-widest md:tracking-wider mb-0.5 md:mb-1">Lulus</span>
-                    <span class="text-xl md:text-3xl font-bold md:font-medium text-emerald-500 tracking-tight">{{ stats.passed || 0 }}</span>
-                </div>
-            </div>
-
-            <!-- Empty State -->
-            <div v-if="histories.length === 0" class="bg-white border border-slate-200 rounded-2xl md:rounded-[1.5rem] p-6 md:p-12 flex flex-col items-center text-center shadow-sm max-w-xl mx-auto mt-4">
-                <div class="w-10 h-10 md:w-12 md:h-12 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center mb-3 text-base md:text-lg">
-                    📝
-                </div>
-                <h3 class="text-xs md:text-sm text-slate-800 font-bold md:font-medium mb-1">Belum Ada Riwayat</h3>
-                <p class="text-[11px] md:text-xs text-slate-500 font-medium md:font-normal max-w-sm leading-relaxed mb-4">
-                    Anda belum menyelesaikan tryout apapun. Ayo mulai latihan soal sekarang!
-                </p>
-                <Link :href="route('tryout.index')" class="w-full md:w-auto px-5 py-3 md:py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-bold md:font-medium uppercase tracking-wider hover:bg-slate-800 transition active:scale-95 shadow-sm">
-                    Jelajahi Tryout
-                </Link>
-            </div>
-
-            <!-- History Items List -->
-            <div v-else class="flex flex-col gap-3 md:gap-2 pb-8">
-                <Link 
-                    v-for="history in displayedHistories" 
+            <!-- GRID CARDS -->
+            <div v-if="histories.length > 0" class="grid grid-cols-1 md:grid-cols-2 gap-4 pb-12">
+                <div 
+                    v-for="history in histories" 
                     :key="history.id"
-                    :href="route('tryout.history.detail', history.tryout_id || history.tryout?.id)"
-                    class="group bg-white border border-slate-200 rounded-xl md:rounded-xl p-3 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden flex items-stretch md:items-center"
+                    class="group bg-white border border-slate-200 rounded-xl p-4 flex flex-col h-full hover:border-slate-300 hover:shadow-sm transition-all relative overflow-hidden"
                 >
-                    <!-- Indikator Warna Garis Kiri -->
-                    <div class="absolute left-0 top-0 bottom-0 w-1 md:w-1 transition-colors duration-300" 
-                         :class="history.is_passed ? 'bg-emerald-400' : 'bg-amber-400'">
-                    </div>
+                    <!-- Header Card: Badge Attempt & Ranking -->
+                    <div class="relative z-10 flex items-center justify-between mb-3 gap-2">
+                        <span class="inline-flex px-2 py-0.5 rounded border border-blue-100 bg-blue-50 text-blue-600 text-[9px] uppercase tracking-widest font-medium">
+                            Pengerjaan Ke-{{ history.attempt_number || 1 }}
+                        </span>
 
-                    <!-- Layout: Column di Mobile, Row di Desktop -->
-                    <div class="flex-1 min-w-0 pl-1 md:pl-2 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-4">
-                        
-                        <!-- Kiri: Judul TO, Status, Tanggal -->
-                        <div class="w-full md:flex-1 min-w-0 flex flex-col justify-center">
-                            <h3 class="text-xs md:text-sm font-bold md:font-medium text-slate-800 line-clamp-1 md:truncate group-hover:text-blue-600 transition-colors uppercase leading-tight">
-                                {{ history.tryout?.title || 'Tryout Tidak Diketahui' }}
-                            </h3>
-                            <div class="flex items-center gap-1.5 md:gap-2 mt-1.5 md:mt-1">
-                                <span class="text-[8px] font-bold md:font-medium uppercase tracking-widest px-1.5 py-0.5 rounded border"
-                                      :class="history.is_passed ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'">
-                                    {{ history.is_passed ? 'LULUS' : 'GAGAL' }}
-                                </span>
-                                <span class="text-[9px] text-slate-400 font-medium md:font-normal truncate">
-                                    {{ formatDate(history.created_at || history.start_time) }} WIB
-                                </span>
-                            </div>
-                        </div>
-
-                        <!-- Kanan: Grid Skor & Peringkat (Lebar penuh di mobile, mengecil di Desktop) -->
-                        <div class="w-full md:w-auto shrink-0 flex items-center justify-between md:justify-start gap-1 sm:gap-2 lg:gap-3 bg-slate-50 border border-slate-100 rounded-lg px-2 sm:px-3 py-1.5 md:py-1">
-                            <div class="flex flex-col items-center justify-center flex-1 md:flex-none md:min-w-[28px]">
-                                <span class="text-[7px] md:text-[8px] text-slate-400 font-bold md:font-normal uppercase mb-0.5">TWK</span>
-                                <span class="text-[10px] md:text-[11px] font-bold md:font-medium text-slate-700 leading-none">{{ history.twk_score || 0 }}</span>
-                            </div>
-                            <div class="w-px h-6 md:h-5 bg-slate-200"></div>
-                            
-                            <div class="flex flex-col items-center justify-center flex-1 md:flex-none md:min-w-[28px]">
-                                <span class="text-[7px] md:text-[8px] text-slate-400 font-bold md:font-normal uppercase mb-0.5">TIU</span>
-                                <span class="text-[10px] md:text-[11px] font-bold md:font-medium text-slate-700 leading-none">{{ history.tiu_score || 0 }}</span>
-                            </div>
-                            <div class="w-px h-6 md:h-5 bg-slate-200"></div>
-                            
-                            <div class="flex flex-col items-center justify-center flex-1 md:flex-none md:min-w-[28px]">
-                                <span class="text-[7px] md:text-[8px] text-slate-400 font-bold md:font-normal uppercase mb-0.5">TKP</span>
-                                <span class="text-[10px] md:text-[11px] font-bold md:font-medium text-slate-700 leading-none">{{ history.tkp_score || 0 }}</span>
-                            </div>
-                            <div class="w-px h-6 md:h-5 bg-slate-200"></div>
-                            
-                            <div class="flex flex-col items-center justify-center flex-1 md:flex-none md:min-w-[32px]">
-                                <span class="text-[7px] md:text-[8px] text-slate-400 font-bold md:font-normal uppercase mb-0.5">TOTAL</span>
-                                <span class="text-[10px] md:text-[11px] font-bold md:font-medium leading-none" :class="history.is_passed ? 'text-emerald-600' : 'text-amber-600'">
-                                    {{ history.total_score || history.score || 0 }}
-                                </span>
-                            </div>
-                            <div class="w-px h-6 md:h-5 bg-slate-200"></div>
-                            
-                            <div class="flex flex-col items-center justify-center flex-1 md:flex-none md:min-w-[32px]">
-                                <span class="text-[7px] md:text-[8px] text-slate-400 font-bold md:font-normal uppercase mb-0.5">RANK</span>
-                                <span class="text-[10px] md:text-[11px] font-bold md:font-medium text-blue-600 leading-none">#{{ history.rank || '-' }}</span>
-                            </div>
-                        </div>
-
-                        <!-- Icon Chevron -->
-                        <div class="shrink-0 text-slate-300 group-hover:text-blue-500 transition-colors hidden sm:block pr-1">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                        <!-- BADGE RANKING (Hanya tampil jika pengerjaan ke-1) -->
+                        <span 
+                            v-if="(history.attempt_number || 1) === 1" 
+                            class="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-amber-100 bg-amber-50 text-amber-600 text-[9px] uppercase tracking-widest font-medium"
+                        >
+                            <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 0 1 3 3h-15a3 3 0 0 1 3-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 0 1-.982-3.172M9.497 14.25a7.454 7.454 0 0 0 .981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 0 0 7.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M7.73 9.728a6.726 6.726 0 0 0 2.748 1.35m8.272-6.842V4.5c0 2.108-.966 3.99-2.48 5.228m2.48-5.492a46.32 46.32 0 0 1 2.916.52 6.003 6.003 0 0 1-5.395 4.972m0 0a6.726 6.726 0 0 1-2.749 1.35m0 0a6.772 6.772 0 0 1-3.044 0" />
                             </svg>
+                            Rank {{ history.rank || '-' }}
+                        </span>
+                        <!-- BADGE LATIHAN (Jika pengerjaan > 1) -->
+                        <span 
+                            v-else 
+                            class="inline-flex items-center px-2 py-0.5 rounded border border-slate-100 bg-slate-50 text-slate-400 text-[9px] font-medium uppercase tracking-widest"
+                        >
+                            Hanya Latihan
+                        </span>
+                    </div>
+
+                    <!-- Judul Tryout -->
+                    <h2 class="text-sm text-slate-900 leading-snug font-medium mb-3 line-clamp-2">
+                        {{ history.tryout?.title || 'Simulasi Ujian CAT' }}
+                    </h2>
+
+                    <!-- Box Rincian Skor (TWK, TIU, TKP, Total) -->
+                    <div class="bg-slate-50 border border-slate-100 rounded-lg p-2 mb-4 flex justify-between items-center text-center divide-x divide-slate-200">
+                        <div class="px-1 w-full">
+                            <p class="text-[8px] uppercase tracking-widest text-slate-400 font-normal mb-0.5">TWK</p>
+                            <p class="text-[11px] font-medium text-slate-700">{{ history.twk_score || 0 }}</p>
+                        </div>
+                        <div class="px-1 w-full">
+                            <p class="text-[8px] uppercase tracking-widest text-slate-400 font-normal mb-0.5">TIU</p>
+                            <p class="text-[11px] font-medium text-slate-700">{{ history.tiu_score || 0 }}</p>
+                        </div>
+                        <div class="px-1 w-full">
+                            <p class="text-[8px] uppercase tracking-widest text-slate-400 font-normal mb-0.5">TKP</p>
+                            <p class="text-[11px] font-medium text-slate-700">{{ history.tkp_score || 0 }}</p>
+                        </div>
+                        <div class="px-1 w-full">
+                            <p class="text-[8px] uppercase tracking-widest text-slate-500 font-medium mb-0.5">Total</p>
+                            <p class="text-xs font-medium text-slate-900">{{ history.total_score || 0 }}</p>
+                        </div>
+                    </div>
+
+                    <!-- Footer: Status, Waktu & Tombol -->
+                    <div class="mt-auto pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                        
+                        <div class="flex flex-col">
+                            <span class="text-[8px] text-slate-400 uppercase tracking-widest mb-0.5 font-normal">Keterangan</span>
+                            <div class="flex items-center gap-1.5">
+                                <span 
+                                    class="text-[10px] font-medium uppercase tracking-wider"
+                                    :class="history.is_passed ? 'text-emerald-600' : 'text-rose-500'"
+                                >
+                                    {{ history.is_passed ? 'Lulus' : 'Gagal' }}
+                                </span>
+                                <span class="text-slate-300">•</span>
+                                <span class="text-[9px] font-medium text-slate-500 truncate max-w-[90px] md:max-w-none">
+                                    {{ formatDateTime(history.end_time || history.created_at) }}
+                                </span>
+                            </div>
                         </div>
 
+                        <!-- Tombol Pembahasan -->
+                        <Link 
+                            :href="route('tryout.history.detail', history.id)"
+                            class="shrink-0 px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-md text-[9px] uppercase tracking-wider transition-colors font-medium flex items-center gap-1"
+                        >
+                            Pembahasan
+                            <span class="text-xs leading-none">&rarr;</span>
+                        </Link>
                     </div>
-                </Link>
 
-                <!-- Load More Hint -->
-                <div v-if="histories.length > 10 && itemsPerPage !== 'all' && displayedHistories.length < histories.length" class="text-center pt-3">
-                    <button @click="itemsPerPage = 'all'" class="text-[10px] md:text-[11px] font-bold md:font-medium text-slate-500 hover:text-blue-600 transition-colors bg-white px-4 py-2.5 md:py-2 rounded-xl border border-slate-200 shadow-sm active:scale-95">
-                        Muat Semua Riwayat Tersisa ({{ histories.length - displayedHistories.length }})
-                    </button>
                 </div>
+            </div>
+
+            <!-- EMPTY STATE -->
+            <div v-else class="border border-dashed border-slate-200 rounded-2xl p-10 flex flex-col items-center text-center max-w-lg mx-auto">
+                <div class="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center mb-3 text-slate-400">
+                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+                <h3 class="text-sm text-slate-900 mb-1 font-medium">Belum Ada Riwayat</h3>
+                <p class="text-[11px] text-slate-500 font-normal mb-4">
+                    Anda belum menyelesaikan simulasi ujian apa pun.
+                </p>
+                <Link 
+                    :href="route('tryouts.index')"
+                    class="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[10px] uppercase tracking-wider font-medium transition-colors"
+                >
+                    Mulai Tryout
+                </Link>
             </div>
 
         </div>

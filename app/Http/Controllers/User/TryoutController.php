@@ -628,12 +628,30 @@ class TryoutController extends Controller
         return redirect()->route('tryout.result', $attempt->id);
     }
 
-    public function history()
+ public function history()
     {
-        $attempts = ExamAttempt::where('user_id', auth()->id())
+        $userId = auth()->id();
+        
+        // 1. Ambil semua data ascending terlebih dahulu untuk menentukan urutan pengerjaan
+        $attempts = ExamAttempt::where('user_id', $userId)
             ->with('tryout')
-            ->latest()
+            ->orderBy('created_at', 'asc')
             ->get();
+
+        // 2. Tentukan ini pengerjaan ke berapa (attempt_number)
+        $groupedAttempts = $attempts->groupBy('tryout_id');
+        $processedAttempts = collect();
+
+        foreach ($groupedAttempts as $tId => $group) {
+            $number = 1;
+            foreach ($group as $att) {
+                $att->attempt_number = $number++;
+                $processedAttempts->push($att);
+            }
+        }
+
+        // 3. Kembalikan urutan menjadi yang terbaru (descending) untuk ditampilkan ke UI
+        $attempts = $processedAttempts->sortByDesc('created_at')->values();
 
         $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65; 
         $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80; 
@@ -642,6 +660,7 @@ class TryoutController extends Controller
         $tryoutIds = $attempts->pluck('tryout_id')->unique();
         $firstAttemptsByTryout = collect();
         
+        // 4. Ambil data pengerjaan PERTAMA dari semua user untuk tryout terkait (untuk ranking)
         foreach ($tryoutIds as $tId) {
             $firstAttemptsByTryout[$tId] = ExamAttempt::where('tryout_id', $tId)
                 ->orderBy('created_at', 'asc')
@@ -650,27 +669,35 @@ class TryoutController extends Controller
                 ->map->first();
         }
 
+        // 5. Mapping data final
         $histories = $attempts->map(function ($attempt) use ($pgTwk, $pgTiu, $pgTkp, $firstAttemptsByTryout) {
             $attempt->is_passed = ($attempt->twk_score >= $pgTwk && $attempt->tiu_score >= $pgTiu && $attempt->tkp_score >= $pgTkp);
             
-            $firstAttempts = $firstAttemptsByTryout[$attempt->tryout_id] ?? collect();
-            
-            $currentPassed = $attempt->is_passed ? 1 : 0;
-            $currentScoreString = sprintf('%d-%03d-%03d-%03d-%03d', $currentPassed, $attempt->total_score, $attempt->tkp_score, $attempt->tiu_score, $attempt->twk_score);
+            // HANYA HITUNG RANKING JIKA PENGERJAAN PERTAMA
+            if ($attempt->attempt_number === 1) {
+                $firstAttempts = $firstAttemptsByTryout[$attempt->tryout_id] ?? collect();
+                
+                $currentPassed = $attempt->is_passed ? 1 : 0;
+                $currentScoreString = sprintf('%d-%03d-%03d-%03d-%03d', $currentPassed, $attempt->total_score, $attempt->tkp_score, $attempt->tiu_score, $attempt->twk_score);
 
-            $rank = 1;
-            foreach ($firstAttempts as $userId => $firstAttempt) {
-                if ($userId === $attempt->user_id) continue;
+                $rank = 1;
+                foreach ($firstAttempts as $userId => $firstAttempt) {
+                    if ($userId === $attempt->user_id) continue;
 
-                $isPassed = ($firstAttempt->twk_score >= $pgTwk && $firstAttempt->tiu_score >= $pgTiu && $firstAttempt->tkp_score >= $pgTkp) ? 1 : 0;
-                $compareScoreString = sprintf('%d-%03d-%03d-%03d-%03d', $isPassed, $firstAttempt->total_score, $firstAttempt->tkp_score, $firstAttempt->tiu_score, $firstAttempt->twk_score);
+                    $isPassed = ($firstAttempt->twk_score >= $pgTwk && $firstAttempt->tiu_score >= $pgTiu && $firstAttempt->tkp_score >= $pgTkp) ? 1 : 0;
+                    $compareScoreString = sprintf('%d-%03d-%03d-%03d-%03d', $isPassed, $firstAttempt->total_score, $firstAttempt->tkp_score, $firstAttempt->tiu_score, $firstAttempt->twk_score);
 
-                if (strcmp($compareScoreString, $currentScoreString) > 0) {
-                    $rank++;
+                    if (strcmp($compareScoreString, $currentScoreString) > 0) {
+                        $rank++;
+                    }
                 }
+
+                $attempt->rank = $rank;
+            } else {
+                // Jika pengerjaan ke-2 atau ke-3, kosongkan rank
+                $attempt->rank = null;
             }
 
-            $attempt->rank = $rank;
             return $attempt;
         });
 

@@ -39,9 +39,9 @@ class Tryout extends Model
         'published_at' => 'datetime:Y-m-d H:i:s',
         'ended_at'     => 'datetime:Y-m-d H:i:s', 
         'end_date'     => 'datetime:Y-m-d H:i:s', 
-        'registration_start_at' => 'datetime',
-    'registration_end_at'   => 'datetime',
-    'started_at'            => 'datetime',
+        'registration_start_at' => 'datetime:Y-m-d H:i:s',
+        'registration_end_at'   => 'datetime:Y-m-d H:i:s',
+        'started_at'            => 'datetime:Y-m-d H:i:s',
         
         'is_active'    => 'boolean',
         'is_published' => 'boolean',
