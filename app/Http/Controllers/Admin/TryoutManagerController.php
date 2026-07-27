@@ -39,60 +39,59 @@ class TryoutManagerController extends Controller
     }
 
     public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'duration' => 'required|integer|min:1',
-            'description' => 'nullable|string',
-            'is_paid' => 'required|boolean',
-            'price' => 'required_if:is_paid,true|numeric|min:0',
-            'is_published' => 'boolean',
-            'started_at' => 'nullable|date', 
-            'end_date' => 'nullable|date',     
-        ]);
+{
+    $validated = $request->validate([
+        'title'                 => 'required|string|max:255',
+        'duration'              => 'required|integer|min:1',
+        'description'           => 'nullable|string',
+        'is_paid'               => 'required|boolean',
+        'price'                 => 'required_if:is_paid,true|numeric|min:0',
+        'is_published'          => 'boolean',
+        'registration_start_at' => 'nullable|date',
+        'registration_end_at'   => 'nullable|date|after_or_equal:registration_start_at',
+        'started_at'            => 'nullable|date', 
+        'end_date'              => 'nullable|date|after_or_equal:started_at',     
+    ]);
 
-        $validated['type'] = 'general'; // Default tipe
-        
-        // WAJIB: Samakan is_active dengan is_published
-        $validated['is_active'] = $request->is_published; 
-        
-        // WAJIB: Isi published_at jika dipublish agar lolos filter tanggal
-        if ($request->is_published) {
-            $validated['published_at'] = Carbon::now();
-        }
-
-        Tryout::create($validated);
-
-        return back()->with('message', 'Paket Tryout berhasil ditambahkan!');
+    $validated['type'] = 'general';
+    $validated['is_active'] = $request->is_published; 
+    
+    if ($request->is_published) {
+        $validated['published_at'] = Carbon::now();
     }
 
-    public function update(Request $request, Tryout $tryout)
-    {
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'duration' => 'required|integer|min:1',
-            'description' => 'nullable|string',
-            'is_paid' => 'required|boolean',
-            'price' => 'required_if:is_paid,true|numeric|min:0',
-            'is_published' => 'boolean',
-            'started_at' => 'nullable|date', 
-            'end_date' => 'nullable|date',     
-        ]);
-        
-        // WAJIB: Samakan is_active dengan is_published
-        $validated['is_active'] = $request->is_published;
-        
-        // Cek jika statusnya berubah dari false ke true, set published_at
-        if ($request->is_published && !$tryout->published_at) {
-            $validated['published_at'] = Carbon::now();
-        } else if (!$request->is_published) {
-            $validated['published_at'] = null; // Tarik kembali (unpublish)
-        }
+    Tryout::create($validated);
 
-        $tryout->update($validated);
+    return back()->with('message', 'Paket Tryout berhasil ditambahkan!');
+}
 
-        return back()->with('message', 'Paket Tryout berhasil diperbarui!');
+public function update(Request $request, Tryout $tryout)
+{
+    $validated = $request->validate([
+        'title'                 => 'required|string|max:255',
+        'duration'              => 'required|integer|min:1',
+        'description'           => 'nullable|string',
+        'is_paid'               => 'required|boolean',
+        'price'                 => 'required_if:is_paid,true|numeric|min:0',
+        'is_published'          => 'boolean',
+        'registration_start_at' => 'nullable|date',
+        'registration_end_at'   => 'nullable|date|after_or_equal:registration_start_at',
+        'started_at'            => 'nullable|date', 
+        'end_date'              => 'nullable|date|after_or_equal:started_at',     
+    ]);
+    
+    $validated['is_active'] = $request->is_published;
+    
+    if ($request->is_published && !$tryout->published_at) {
+        $validated['published_at'] = Carbon::now();
+    } else if (!$request->is_published) {
+        $validated['published_at'] = null;
     }
+
+    $tryout->update($validated);
+
+    return back()->with('message', 'Paket Tryout berhasil diperbarui!');
+}
 
     public function destroy(Tryout $tryout)
     {

@@ -9,7 +9,6 @@ const props = defineProps({
     filters: Object
 });
 
-// Computed property ini memastikan Vue tidak error baik Anda menggunakan paginate() maupun get() di Controller
 const tryoutList = computed(() => {
     return props.tryouts?.data ? props.tryouts.data : props.tryouts;
 });
@@ -27,7 +26,6 @@ const performSearch = () => {
     });
 };
 
-// Deteksi perubahan pencarian
 let searchTimeout;
 watch(search, () => {
     clearTimeout(searchTimeout);
@@ -47,8 +45,9 @@ const form = useForm({
     description: '',
     is_published: false,
     published_at: '',
-    started_at: '',
-    end_date: '',
+    registration_start_at: '', 
+    registration_end_at: '',   
+    started_at: '',            
     is_paid: false,
     price: 0,
     type: 'general'
@@ -69,8 +68,9 @@ const openEditModal = (tryout) => {
     form.description = tryout.description;
     form.is_published = !!tryout.is_published;
     form.published_at = tryout.published_at ? tryout.published_at.substring(0, 16) : '';
+    form.registration_start_at = tryout.registration_start_at ? tryout.registration_start_at.substring(0, 16) : '';
+    form.registration_end_at = tryout.registration_end_at ? tryout.registration_end_at.substring(0, 16) : '';
     form.started_at = tryout.started_at ? tryout.started_at.substring(0, 16) : '';
-    form.end_date = tryout.end_date ? tryout.end_date.substring(0, 16) : '';
     form.is_paid = !!tryout.is_paid;
     form.price = tryout.price;
     showModal.value = true;
@@ -134,7 +134,6 @@ const formatCurrency = (price) => {
                 </div>
 
                 <div class="flex items-center gap-2.5 w-full sm:w-auto relative z-10 shrink-0">
-                    <!-- KOTAK PENCARIAN -->
                     <div class="relative flex-1 sm:w-56 md:w-60">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <svg class="h-3.5 w-3.5 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -162,34 +161,35 @@ const formatCurrency = (price) => {
                 <div class="overflow-x-auto custom-scrollbar">
                     <table class="w-full text-left text-slate-600 table-auto">
                         <thead>
-                            <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                <th class="px-4 py-3 w-12 text-center">No</th>
-                                <th class="px-4 py-3 min-w-[280px]">Identitas Paket</th>
-                                <th class="px-4 py-3 w-32">Akses & Harga</th>
-                                <th class="px-4 py-3 w-56">Jadwal Pelaksanaan</th>
-                                <th class="px-4 py-3 text-center w-24">Status</th>
-                                <th class="px-4 py-3 text-right w-40">Tindakan</th>
+                            <!-- PERBAIKAN: Padding diperkecil (px-3 py-2) dan Width dikurangi -->
+                            <tr class="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                <th class="px-3 py-2 w-10 text-center">No</th>
+                                <th class="px-3 py-2 min-w-[220px]">Identitas Paket</th>
+                                <th class="px-3 py-2 w-28">Akses & Harga</th>
+                                <th class="px-3 py-2 w-52">Penjadwalan</th>
+                                <th class="px-3 py-2 text-center w-20">Status</th>
+                                <th class="px-3 py-2 text-right w-28">Tindakan</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
-                            <!-- LOOPING SEMUA DATA YANG ADA DI tryoutList -->
                             <tr v-for="(tryout, index) in tryoutList" :key="tryout.id" class="hover:bg-slate-50/80 transition-colors">
                                 
-                                <!-- NOMOR URUT -->
-                                <td class="px-4 py-3 text-center text-sm font-medium text-slate-600">
+                                <td class="px-3 py-2 text-center text-xs font-medium text-slate-600">
                                     {{ index + 1 }}
                                 </td>
 
-                                <td class="px-4 py-3 min-w-[280px]">
-                                    <div class="flex items-start gap-3">
-                                        <div class="w-8 h-8 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-center text-blue-600 shrink-0 mt-0.5">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <td class="px-3 py-2 min-w-[220px]">
+                                    <!-- PERBAIKAN: Jarak gap dan ikon diperkecil -->
+                                    <div class="flex items-start gap-2">
+                                        <div class="w-6 h-6 bg-blue-50 border border-blue-100 rounded md flex items-center justify-center text-blue-600 shrink-0 mt-0.5">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
                                             </svg>
                                         </div>
                                         <div class="min-w-0 flex-1">
-                                            <p class="font-bold text-slate-900 text-sm whitespace-normal break-words leading-snug" :title="tryout.title">{{ tryout.title }}</p>
-                                            <div class="flex items-center gap-1.5 mt-1 text-xs text-slate-400 font-medium">
+                                            <!-- PERBAIKAN: Teks judul menjadi text-xs -->
+                                            <p class="font-bold text-slate-900 text-xs whitespace-normal break-words leading-snug" :title="tryout.title">{{ tryout.title }}</p>
+                                            <div class="flex items-center gap-1 mt-0.5 text-[10px] text-slate-400 font-medium">
                                                 <span>{{ tryout.duration }} Menit</span>
                                                 <span class="w-1 h-1 bg-slate-300 rounded-full"></span>
                                                 <span>{{ tryout.questions_count || 0 }} Soal</span>
@@ -198,64 +198,69 @@ const formatCurrency = (price) => {
                                     </div>
                                 </td>
                                 
-                                <td class="px-4 py-3">
+                                <td class="px-3 py-2">
                                     <div class="flex flex-col gap-0.5 items-start">
-                                        <span class="px-2 py-0.5 rounded border text-[10px] font-bold uppercase tracking-wider"
+                                        <!-- PERBAIKAN: Badge diperkecil -->
+                                        <span class="px-1.5 py-0.5 rounded border text-[9px] font-bold uppercase tracking-wider"
                                             :class="tryout.is_paid ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200'">
                                             {{ tryout.is_paid ? 'Premium' : 'Gratis' }}
                                         </span>
-                                        <span v-if="tryout.is_paid" class="text-sm font-bold text-slate-800 mt-0.5 tracking-tight">
+                                        <span v-if="tryout.is_paid" class="text-xs font-bold text-slate-800 tracking-tight mt-0.5">
                                             {{ formatCurrency(tryout.price) }}
                                         </span>
                                     </div>
                                 </td>
                                 
-                                <td class="px-4 py-3">
-                                    <div class="flex flex-col text-xs text-slate-600 gap-0.5 font-medium whitespace-nowrap">
-                                        <div class="flex items-center gap-1">
-                                            <span class="text-slate-400 w-8">Mulai</span>
-                                            <span class="text-slate-700 font-semibold">: {{ formatDate(tryout.started_at) }}</span>
+                                <td class="px-3 py-2">
+                                    <!-- PERBAIKAN: Ukuran font waktu menjadi 10px -->
+                                    <div class="flex flex-col text-[10px] text-slate-500 gap-0.5 font-medium whitespace-nowrap">
+                                        <div class="flex items-start gap-1">
+                                            <span class="text-slate-400 w-9 shrink-0">Daftar</span>
+                                            <span class="text-slate-700 whitespace-normal leading-tight">
+                                                : {{ formatDate(tryout.registration_start_at) }} <br> s/d {{ formatDate(tryout.registration_end_at) }}
+                                            </span>
                                         </div>
-                                        <div class="flex items-center gap-1">
-                                            <span class="text-slate-400 w-8">Akhir</span>
-                                            <span class="text-slate-700 font-semibold">: {{ formatDate(tryout.end_date) }}</span>
+                                        <div class="flex items-center gap-1 mt-0.5">
+                                            <span class="text-blue-500 font-bold w-9 shrink-0">Ujian</span>
+                                            <span class="text-blue-700 font-bold">: Mulai {{ formatDate(tryout.started_at) }}</span>
                                         </div>
                                     </div>
                                 </td>
 
-                                <td class="px-4 py-3 text-center">
-                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] font-bold uppercase tracking-wider"
+                                <td class="px-3 py-2 text-center">
+                                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-bold uppercase tracking-wider"
                                           :class="tryout.is_published ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-50 text-slate-500 border-slate-200'">
                                         <span :class="tryout.is_published ? 'bg-emerald-500' : 'bg-slate-400'" class="w-1 h-1 rounded-full"></span>
                                         {{ tryout.is_published ? 'Live' : 'Draft' }}
                                     </span>
                                 </td>
 
-                                <td class="px-4 py-3 text-right">
-                                    <div class="flex items-center justify-end gap-1.5">
-                                        <button @click="openEditModal(tryout)" title="Edit Paket" class="w-7 h-7 flex items-center justify-center bg-white border border-slate-200 text-blue-600 hover:bg-blue-50 rounded-lg shadow-sm transition active:scale-95 shrink-0">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                <td class="px-3 py-2 text-right">
+                                    <!-- PERBAIKAN: Ukuran tombol tindakan dan icon diperkecil -->
+                                    <div class="flex items-center justify-end gap-1">
+                                        <button @click="openEditModal(tryout)" title="Edit Paket" class="w-6 h-6 flex items-center justify-center bg-white border border-slate-200 text-blue-600 hover:bg-blue-50 rounded-md shadow-sm transition active:scale-95 shrink-0">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                         </button>
                                         
-                                        <Link :href="route('admin.tryouts.results', tryout.id)" title="Lihat Hasil & Peringkat" class="w-7 h-7 flex items-center justify-center bg-white border border-slate-200 text-amber-600 hover:bg-amber-50 rounded-lg shadow-sm transition active:scale-95 shrink-0">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                        <Link :href="route('admin.tryouts.results', tryout.id)" title="Lihat Hasil & Peringkat" class="w-6 h-6 flex items-center justify-center bg-white border border-slate-200 text-amber-600 hover:bg-amber-50 rounded-md shadow-sm transition active:scale-95 shrink-0">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012-2h-2a2 2 0 01-2-2z" />
                                             </svg>
                                         </Link>
                                         
-                                        <Link :href="route('admin.tryouts.questions.index', { tryout: tryout.id })" title="Manajemen Soal" class="w-7 h-7 flex items-center justify-center bg-white border border-slate-200 text-emerald-600 hover:bg-emerald-50 rounded-lg shadow-sm transition active:scale-95 shrink-0">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                        <Link :href="route('admin.tryouts.questions.index', { tryout: tryout.id })" title="Manajemen Soal" class="w-6 h-6 flex items-center justify-center bg-white border border-slate-200 text-emerald-600 hover:bg-emerald-50 rounded-md shadow-sm transition active:scale-95 shrink-0">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                                         </Link>
                                         
-                                        <button @click="deleteTryout(tryout.id)" title="Hapus Paket" class="w-7 h-7 flex items-center justify-center bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 rounded-lg shadow-sm transition active:scale-95 shrink-0">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                        <button @click="deleteTryout(tryout.id)" title="Hapus Paket" class="w-6 h-6 flex items-center justify-center bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 rounded-md shadow-sm transition active:scale-95 shrink-0">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                         </button>
                                     </div>
                                 </td>
                             </tr>
 
                             <tr v-if="!tryoutList.length">
-                                <td colspan="6" class="px-4 py-8 text-center text-xs text-slate-400 font-medium">
+                                <td colspan="6" class="px-3 py-6 text-center text-xs text-slate-400 font-medium">
                                     Tidak ada paket tryout ditemukan.
                                 </td>
                             </tr>
@@ -264,7 +269,6 @@ const formatCurrency = (price) => {
                 </div>
             </div>
 
-            <!-- Teks Jumlah Data -->
             <div class="flex justify-start mt-4" v-if="tryoutList.length > 0">
                 <div class="text-xs text-slate-500 font-medium">
                     Menampilkan total <span class="font-bold text-slate-800">{{ tryoutList.length }}</span> data
@@ -320,14 +324,25 @@ const formatCurrency = (price) => {
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-700 mb-1.5">Waktu Mulai</label>
-                                <input v-model="form.started_at" type="datetime-local" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none shadow-sm transition-all" />
+                        <div class="space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                            <span class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Masa Pendaftaran</span>
+                            <div class="grid grid-cols-2 gap-3 pt-1">
+                                <div>
+                                    <label class="block text-[11px] font-medium text-slate-500 mb-1">Buka Pendaftaran</label>
+                                    <input v-model="form.registration_start_at" type="datetime-local" class="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all shadow-sm" />
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-medium text-slate-500 mb-1">Tutup Pendaftaran</label>
+                                    <input v-model="form.registration_end_at" type="datetime-local" class="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all shadow-sm" />
+                                </div>
                             </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-700 mb-1.5">Waktu Berakhir</label>
-                                <input v-model="form.end_date" type="datetime-local" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none shadow-sm transition-all" />
+                        </div>
+
+                        <div class="space-y-1 bg-blue-50/50 p-3 rounded-xl border border-blue-100">
+                            <span class="block text-xs font-bold text-blue-900 uppercase tracking-wider">Masa Pengerjaan</span>
+                            <div class="pt-1">
+                                <label class="block text-[11px] font-medium text-blue-700 mb-1">Mulai Dikerjakan (Terus Dibuka)</label>
+                                <input v-model="form.started_at" type="datetime-local" class="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all shadow-sm" />
                             </div>
                         </div>
                         

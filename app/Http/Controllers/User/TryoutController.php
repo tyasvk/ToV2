@@ -82,7 +82,10 @@ class TryoutController extends Controller
 
     public function show(Tryout $tryout)
     {
-        $isClosed = $tryout->end_date && now()->greaterThan($tryout->end_date);
+        $now = now();
+        // --- PERBAIKAN: Menentukan status tutup berdasarkan batas daftar ATAU batas pengerjaan ---
+        $isClosed = ($tryout->registration_end_at && $now->greaterThan($tryout->registration_end_at)) || 
+                    ($tryout->end_date && $now->greaterThan($tryout->end_date));
 
         return Inertia::render('User/Tryout/Show', [
             'tryout' => $tryout,
@@ -95,8 +98,17 @@ class TryoutController extends Controller
      */
     public function processRegistration(Request $request, Tryout $tryout)
     {
-        if ($tryout->end_date && now()->greaterThan($tryout->end_date)) {
-            return back()->withErrors(['message' => 'Pendaftaran untuk tryout ini sudah ditutup karena melewati batas waktu.']);
+        $now = now();
+
+        // --- PERBAIKAN: Validasi Masa Pendaftaran & Pengerjaan ---
+        if ($tryout->registration_start_at && $now->lt($tryout->registration_start_at)) {
+            return back()->withErrors(['message' => 'Pendaftaran untuk tryout ini belum dibuka.']);
+        }
+        if ($tryout->registration_end_at && $now->gt($tryout->registration_end_at)) {
+            return back()->withErrors(['message' => 'Pendaftaran untuk tryout ini telah ditutup.']);
+        }
+        if ($tryout->end_date && $now->greaterThan($tryout->end_date)) {
+            return back()->withErrors(['message' => 'Masa pengerjaan tryout ini sudah berakhir.']);
         }
 
         $request->validate([
@@ -373,6 +385,7 @@ class TryoutController extends Controller
         ]);
     }
 
+    // --- PERBAIKAN: Fungsi Utama Validasi Akses Pengerjaan ---
     private function validateAccess(Tryout $tryout)
     {
         $user = auth()->user();
@@ -396,10 +409,26 @@ class TryoutController extends Controller
             ];
         }
 
-        if ($tryout->type === 'akbar') {
-            if ($now->lt($tryout->started_at)) {
-                return ['allowed' => false, 'route' => 'tryout-akbar.index', 'message' => 'Event belum dimulai!'];
-            }
+        // 1. Cek Masa Pengerjaan Belum Dimulai
+        if ($tryout->started_at && $now->lt($tryout->started_at)) {
+            $waktuBuka = \Carbon\Carbon::parse($tryout->started_at)->translatedFormat('d F Y H:i WIB');
+            return [
+                'allowed' => false, 
+                'route' => 'tryout.history.detail', 
+                'params' => $tryout->id, 
+                'message' => "Tryout belum dibuka! Masa pengerjaan baru dimulai pada: {$waktuBuka}"
+            ];
+        }
+
+        // 2. Cek Masa Pengerjaan Sudah Berakhir
+        if ($tryout->end_date && $now->gt($tryout->end_date)) {
+            $waktuTutup = \Carbon\Carbon::parse($tryout->end_date)->translatedFormat('d F Y H:i WIB');
+            return [
+                'allowed' => false, 
+                'route' => 'tryout.history.detail', 
+                'params' => $tryout->id, 
+                'message' => "Masa pengerjaan Tryout ini sudah berakhir pada: {$waktuTutup}"
+            ];
         }
 
         $maxAttempts = ($tryout->type === 'akbar') ? 1 : 3;
@@ -419,9 +448,22 @@ class TryoutController extends Controller
 
     public function registerForm(Tryout $tryout)
     {
-        if ($tryout->end_date && now()->greaterThan($tryout->end_date)) {
+        $now = now();
+
+        // --- PERBAIKAN: Validasi Pendaftaran di Form ---
+        if ($tryout->registration_start_at && $now->lt($tryout->registration_start_at)) {
+            return redirect()->route('tryout.show', $tryout->id)
+                ->with('error', 'Pendaftaran untuk tryout ini belum dibuka.');
+        }
+
+        if ($tryout->registration_end_at && $now->gt($tryout->registration_end_at)) {
             return redirect()->route('tryout.show', $tryout->id)
                 ->with('error', 'Pendaftaran untuk tryout ini telah ditutup.');
+        }
+
+        if ($tryout->end_date && $now->greaterThan($tryout->end_date)) {
+            return redirect()->route('tryout.show', $tryout->id)
+                ->with('error', 'Masa pengerjaan tryout ini telah berakhir.');
         }
 
         return Inertia::render('User/Tryout/Register', ['tryout' => $tryout]);
@@ -684,7 +726,7 @@ class TryoutController extends Controller
         ]);
     }
 
-/**
+    /**
      * Proses Checkout Bundling Tryout (Mendukung Dompet & Midtrans)
      */
     public function processBundlingCheckout(Request $request)
@@ -837,6 +879,24 @@ class TryoutController extends Controller
 
     public function collectiveRegister(Tryout $tryout)
     {
+        $now = now();
+
+        // --- PERBAIKAN: Validasi Pendaftaran Kolektif ---
+        if ($tryout->registration_start_at && $now->lt($tryout->registration_start_at)) {
+            return redirect()->route('tryout.show', $tryout->id)
+                ->with('error', 'Pendaftaran untuk tryout ini belum dibuka.');
+        }
+
+        if ($tryout->registration_end_at && $now->gt($tryout->registration_end_at)) {
+            return redirect()->route('tryout.show', $tryout->id)
+                ->with('error', 'Pendaftaran untuk tryout ini telah ditutup.');
+        }
+
+        if ($tryout->end_date && $now->greaterThan($tryout->end_date)) {
+            return redirect()->route('tryout.show', $tryout->id)
+                ->with('error', 'Masa pengerjaan tryout ini telah berakhir.');
+        }
+
         return Inertia::render('User/Tryout/CollectiveRegister', ['tryout' => $tryout]);
     }
 

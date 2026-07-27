@@ -26,16 +26,22 @@ class Tryout extends Model
         'requirements',   
         'ended_at',       
         'duration',       
-        'end_date',       
+        'end_date',     
+        'registration_start_at', // Baru
+    'registration_end_at',   // Baru
+    'started_at',            // Masa Pengerjaan Mulai
+    'end_date',              // Masa Pengerjaan Selesai  
     ];
 
     protected $casts = [
         // FORMAT KUNCI: Laravel dipaksa mengeluarkan output murni (Contoh: "2026-05-28 08:00:00")
         // Tidak akan ada lagi huruf 'T', 'Z', atau konversi zona waktu yang mengacaukan browser.
         'published_at' => 'datetime:Y-m-d H:i:s',
-        'started_at'   => 'datetime:Y-m-d H:i:s',
         'ended_at'     => 'datetime:Y-m-d H:i:s', 
         'end_date'     => 'datetime:Y-m-d H:i:s', 
+        'registration_start_at' => 'datetime',
+    'registration_end_at'   => 'datetime',
+    'started_at'            => 'datetime',
         
         'is_active'    => 'boolean',
         'is_published' => 'boolean',
