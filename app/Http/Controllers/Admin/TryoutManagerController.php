@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Tryout;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Illuminate\Support\Carbon; // Pastikan import Carbon untuk waktu
+use Illuminate\Support\Carbon; 
 use App\Models\ExamAttempt;
 
 class TryoutManagerController extends Controller
@@ -21,15 +21,30 @@ class TryoutManagerController extends Controller
               ->orWhereNull('type');
         });
 
+        // Tangkap parameter pencarian
         if ($request->search) {
             $query->where('title', 'like', '%' . $request->search . '%');
         }
 
-        $tryouts = $query->latest()->paginate(10)->withQueryString();
+        // --- TAMBAHAN UNTUK FITUR PILIHAN 10, 50, 100 DATA ---
+        // Ambil input per_page, pastikan format integer, default ke 10
+        $perPage = (int) $request->input('per_page', 10);
+
+        // Validasi keamanan ringan agar URL tidak diisi angka sembarangan
+        if (!in_array($perPage, [10, 50, 100])) {
+            $perPage = 10;
+        }
+
+        // Gunakan $perPage ke dalam method paginate()
+        $tryouts = $query->latest()->paginate($perPage)->withQueryString();
 
         return Inertia::render('Admin/Tryout/Index', [
             'tryouts' => $tryouts,
-            'filters' => $request->only(['search']),
+            // Kembalikan search dan per_page agar dropdown di Vue membaca statenya
+            'filters' => [
+                'search' => $request->search,
+                'per_page' => $perPage,
+            ],
         ]);
     }
 
@@ -42,7 +57,7 @@ class TryoutManagerController extends Controller
             'is_paid' => 'required|boolean',
             'price' => 'required_if:is_paid,true|numeric|min:0',
             'is_published' => 'boolean',
-            'started_at' => 'nullable|date', // <--- WAJIB DITAMBAHKAN
+            'started_at' => 'nullable|date', 
             'end_date' => 'nullable|date',     
         ]);
 
@@ -70,7 +85,7 @@ class TryoutManagerController extends Controller
             'is_paid' => 'required|boolean',
             'price' => 'required_if:is_paid,true|numeric|min:0',
             'is_published' => 'boolean',
-            'started_at' => 'nullable|date', // <--- WAJIB DITAMBAHKAN
+            'started_at' => 'nullable|date', 
             'end_date' => 'nullable|date',     
         ]);
         
@@ -235,11 +250,11 @@ class TryoutManagerController extends Controller
                                 if ($category === 'TIU') $tiuScore += 5;
                             }
                         } 
-                        // -- LOGIKA SKOR TKP (SUDAH DIPERBAIKI) --
+                        // -- LOGIKA SKOR TKP --
                         elseif ($category === 'TKP') {
                             $foundScore = false;
 
-                            // 1. Cek dari kolom `tkp_scores` (Sesuai dengan standard Controller Ujian)
+                            // 1. Cek dari kolom `tkp_scores`
                             if (!empty($question->tkp_scores)) {
                                 $tkpScoresMap = is_string($question->tkp_scores) ? json_decode($question->tkp_scores, true) : $question->tkp_scores;
                                 if (is_array($tkpScoresMap)) {
@@ -290,7 +305,6 @@ class TryoutManagerController extends Controller
             }
 
             // 3. BYPASS $FILLABLE DENGAN DIRECT ASSIGNMENT
-            // Cara ini menjamin bahwa angka baru PASTI dimasukkan ke dalam database meskipun ada restriksi model
             $attempt->twk_score   = $twkScore;
             $attempt->tiu_score   = $tiuScore;
             $attempt->tkp_score   = $tkpScore;

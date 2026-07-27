@@ -9,22 +9,28 @@ const props = defineProps({
     filters: Object
 });
 
-// --- FITUR PENCARIAN ---
+// --- FITUR PENCARIAN & PAGINATION SIZE ---
 const search = ref(props.filters?.search || '');
+// Pastikan dipaksa menjadi Number agar sinkron dengan :value dropdown
+const perPage = ref(Number(props.filters?.per_page) || 10); 
 
-const performSearch = (value) => {
-    router.get(route('admin.tryouts.index'), { search: value }, { 
+const performSearch = () => {
+    router.get(route('admin.tryouts.index'), { 
+        search: search.value, 
+        per_page: perPage.value 
+    }, { 
         preserveState: true, 
         preserveScroll: true,
         replace: true 
     });
 };
 
+// Deteksi perubahan pencarian
 let searchTimeout;
-watch(search, (value) => {
+watch(search, () => {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
-        performSearch(value);
+        performSearch();
     }, 500);
 });
 
@@ -126,7 +132,27 @@ const formatCurrency = (price) => {
                 </div>
 
                 <div class="flex items-center gap-2.5 w-full sm:w-auto relative z-10 shrink-0">
-                    <div class="relative flex-1 sm:w-60 md:w-64">
+                    
+                    <!-- DROPDOWN PAGINATION SIZE -->
+                    <div class="relative">
+                        <select 
+                            v-model="perPage" 
+                            @change="performSearch"
+                            class="bg-slate-50 border border-slate-200 rounded-lg pl-3 pr-8 py-1.5 text-xs focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium text-slate-800 shadow-sm appearance-none cursor-pointer"
+                        >
+                            <option :value="10">10 Data</option>
+                            <option :value="50">50 Data</option>
+                            <option :value="100">100 Data</option>
+                        </select>
+                        <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-slate-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- KOTAK PENCARIAN -->
+                    <div class="relative flex-1 sm:w-56 md:w-60">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <svg class="h-3.5 w-3.5 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
@@ -154,7 +180,7 @@ const formatCurrency = (price) => {
                     <table class="w-full text-left text-slate-600 table-auto">
                         <thead>
                             <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                <th class="px-4 py-3">Identitas Paket</th>
+                                <th class="px-4 py-3 min-w-[280px]">Identitas Paket</th>
                                 <th class="px-4 py-3 w-32">Akses & Harga</th>
                                 <th class="px-4 py-3 w-56">Jadwal Pelaksanaan</th>
                                 <th class="px-4 py-3 text-center w-24">Status</th>
@@ -164,16 +190,16 @@ const formatCurrency = (price) => {
                         <tbody class="divide-y divide-slate-100">
                             <tr v-for="tryout in tryouts.data" :key="tryout.id" class="hover:bg-slate-50/80 transition-colors">
                                 
-                                <td class="px-4 py-3 max-w-[240px]">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-8 h-8 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-center text-blue-600 shrink-0">
+                                <td class="px-4 py-3 min-w-[280px]">
+                                    <div class="flex items-start gap-3">
+                                        <div class="w-8 h-8 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-center text-blue-600 shrink-0 mt-0.5">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
                                             </svg>
                                         </div>
-                                        <div class="min-w-0">
-                                            <p class="font-bold text-slate-900 text-sm line-clamp-1 leading-tight" :title="tryout.title">{{ tryout.title }}</p>
-                                            <div class="flex items-center gap-1.5 mt-0.5 text-xs text-slate-400 font-medium">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="font-bold text-slate-900 text-sm whitespace-normal break-words leading-snug" :title="tryout.title">{{ tryout.title }}</p>
+                                            <div class="flex items-center gap-1.5 mt-1 text-xs text-slate-400 font-medium">
                                                 <span>{{ tryout.duration }} Menit</span>
                                                 <span class="w-1 h-1 bg-slate-300 rounded-full"></span>
                                                 <span>{{ tryout.questions_count || 0 }} Soal</span>
@@ -217,7 +243,6 @@ const formatCurrency = (price) => {
 
                                 <td class="px-4 py-3 text-right">
                                     <div class="flex items-center justify-end gap-1.5">
-                                        
                                         <button @click="openEditModal(tryout)" title="Edit Paket" class="w-7 h-7 flex items-center justify-center bg-white border border-slate-200 text-blue-600 hover:bg-blue-50 rounded-lg shadow-sm transition active:scale-95 shrink-0">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                         </button>
@@ -249,23 +274,33 @@ const formatCurrency = (price) => {
                 </div>
             </div>
 
-            <div class="flex justify-end" v-if="tryouts.links && tryouts.links.length > 3">
-                <div class="flex items-center space-x-0.5 bg-white border border-slate-200 rounded-lg shadow-sm p-0.5">
-                    <template v-for="(link, key) in tryouts.links" :key="key">
-                        <Link 
-                            v-if="link.url"
-                            :href="link.url"
-                            v-html="link.label"
-                            class="px-2.5 py-1 rounded text-xs font-semibold transition-all"
-                            :class="link.active ? 'bg-blue-50 border border-blue-200 text-blue-600' : 'text-slate-600 hover:bg-slate-50 border border-transparent'"
-                        />
-                        <span v-else class="px-2.5 py-1 text-xs text-slate-400" v-html="link.label"></span>
-                    </template>
+            <!-- TABEL INFO DATA & PAGINASI -->
+            <div class="flex flex-col sm:flex-row justify-between items-center gap-3 mt-4" v-if="tryouts.total > 0">
+                <div class="text-xs text-slate-500 font-medium">
+                    Menampilkan <span class="font-bold text-slate-800">{{ tryouts.from }}</span> - <span class="font-bold text-slate-800">{{ tryouts.to }}</span> dari total <span class="font-bold text-slate-800">{{ tryouts.total }}</span> data
+                </div>
+                
+                <div class="flex justify-end" v-if="tryouts.links && tryouts.links.length > 3">
+                    <div class="flex items-center space-x-0.5 bg-white border border-slate-200 rounded-lg shadow-sm p-0.5">
+                        <template v-for="(link, key) in tryouts.links" :key="key">
+                            <Link 
+                                v-if="link.url"
+                                :href="link.url"
+                                v-html="link.label"
+                                preserve-scroll
+                                preserve-state
+                                class="px-2.5 py-1 rounded text-xs font-semibold transition-all"
+                                :class="link.active ? 'bg-blue-50 border border-blue-200 text-blue-600' : 'text-slate-600 hover:bg-slate-50 border border-transparent'"
+                            />
+                            <span v-else class="px-2.5 py-1 text-xs text-slate-400" v-html="link.label"></span>
+                        </template>
+                    </div>
                 </div>
             </div>
 
         </div>
 
+        <!-- Modal Code -->
         <Teleport to="body">
             <div v-if="showModal" class="fixed inset-0 z-[999] flex items-center justify-center p-4 sm:p-0">
                 <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @click="closeModal"></div>
@@ -358,5 +393,4 @@ const formatCurrency = (price) => {
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .animate-in { animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
-.line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
 </style>
