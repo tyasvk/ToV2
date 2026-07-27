@@ -22,23 +22,22 @@ const setAutoMethod = () => {
     }
 };
 
-// --- PERBAIKAN 1: Fungsi untuk memuat script Midtrans JS secara dinamis ---
+// --- PERBAIKAN: Paksa load script Production Midtrans ---
 const loadMidtransScript = () => {
-    // Mengambil Client Key dari environment (pastikan VITE_MIDTRANS_CLIENT_KEY ada di .env)
-    const clientKey = import.meta.env.VITE_MIDTRANS_CLIENT_KEY || 'SB-Mid-client-XXXXX'; // Ganti XXXX dengan Client Key Sandbox Anda jika tidak pakai .env
-    
     if (document.getElementById('midtrans-script')) return; 
 
     const script = document.createElement('script');
-    script.src = 'https://app.sandbox.midtrans.com/snap/snap.js';
-    script.setAttribute('data-client-key', clientKey);
+    // MENGGUNAKAN URL PRODUCTION (Tanpa kata sandbox)
+    script.src = 'https://app.midtrans.com/snap/snap.js';
+    // MENGGUNAKAN CLIENT KEY PRODUCTION ANDA
+    script.setAttribute('data-client-key', 'Mid-client-sYattwxjbV1gCt1Q');
     script.id = 'midtrans-script';
     document.head.appendChild(script);
 };
 
 onMounted(() => {
     setAutoMethod();
-    loadMidtransScript(); // Panggil script Midtrans saat halaman pertama kali dibuka
+    loadMidtransScript(); 
 });
 
 watch(() => props.transaction, setAutoMethod, { immediate: true });
@@ -98,7 +97,6 @@ const handleWalletPayment = () => {
 };
 
 const handleMidtransPayment = () => {
-    // --- PERBAIKAN 2: Cegah error blank jika snap_token dari server kosong/gagal dibuat ---
     if (!props.transaction?.snap_token) {
         Swal.fire({ 
             title: 'Sistem Error', 
@@ -108,7 +106,6 @@ const handleMidtransPayment = () => {
         return;
     }
 
-    // --- PERBAIKAN 3: Jika script snap belum selesai dimuat oleh browser ---
     if (typeof window.snap === 'undefined') {
         Swal.fire({ 
             title: 'Menghubungkan...', 
