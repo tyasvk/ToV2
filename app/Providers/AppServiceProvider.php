@@ -5,6 +5,7 @@ namespace App\Providers;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\URL; // <-- Tambahkan ini
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -28,5 +29,9 @@ class AppServiceProvider extends ServiceProvider
     if (env('APP_ENV') !== 'local') {
         \Illuminate\Support\Facades\URL::forceScheme('https');
     }
+    // Paksa HTTPS jika aplikasi tidak berjalan di environment local
+        if (config('app.env') !== 'local') {
+            URL::forceScheme('https');
+        }
 }
 }
