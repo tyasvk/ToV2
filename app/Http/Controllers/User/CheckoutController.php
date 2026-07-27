@@ -90,23 +90,38 @@ class CheckoutController extends Controller
         
         $transaction->update(['total_amount' => $totalToPay]);
 
-        if (empty($transaction->snap_token) || $tokenAfiliasi === null) {
+        // Cek apakah token sudah usang (lebih dari 22 jam)
+        $isTokenExpired = true;
+        if (!empty($transaction->snap_token) && $transaction->updated_at) {
+            $isTokenExpired = $transaction->updated_at->diffInHours(now()) >= 22;
+        }
+
+        if (empty($transaction->snap_token) || $tokenAfiliasi === null || $isTokenExpired) {
             $this->initMidtrans();
             $params = [
                 'transaction_details' => [
-                    'order_id' => $transaction->invoice_code . '-' . time(),
+                    'order_id' => $transaction->invoice_code . '-' . time(), // Dibuat unik dengan timestamp
                     'gross_amount' => $totalToPay
                 ],
                 'item_details' => [
-                    ['id' => $transaction->id, 'price' => (int) $finalTagihan, 'quantity' => 1, 'name' => substr($itemName, 0, 30)],
+                    ['id' => (string) $transaction->id, 'price' => (int) $finalTagihan, 'quantity' => 1, 'name' => substr($itemName, 0, 30)],
                     ['id' => 'FEE', 'price' => (int) $fee, 'quantity' => 1, 'name' => 'Biaya Layanan']
                 ],
-                'customer_details' => ['first_name' => $user->name, 'email' => $user->email],
+                'customer_details' => [
+                    'first_name' => substr($user->name, 0, 20), 
+                    'email' => $user->email
+                ],
             ];
+            
             try {
                 $snapToken = Snap::getSnapToken($params);
-                $transaction->update(['snap_token' => $snapToken]);
-            } catch (\Exception $e) {}
+                $transaction->update([
+                    'snap_token' => $snapToken,
+                    'updated_at' => now(), 
+                ]);
+            } catch (\Exception $e) {
+                Log::error('Midtrans Snap Error: ' . $e->getMessage());
+            }
         }
 
         return Inertia::render('User/Checkout/Show', [
@@ -138,7 +153,6 @@ class CheckoutController extends Controller
 
         $parentTransaction = DB::transaction(function () use ($selectedTryouts, $totalPrice, $request, $invoice) {
             
-            // 1. Buat Transaksi Induk (Parent) untuk Proses Checkout
             $transaction = Transaction::create([
                 'user_id'        => auth()->id(),
                 'invoice_code'   => $invoice,
@@ -154,14 +168,12 @@ class CheckoutController extends Controller
                 ]
             ]);
 
-            // 2. Buat Transaksi Anak (Child) untuk memberikan akses Tryout
             foreach ($selectedTryouts as $tryout) {
                 Transaction::create([
                     'user_id'        => auth()->id(),
                     'tryout_id'      => $tryout->id,
-                    // PERBAIKAN: Beri akhiran ID Tryout agar invoice code tetap unik
                     'invoice_code'   => $invoice . '-' . $tryout->id, 
-                    'amount'         => 0, // Harga dibuat 0 agar tidak merusak total pendapatan
+                    'amount'         => 0, 
                     'total_amount'   => 0,
                     'status'         => 'pending',
                     'type'           => 'bundling_item',
@@ -176,7 +188,6 @@ class CheckoutController extends Controller
             return $transaction;
         });
 
-        // Arahkan user ke halaman checkout dengan ID Transaksi Induk
         return redirect()->route('checkout.show', $parentTransaction->id)
             ->with('success', 'Berhasil membuat pesanan bundling!');
     }
@@ -195,16 +206,13 @@ class CheckoutController extends Controller
             DB::transaction(function () use ($user, $transaction) {
                 $user->decrement('balance', $transaction->amount);
                 
-                // Update Parent Transaction
                 $transaction->update(['status' => 'paid', 'payment_method' => 'wallet']);
                 
-                // PERBAIKAN: Gunakan operator LIKE untuk mencakup invoice_code anak (INV-XXXXX-1, INV-XXXXX-2, dst)
                 if ($transaction->invoice_code && $transaction->type === 'bundling') {
                     Transaction::where('invoice_code', 'LIKE', $transaction->invoice_code . '-%')
                         ->update(['status' => 'paid', 'payment_method' => 'wallet']);
                 }
                 
-                // --- LOGGING ---
                 Log::info("DEBUG KOMISI: Memproses transaksi {$transaction->id} untuk user {$user->id}");
 
                 $totalProductPurchases = Transaction::where('user_id', $user->id)

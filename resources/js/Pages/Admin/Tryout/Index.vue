@@ -1,37 +1,25 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, useForm, router } from '@inertiajs/vue3';
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import { debounce } from 'lodash'; 
 
 const props = defineProps({
-    tryouts: Object,
+    tryouts: [Object, Array],
     filters: Object
 });
 
-const handlePerPageChange = (newPerPage) => {
-    router.get(
-        window.location.pathname, // <-- Mengunci path saat ini (/admin/tryouts)
-        { 
-            per_page: newPerPage,
-            search: search.value // sertakan kata kunci pencarian jika ada
-        },
-        { 
-            preserveState: true,
-            preserveScroll: true,
-            replace: true 
-        }
-    )
-}
-// --- FITUR PENCARIAN & PAGINATION SIZE ---
+// Computed property ini memastikan Vue tidak error baik Anda menggunakan paginate() maupun get() di Controller
+const tryoutList = computed(() => {
+    return props.tryouts?.data ? props.tryouts.data : props.tryouts;
+});
+
+// --- FITUR PENCARIAN ---
 const search = ref(props.filters?.search || '');
-// Pastikan dipaksa menjadi Number agar sinkron dengan :value dropdown
-const perPage = ref(Number(props.filters?.per_page) || 10); 
 
 const performSearch = () => {
     router.get(route('admin.tryouts.index'), { 
-        search: search.value, 
-        per_page: perPage.value 
+        search: search.value,
     }, { 
         preserveState: true, 
         preserveScroll: true,
@@ -146,25 +134,6 @@ const formatCurrency = (price) => {
                 </div>
 
                 <div class="flex items-center gap-2.5 w-full sm:w-auto relative z-10 shrink-0">
-                    
-                    <!-- DROPDOWN PAGINATION SIZE -->
-                    <div class="relative">
-                        <select 
-                            v-model="perPage" 
-                            @change="performSearch"
-                            class="bg-slate-50 border border-slate-200 rounded-lg pl-3 pr-8 py-1.5 text-xs focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium text-slate-800 shadow-sm appearance-none cursor-pointer"
-                        >
-                            <option :value="10">10 Data</option>
-                            <option :value="50">50 Data</option>
-                            <option :value="100">100 Data</option>
-                        </select>
-                        <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-slate-400">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </div>
-                    </div>
-
                     <!-- KOTAK PENCARIAN -->
                     <div class="relative flex-1 sm:w-56 md:w-60">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -194,6 +163,7 @@ const formatCurrency = (price) => {
                     <table class="w-full text-left text-slate-600 table-auto">
                         <thead>
                             <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                <th class="px-4 py-3 w-12 text-center">No</th>
                                 <th class="px-4 py-3 min-w-[280px]">Identitas Paket</th>
                                 <th class="px-4 py-3 w-32">Akses & Harga</th>
                                 <th class="px-4 py-3 w-56">Jadwal Pelaksanaan</th>
@@ -202,8 +172,14 @@ const formatCurrency = (price) => {
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
-                            <tr v-for="tryout in tryouts.data" :key="tryout.id" class="hover:bg-slate-50/80 transition-colors">
+                            <!-- LOOPING SEMUA DATA YANG ADA DI tryoutList -->
+                            <tr v-for="(tryout, index) in tryoutList" :key="tryout.id" class="hover:bg-slate-50/80 transition-colors">
                                 
+                                <!-- NOMOR URUT -->
+                                <td class="px-4 py-3 text-center text-sm font-medium text-slate-600">
+                                    {{ index + 1 }}
+                                </td>
+
                                 <td class="px-4 py-3 min-w-[280px]">
                                     <div class="flex items-start gap-3">
                                         <div class="w-8 h-8 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-center text-blue-600 shrink-0 mt-0.5">
@@ -278,8 +254,8 @@ const formatCurrency = (price) => {
                                 </td>
                             </tr>
 
-                            <tr v-if="!tryouts.data.length">
-                                <td colspan="5" class="px-4 py-8 text-center text-xs text-slate-400 font-medium">
+                            <tr v-if="!tryoutList.length">
+                                <td colspan="6" class="px-4 py-8 text-center text-xs text-slate-400 font-medium">
                                     Tidak ada paket tryout ditemukan.
                                 </td>
                             </tr>
@@ -288,27 +264,10 @@ const formatCurrency = (price) => {
                 </div>
             </div>
 
-            <!-- TABEL INFO DATA & PAGINASI -->
-            <div class="flex flex-col sm:flex-row justify-between items-center gap-3 mt-4" v-if="tryouts.total > 0">
+            <!-- Teks Jumlah Data -->
+            <div class="flex justify-start mt-4" v-if="tryoutList.length > 0">
                 <div class="text-xs text-slate-500 font-medium">
-                    Menampilkan <span class="font-bold text-slate-800">{{ tryouts.from }}</span> - <span class="font-bold text-slate-800">{{ tryouts.to }}</span> dari total <span class="font-bold text-slate-800">{{ tryouts.total }}</span> data
-                </div>
-                
-                <div class="flex justify-end" v-if="tryouts.links && tryouts.links.length > 3">
-                    <div class="flex items-center space-x-0.5 bg-white border border-slate-200 rounded-lg shadow-sm p-0.5">
-                        <template v-for="(link, key) in tryouts.links" :key="key">
-                            <Link 
-                                v-if="link.url"
-                                :href="link.url"
-                                v-html="link.label"
-                                preserve-scroll
-                                preserve-state
-                                class="px-2.5 py-1 rounded text-xs font-semibold transition-all"
-                                :class="link.active ? 'bg-blue-50 border border-blue-200 text-blue-600' : 'text-slate-600 hover:bg-slate-50 border border-transparent'"
-                            />
-                            <span v-else class="px-2.5 py-1 text-xs text-slate-400" v-html="link.label"></span>
-                        </template>
-                    </div>
+                    Menampilkan total <span class="font-bold text-slate-800">{{ tryoutList.length }}</span> data
                 </div>
             </div>
 

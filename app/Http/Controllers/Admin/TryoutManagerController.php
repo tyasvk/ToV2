@@ -26,24 +26,14 @@ class TryoutManagerController extends Controller
             $query->where('title', 'like', '%' . $request->search . '%');
         }
 
-        // --- TAMBAHAN UNTUK FITUR PILIHAN 10, 50, 100 DATA ---
-        // Ambil input per_page, pastikan format integer, default ke 10
-        $perPage = (int) $request->input('per_page', 10);
-
-        // Validasi keamanan ringan agar URL tidak diisi angka sembarangan
-        if (!in_array($perPage, [10, 50, 100])) {
-            $perPage = 10;
-        }
-
-        // Gunakan $perPage ke dalam method paginate()
-        $tryouts = $query->latest()->paginate($perPage)->withQueryString();
+        // --- UBAH DI SINI: Gunakan get() untuk mengambil SEMUA data tanpa terpotong pagination ---
+        $tryouts = $query->latest()->get();
 
         return Inertia::render('Admin/Tryout/Index', [
             'tryouts' => $tryouts,
-            // Kembalikan search dan per_page agar dropdown di Vue membaca statenya
+            // Hapus per_page, sisa parameter pencarian saja
             'filters' => [
                 'search' => $request->search,
-                'per_page' => $perPage,
             ],
         ]);
     }
