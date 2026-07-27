@@ -5,6 +5,34 @@ const props = defineProps({
     tryout: Object, 
 });
 
+// Helper waktu dengan perbaikan Zona Waktu (WIB vs UTC) untuk mencegah berkurang 7 jam
+const formatForDatetimeLocal = (dateString) => {
+    if (!dateString) return '';
+    
+    let safeString = dateString;
+    
+    // 1. Ganti spasi dengan 'T' (standar ISO)
+    if (safeString.includes(' ')) {
+        safeString = safeString.replace(' ', 'T');
+    }
+    
+    // 2. Tambahkan 'Z' di akhir jika belum ada agar dibaca sebagai UTC oleh browser
+    if (!safeString.endsWith('Z')) {
+        safeString += 'Z';
+    }
+    
+    const date = new Date(safeString);
+    if (isNaN(date.getTime())) return ''; 
+    
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
 // Inisialisasi form dengan seluruh field yang dibutuhkan
 const form = useForm({
     title: props.tryout?.title ?? '',
@@ -13,9 +41,9 @@ const form = useForm({
     is_paid: props.tryout?.is_paid ?? false,
     price: props.tryout?.price ?? 0,
     
-    // Field waktu (Pastikan menerima string langsung dari backend, bukan new Date())
-    started_at: props.tryout?.started_at ?? '', 
-    end_date: props.tryout?.end_date ?? '', 
+    // Terapkan helper fungsi waktu yang sudah ditambal
+    started_at: formatForDatetimeLocal(props.tryout?.started_at), 
+    end_date: formatForDatetimeLocal(props.tryout?.end_date), 
     
     // Status Publish
     is_published: props.tryout?.is_published ? true : false, 
