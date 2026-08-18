@@ -68,18 +68,24 @@ const formatDate = (dateString) => {
                         </div>
                         <div>
                             <p class="text-xs text-slate-400 uppercase tracking-widest font-semibold mb-1">Total Soal</p>
-                            <p class="font-medium text-slate-800 text-lg">{{ tryout.questions_count || '-' }} <span class="text-sm text-slate-500">Soal</span></p>
+                            <p class="font-medium text-slate-800 text-lg">110 <span class="text-sm text-slate-500">Soal</span></p>
                         </div>
                         <div class="col-span-2">
                             <p class="text-xs text-slate-400 uppercase tracking-widest font-semibold mb-1">Masa Pendaftaran</p>
-                            <p class="font-medium text-slate-800 text-sm">
+                            <p v-if="tryout.registration_start_at && tryout.registration_end_at" class="font-medium text-slate-800 text-sm">
                                 {{ formatDate(tryout.registration_start_at) }} <span class="text-slate-400 mx-2 font-normal">s/d</span> {{ formatDate(tryout.registration_end_at) }}
+                            </p>
+                            <p v-else class="font-medium text-emerald-600 text-sm">
+                                Selalu Terbuka
                             </p>
                         </div>
                         <div class="col-span-2">
                             <p class="text-xs text-slate-400 uppercase tracking-widest font-semibold mb-1">Mulai Ujian</p>
-                            <p class="font-medium text-blue-600 text-sm">
+                            <p v-if="tryout.started_at" class="font-medium text-blue-600 text-sm">
                                 {{ formatDate(tryout.started_at) }}
+                            </p>
+                            <p v-else class="font-medium text-emerald-600 text-sm">
+                                Kapan saja
                             </p>
                         </div>
                     </div>
@@ -93,14 +99,14 @@ const formatDate = (dateString) => {
                             {{ formatCurrency(tryout.price) }}
                         </p>
 
-                        <div v-if="is_registration_closed" class="bg-rose-50 text-rose-600 text-sm font-bold py-3.5 rounded-xl border border-rose-100">
+                        <div v-if="is_registration_closed && tryout.registration_start_at && tryout.registration_end_at" class="bg-rose-50 text-rose-600 text-sm font-bold py-3.5 rounded-xl border border-rose-100">
                             Pendaftaran Ditutup
                         </div>
                         <Link v-else :href="route('tryout.register', tryout.id)" class="bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold py-4 rounded-xl transition-all shadow-md hover:shadow-lg active:scale-95 block w-full">
                             Daftar Sekarang
                         </Link>
                         
-                        <p v-if="!is_registration_closed" class="text-[10px] text-slate-400 mt-4 font-medium">
+                        <p v-if="!(is_registration_closed && tryout.registration_start_at && tryout.registration_end_at)" class="text-[10px] text-slate-400 mt-4 font-medium">
                             Akses ujian akan otomatis terbuka pada jadwal yang ditentukan.
                         </p>
                     </div>
