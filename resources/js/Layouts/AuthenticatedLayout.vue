@@ -44,7 +44,7 @@ const formatDate = (dateString) => {
     });
 };
 
-// --- 4. LOGIKA SCROLL PERSISTENCE ---
+// --- 4. LOGIKA SCROLL PERSISTENCE (SIDEBAR) ---
 const scrollToActive = () => {
     nextTick(() => {
         const activeElement = sidebarNav.value?.querySelector('.active-link');
@@ -69,12 +69,10 @@ const logoRoute = computed(() => {
     }
 });
 
-// Fungsi untuk mengecek tipe tryout yang sedang dibuka (Bisa dari prop tryout langsung atau dari relasi attempt)
 const activeTryoutType = computed(() => {
     return page.props.tryout?.type || page.props.attempt?.tryout?.type || null;
 });
 
-// Membantu memastikan apakah kita sedang di dalam halaman yang berkaitan dengan sebuah tryout
 const isInsideTryoutScope = computed(() => {
     return route().current('tryout.show') || 
            route().current('tryout.wait') || 
@@ -82,10 +80,34 @@ const isInsideTryoutScope = computed(() => {
            route().current('tryout.review') || 
            route().current('tryout.leaderboard');
 });
+
+// --- 6. LOGIKA MOBILE BOTTOM TAB ---
+const isScrolled = ref(false);
+let lastScrollPosition = 0;
+
+// Deteksi apakah user sedang berada di halaman ujian (agar tab disembunyikan)
+const isExamPage = computed(() => {
+    try {
+        return route().current('tryout.exam') || page.url.includes('/exam') || page.url.includes('/ujian');
+    } catch (e) {
+        return page.url.includes('/exam') || page.url.includes('/ujian');
+    }
+});
+
+// Fungsi untuk menghide tab saat scroll ke bawah
+const handleScroll = (e) => {
+    const currentScrollPosition = e.target.scrollTop;
+    if (currentScrollPosition > lastScrollPosition && currentScrollPosition > 50) {
+        isScrolled.value = true; // Sembunyikan tab
+    } else {
+        isScrolled.value = false; // Munculkan tab
+    }
+    lastScrollPosition = currentScrollPosition;
+};
 </script>
 
 <template>
-    <div class="flex h-screen bg-[#F8FAFC] overflow-hidden font-sans text-slate-900">
+    <div class="flex h-screen bg-[#F8FAFC] overflow-hidden font-sans text-slate-900 relative">
         
         <div 
             v-if="isSidebarOpen" 
@@ -145,9 +167,9 @@ const isInsideTryoutScope = computed(() => {
                     </Link>
 
                     <Link :href="route('admin.tryouts.index')" :class="[(route().current('admin.tryouts.*') && !route().current('admin.tryouts.questions.*')) || (route().current('admin.tryouts.questions.*') && activeTryoutType !== 'adidaya' && activeTryoutType !== 'akbar') ? 'bg-rose-50 text-rose-600 active-link shadow-sm' : 'text-slate-500 hover:bg-rose-50', 'flex items-center gap-3 lg:gap-2 py-2.5 lg:py-2 px-4 rounded-xl font-medium transition-all group relative']">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 flex-shrink-0 text-indigo-500"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18s4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18c-2.305 0-4.408.867-6 2.292m0-14.25v14.25" /></svg>
-    <span class="text-xs lg:text-[11px] uppercase tracking-wider">Kelola Tryout</span>
-</Link>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 flex-shrink-0 text-indigo-500"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18s4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18c-2.305 0-4.408.867-6 2.292m0-14.25v14.25" /></svg>
+                        <span class="text-xs lg:text-[11px] uppercase tracking-wider">Kelola Tryout</span>
+                    </Link>
 
                     <Link :href="route('admin.adidaya.index')" :class="[route().current('admin.adidaya.*') || (route().current('admin.tryouts.questions.*') && activeTryoutType === 'adidaya') ? 'bg-rose-50 text-rose-600 active-link shadow-sm' : 'text-slate-500 hover:bg-rose-50', 'flex items-center gap-3 lg:gap-2 py-2.5 lg:py-2 px-4 rounded-xl font-medium transition-all group relative']">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 flex-shrink-0 text-purple-500"><path stroke-linecap="round" stroke-linejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" /></svg>
@@ -160,9 +182,9 @@ const isInsideTryoutScope = computed(() => {
                     </Link>
 
                     <Link :href="route('admin.tryout-akbar.index')" :class="[route().current('admin.tryout-akbar.*') || (route().current('admin.tryouts.questions.*') && activeTryoutType === 'akbar') ? 'bg-rose-50 text-rose-600 active-link shadow-sm' : 'text-slate-500 hover:bg-rose-50', 'flex items-center gap-3 lg:gap-2 py-2.5 lg:py-2 px-4 rounded-xl font-medium transition-all group relative']">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 flex-shrink-0 text-orange-500"><path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.563.563 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.563.563 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" /></svg>
-    <span class="text-xs lg:text-[11px] uppercase tracking-wider">Event Akbar</span>
-</Link>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 flex-shrink-0 text-orange-500"><path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.563.563 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.563.563 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" /></svg>
+                        <span class="text-xs lg:text-[11px] uppercase tracking-wider">Event Akbar</span>
+                    </Link>
 
                     <Link :href="route('admin.transactions.index')" :class="[route().current('admin.transactions.*') ? 'bg-rose-50 text-rose-600 active-link shadow-sm' : 'text-slate-500 hover:bg-rose-50', 'flex items-center gap-3 lg:gap-2 py-2.5 lg:py-2 px-4 rounded-xl font-medium transition-all group relative']">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 flex-shrink-0 text-emerald-500"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75m0 1.5v.75m0 1.5v.75m0 1.5V15m1.5 1.5h1.5m1.5 0h1.5m1.5 0h1.5m1.5 0h1.5M6.75 20.25v.75m0-1.5v-.75m0-1.5v-.75m0-1.5v-.75m0-1.5V15m-1.5-1.5h.75m1.5 0h.75m1.5 0h.75m1.5 0h.75m1.5 0h.75m1.5 0h.75" /></svg>
@@ -182,22 +204,19 @@ const isInsideTryoutScope = computed(() => {
                     </Link>
 
                     <!-- MENU LAPORAN SOAL -->
-<Link :href="route('admin.question-reports.index')" 
-      :class="route().current('admin.question-reports.*') ? 'bg-rose-50 text-rose-600 font-bold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'"
-      class="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-colors mt-1">
-    
-    <!-- Ikon Bendera (Flag) / Laporan -->
-    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" :class="route().current('admin.question-reports.*') ? 'text-rose-500' : 'text-slate-400'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
-    </svg>
-    
-    Laporan Soal
-</Link>
+                    <Link :href="route('admin.question-reports.index')" 
+                          :class="route().current('admin.question-reports.*') ? 'bg-rose-50 text-rose-600 font-bold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'"
+                          class="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-colors mt-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" :class="route().current('admin.question-reports.*') ? 'text-rose-500' : 'text-slate-400'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+                        </svg>
+                        Laporan Soal
+                    </Link>
 
                     <Link :href="route('admin.settings.index')" :class="[route().current('admin.settings.*') ? 'bg-rose-50 text-rose-600 active-link shadow-sm' : 'text-slate-500 hover:bg-rose-50', 'flex items-center gap-3 lg:gap-2 py-2.5 lg:py-2 px-4 rounded-xl font-medium transition-all group relative']">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 flex-shrink-0 text-sky-500"><path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 0 1 1.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 0 1-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 0 1-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 0 1 .12-1.45l.773-.773a1.125 1.125 0 0 1 1.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
-    <span class="text-xs lg:text-[11px] uppercase tracking-wider">Pengaturan</span>
-</Link>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 flex-shrink-0 text-sky-500"><path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 0 1 1.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 0 1-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71-.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 0 1-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 0 1 .12-1.45l.773-.773a1.125 1.125 0 0 1 1.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+                        <span class="text-xs lg:text-[11px] uppercase tracking-wider">Pengaturan</span>
+                    </Link>
                 </div>
 
                 <div v-if="isUser && !isAdmin" class="flex flex-col space-y-1 lg:space-y-0.5">
@@ -284,12 +303,41 @@ const isInsideTryoutScope = computed(() => {
                 </div>
             </header>
 
-            <main class="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-12 bg-[#F8FAFC]">
+            <!-- Bagian ini membaca fungsi scroll untuk hide bottom navbar -->
+            <main @scroll="handleScroll" class="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-12 bg-[#F8FAFC]" :class="{ 'pb-24': !isExamPage && isUser && !isAdmin }">
                 <div class="max-w-[1400px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-1000">
                     <slot />
                 </div>
             </main>
         </div>
+
+        <!-- ========================================== -->
+        <!-- MOBILE BOTTOM TAB NAVIGATION (Hanya 3 Tab) -->
+        <!-- ========================================== -->
+        <div 
+            v-if="!isExamPage && isUser && !isAdmin"
+            class="md:hidden fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] transition-transform duration-300 z-[999] px-10 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] flex justify-between items-center"
+            :class="{ 'translate-y-full': isScrolled }"
+        >
+            <!-- 1. Home -->
+            <Link :href="route('dashboard')" class="flex flex-col items-center gap-1 transition-colors" :class="{ 'text-blue-600': $page.url === '/dashboard', 'text-slate-400 hover:text-blue-600': $page.url !== '/dashboard' }">
+                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                <span class="text-[10px] font-bold">Home</span>
+            </Link>
+            
+            <!-- 2. Tryout -->
+            <Link :href="route('tryout.index')" class="flex flex-col items-center gap-1 transition-colors" :class="{ 'text-blue-600': $page.url.startsWith('/tryout'), 'text-slate-400 hover:text-blue-600': !$page.url.startsWith('/tryout') }">
+                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                <span class="text-[10px] font-bold">Tryout</span>
+            </Link>
+            
+            <!-- 3. Dompet -->
+            <Link :href="route('wallet.index')" class="flex flex-col items-center gap-1 transition-colors" :class="{ 'text-blue-600': $page.url.startsWith('/wallet'), 'text-slate-400 hover:text-blue-600': !$page.url.startsWith('/wallet') }">
+                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                <span class="text-[10px] font-bold">Dompet</span>
+            </Link>
+        </div>
+
     </div>
 </template>
 
