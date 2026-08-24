@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { computed, onMounted, watch, nextTick, ref } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
 
 const page = usePage();
@@ -81,11 +81,7 @@ const isInsideTryoutScope = computed(() => {
            route().current('tryout.leaderboard');
 });
 
-// --- 6. LOGIKA MOBILE BOTTOM TAB ---
-const isScrolled = ref(false);
-let lastScrollPosition = 0;
-
-// Deteksi apakah user sedang berada di halaman ujian (agar tab disembunyikan)
+// --- 6. DETEKSI HALAMAN UJIAN ---
 const isExamPage = computed(() => {
     try {
         return route().current('tryout.exam') || page.url.includes('/exam') || page.url.includes('/ujian');
@@ -93,21 +89,11 @@ const isExamPage = computed(() => {
         return page.url.includes('/exam') || page.url.includes('/ujian');
     }
 });
-
-// Fungsi untuk menghide tab saat scroll ke bawah
-const handleScroll = (e) => {
-    const currentScrollPosition = e.target.scrollTop;
-    if (currentScrollPosition > lastScrollPosition && currentScrollPosition > 50) {
-        isScrolled.value = true; // Sembunyikan tab
-    } else {
-        isScrolled.value = false; // Munculkan tab
-    }
-    lastScrollPosition = currentScrollPosition;
-};
 </script>
 
 <template>
-    <div class="flex h-screen bg-[#F8FAFC] overflow-hidden font-sans text-slate-900 relative">
+    <!-- MENGHAPUS h-screen & overflow-hidden. MENGGUNAKAN min-h-screen AGAR NATIVE SCROLL BROWSER JALAN -->
+    <div class="flex min-h-screen bg-[#F8FAFC] font-sans text-slate-900 relative">
         
         <div 
             v-if="isSidebarOpen" 
@@ -118,7 +104,7 @@ const handleScroll = (e) => {
         <aside 
             :class="[
                 isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
-                'fixed lg:static inset-y-0 left-0 w-80 bg-white border-r border-slate-200/60 flex flex-col z-50 shadow-2xl shadow-slate-200/50 shrink-0 transition-transform duration-300 ease-in-out'
+                'fixed lg:sticky lg:top-0 h-screen inset-y-0 left-0 w-80 bg-white border-r border-slate-200/60 flex flex-col z-50 shadow-2xl shadow-slate-200/50 shrink-0 transition-transform duration-300 ease-in-out'
             ]"
         >
             <div class="h-16 flex items-center justify-between px-6 border-b border-slate-100 shrink-0 bg-white">
@@ -153,6 +139,7 @@ const handleScroll = (e) => {
 
             <nav ref="sidebarNav" class="flex-1 overflow-y-auto py-3 px-4 custom-scrollbar">
                 
+                <!-- MENU ADMIN -->
                 <div v-if="isAdmin" class="flex flex-col space-y-1 lg:space-y-0.5">
                     <p class="text-[10px] uppercase font-semibold text-rose-500 px-4 mb-2 lg:mb-1.5 mt-3 lg:mt-2 tracking-[0.2em]">Admin Control</p>
                     
@@ -203,10 +190,7 @@ const handleScroll = (e) => {
                         <span class="text-xs lg:text-[11px] uppercase tracking-wider">Kelola Voucher</span>
                     </Link>
 
-                    <!-- MENU LAPORAN SOAL -->
-                    <Link :href="route('admin.question-reports.index')" 
-                          :class="route().current('admin.question-reports.*') ? 'bg-rose-50 text-rose-600 font-bold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'"
-                          class="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-colors mt-1">
+                    <Link :href="route('admin.question-reports.index')" :class="route().current('admin.question-reports.*') ? 'bg-rose-50 text-rose-600 font-bold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'" class="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-colors mt-1">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" :class="route().current('admin.question-reports.*') ? 'text-rose-500' : 'text-slate-400'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
                         </svg>
@@ -219,6 +203,7 @@ const handleScroll = (e) => {
                     </Link>
                 </div>
 
+                <!-- MENU USER -->
                 <div v-if="isUser && !isAdmin" class="flex flex-col space-y-1 lg:space-y-0.5">
                     <p class="text-[10px] uppercase font-semibold text-slate-400 px-4 mb-2 lg:mb-1.5 mt-3 lg:mt-2 tracking-[0.2em]">Menu Navigasi</p>
                     
@@ -281,30 +266,28 @@ const handleScroll = (e) => {
             </div>
         </aside>
 
-        <div class="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-            
-            <header class="h-16 bg-white border-b border-slate-100 flex items-center justify-between px-6 md:px-10 shrink-0 z-30 shadow-sm">
+        <!-- KONTEN UTAMA HALAMAN -->
+        <div class="flex-1 flex flex-col min-w-0">
+            <!-- Header Atas (Fixed di Mobile) -->
+            <header class="sticky top-0 h-16 bg-white/90 backdrop-blur border-b border-slate-100 flex items-center justify-between px-6 md:px-10 z-30 shadow-sm">
                 <div class="flex items-center gap-4">
                     <button @click="isSidebarOpen = true" class="p-2 -ml-2 text-slate-600 hover:bg-slate-50 rounded-xl lg:hidden">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
                     </button>
-
                     <h2 class="font-medium text-slate-900 uppercase text-[10px] md:text-[11px] tracking-[0.15em] md:tracking-[0.2em] truncate">
                         {{ isAdmin ? 'Admin Command Center' : 'Halaman Belajar Nusantara' }}
                     </h2>
                 </div>
-
                 <div class="flex items-center gap-3 md:gap-4">
                     <div class="hidden sm:flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100 text-[9px] font-medium text-emerald-600 uppercase tracking-wider">
                         <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Sistem Aktif
                     </div>
-                    <img :src="user?.profile_photo_url || `https://ui-avatars.com/api/?name=${user?.name}`" 
-                         class="h-8 w-8 md:h-9 md:w-9 rounded-xl border-2 border-white shadow-sm object-cover" />
+                    <img :src="user?.profile_photo_url || `https://ui-avatars.com/api/?name=${user?.name}`" class="h-8 w-8 md:h-9 md:w-9 rounded-xl border-2 border-white shadow-sm object-cover" />
                 </div>
             </header>
 
-            <!-- Bagian ini membaca fungsi scroll untuk hide bottom navbar -->
-            <main @scroll="handleScroll" class="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-12 bg-[#F8FAFC]" :class="{ 'pb-24': !isExamPage && isUser && !isAdmin }">
+            <!-- HAPUS overflow-y-auto AGAR BODY BISA DI-SCROLL, BERI PADDING BOTTOM (pb-24) AGAR TIDAK TERTUTUP TAB -->
+            <main class="flex-1 p-4 md:p-12 pb-24 lg:pb-12">
                 <div class="max-w-[1400px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-1000">
                     <slot />
                 </div>
@@ -312,12 +295,11 @@ const handleScroll = (e) => {
         </div>
 
         <!-- ========================================== -->
-        <!-- MOBILE BOTTOM TAB NAVIGATION (Hanya 3 Tab) -->
+        <!-- MOBILE BOTTOM TAB NAVIGATION (3 TAB FIXED) -->
         <!-- ========================================== -->
         <div 
             v-if="!isExamPage && isUser && !isAdmin"
-            class="md:hidden fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] transition-transform duration-300 z-[999] px-10 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] flex justify-between items-center"
-            :class="{ 'translate-y-full': isScrolled }"
+            class="md:hidden fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-[999] px-10 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] flex justify-between items-center"
         >
             <!-- 1. Home -->
             <Link :href="route('dashboard')" class="flex flex-col items-center gap-1 transition-colors" :class="{ 'text-blue-600': $page.url === '/dashboard', 'text-slate-400 hover:text-blue-600': $page.url !== '/dashboard' }">
@@ -337,7 +319,6 @@ const handleScroll = (e) => {
                 <span class="text-[10px] font-bold">Dompet</span>
             </Link>
         </div>
-
     </div>
 </template>
 
@@ -345,11 +326,6 @@ const handleScroll = (e) => {
 .custom-scrollbar::-webkit-scrollbar { width: 4px; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-
-.animate-in {
-    animation-duration: 0.8s;
-    animation-fill-mode: both;
-}
 
 .active-link::before {
     content: '';
