@@ -36,6 +36,7 @@ class User extends Authenticatable
         'agency_name',    // Menggantikan 'instansi'
         'instance_type',  // Wajib ditambahkan karena Vue mengirimkan data ini
         'gender',         // Menggantikan 'jenis_kelamin'
+        'google_id', // Tambahkan ini
     ];
 
     /**

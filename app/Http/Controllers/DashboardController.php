@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\ExamAttempt;
+use App\Models\Setting;
 use App\Models\Transaction;
 use App\Models\Tryout;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -45,26 +47,17 @@ class DashboardController extends Controller
             }
         }
 
-        // 2. RETRIEVE DATA BAWAAN DASHBOARD SEBELUMNYA
-        $isPremiumMember = $user->membership_expires_at && now()->lt($user->membership_expires_at);
+        // 2. LOGIC TOTAL USER (Bisa diatur manual dari admin atau sesuaikan dengan DB)
+        // Pastikan key 'total_user_mode' dan 'total_user_manual_value' ada atau di-seeder di tabel settings.
+        $totalUserMode = Setting::where('key', 'total_user_mode')->value('value') ?? 'database';
+        
+        if ($totalUserMode === 'manual') {
+            $totalUserDisplay = (int) Setting::where('key', 'total_user_manual_value')->value('value') ?? 0;
+        } else {
+            $totalUserDisplay = User::count();
+        }
 
-        $catalogTryouts = Tryout::query()
-            ->where('is_published', true)
-            ->where(function ($query) {
-                $query->whereNotIn('type', ['akbar', 'adidaya'])->orWhereNull('type');
-            })
-            ->whereDoesntHave('transactions', function($q) use ($user) {
-                $q->whereIn('status', ['paid', 'success'])
-                  ->where(function($subQuery) use ($user) {
-                      $subQuery->where('user_id', $user->id)
-                               ->orWhereJsonContains('participants_data', $user->email);
-                  });
-            })
-            ->latest()
-            ->take(3) // Batasi rekomendasi awal di dashboard
-            ->get();
-
-        // Logic stats sederhana
+        // 3. STATISTIK USER
         $completedAttempts = ExamAttempt::where('user_id', $user->id)->whereNotNull('completed_at')->get();
         $stats = [
             'completed_count' => $completedAttempts->count(),
@@ -73,10 +66,10 @@ class DashboardController extends Controller
 
         return Inertia::render('Dashboard', [
             'activeExam' => $activeExam, // Dioper ke frontend
-            'unpurchased_tryouts' => $catalogTryouts,
             'balance' => $user->balance ?? 0,
             'stats' => $stats,
-            'announcement' => \App\Models\Setting::where('key', 'announcement')->first()?->value ?? null
+            'total_user_display' => $totalUserDisplay, // Mengirim data total user ke frontend
+            'announcement' => Setting::where('key', 'announcement')->first()?->value ?? null
         ]);
     }
 
