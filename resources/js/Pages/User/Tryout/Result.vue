@@ -1,7 +1,7 @@
 <script setup>
 import { Head, Link } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 const props = defineProps({
     attempt: Object,
@@ -11,7 +11,11 @@ const props = defineProps({
     ranking: Object,
     timeStats: Object, 
     backUrl: String,
+    hasFullAccess: Boolean, // Menerima status akses dari controller
 });
+
+// State untuk memunculkan pop-up modal upgrade
+const showUpgradeModal = ref(false);
 
 // LOGIKA RUTE KEMBALI DINAMIS BERDASARKAN TIPE TRYOUT
 const dynamicBackUrl = computed(() => {
@@ -94,7 +98,8 @@ const formatTime = (seconds) => {
                 <div class="grid grid-cols-2 md:grid-cols-4 border-t border-slate-100 bg-slate-50/50 divide-y md:divide-y-0 md:divide-x divide-slate-100">
                     <div class="p-4 text-center border-r border-slate-100 md:border-r-0">
                         <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Peringkat Anda</p>
-                        <p class="text-xl font-bold text-slate-800 tabular-nums">#{{ ranking.rank }} <span class="text-xs font-medium text-slate-400">/ {{ ranking.total_participants }}</span></p>
+                        <p v-if="hasFullAccess" class="text-xl font-bold text-slate-800 tabular-nums">#{{ ranking.rank }} <span class="text-xs font-medium text-slate-400">/ {{ ranking.total_participants }}</span></p>
+                        <p v-else class="text-xl font-bold text-slate-300">🔒</p>
                     </div>
                     <div class="p-4 text-center">
                         <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Target Soal</p>
@@ -145,31 +150,74 @@ const formatTime = (seconds) => {
                 </div>
             </div>
 
+            <!-- ========================================== -->
+            <!-- TOMBOL AKSI (TERKUNCI JIKA AKSES GRATIS)   -->
+            <!-- ========================================== -->
             <div class="flex flex-col sm:flex-row gap-3 mt-6">
-                <Link :href="route('tryout.review', attempt.id)" class="flex-1 flex justify-center items-center px-6 py-3.5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors uppercase tracking-wider">
-                    Lihat Pembahasan Soal
+                
+                <!-- TOMBOL PEMBAHASAN -->
+                <button v-if="!hasFullAccess" @click="showUpgradeModal = true" class="flex-1 flex justify-center items-center gap-2 px-6 py-3.5 bg-[#F5F5F7] hover:bg-[#EBEBEF] text-slate-400 text-sm font-semibold rounded-xl transition-colors uppercase tracking-wider border border-transparent">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                    Pembahasan
+                </button>
+                <Link v-else :href="route('tryout.review', attempt.id)" class="flex-1 flex justify-center items-center px-6 py-3.5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors uppercase tracking-wider border border-transparent">
+                    Lihat Pembahasan
                 </Link>
                 
-                <Link :href="route('tryout.leaderboard', tryout.id)" class="flex-1 flex justify-center items-center px-6 py-3.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-sm font-semibold rounded-xl shadow-sm transition-colors uppercase tracking-wider">
-                    Lihat Papan Peringkat
+                <!-- TOMBOL PERINGKAT -->
+                <button v-if="!hasFullAccess" @click="showUpgradeModal = true" class="flex-1 flex justify-center items-center gap-2 px-6 py-3.5 bg-[#F5F5F7] hover:bg-[#EBEBEF] text-slate-400 text-sm font-semibold rounded-xl transition-colors uppercase tracking-wider border border-transparent">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                    Papan Peringkat
+                </button>
+                <Link v-else :href="route('tryout.leaderboard', tryout.id)" class="flex-1 flex justify-center items-center px-6 py-3.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-sm font-semibold rounded-xl shadow-sm transition-colors uppercase tracking-wider">
+                    Lihat Peringkat
                 </Link>
 
-<a 
-    :href="route('tryout.certificate', attempt.id)" 
-    target="_blank"
-    class="flex-1 flex justify-center items-center px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors uppercase tracking-wider"
->
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-    </svg>
-    Unduh Sertifikat
-</a>
+                <!-- TOMBOL SERTIFIKAT -->
+                <button v-if="!hasFullAccess" @click="showUpgradeModal = true" class="flex-1 flex justify-center items-center gap-2 px-6 py-3.5 bg-[#F5F5F7] hover:bg-[#EBEBEF] text-slate-400 text-sm font-semibold rounded-xl transition-colors uppercase tracking-wider border border-transparent">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                    Sertifikat
+                </button>
+                <a v-else :href="route('tryout.certificate', attempt.id)" target="_blank" class="flex-1 flex justify-center items-center px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors uppercase tracking-wider border border-transparent">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Unduh Sertifikat
+                </a>
             </div>
 
         </main>
+
+        <!-- ============================================== -->
+        <!-- MODAL POP-UP UPGRADE PREMIUM                   -->
+        <!-- ============================================== -->
+        <Teleport to="body">
+            <div v-if="showUpgradeModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" @click="showUpgradeModal = false"></div>
+                
+                <div class="relative bg-white rounded-[24px] p-8 max-w-sm w-full text-center shadow-2xl animate-in zoom-in-95 duration-200 z-10">
+                    <div class="w-16 h-16 bg-[#F5F5F7] rounded-full flex items-center justify-center text-3xl mx-auto mb-5">
+                        🔒
+                    </div>
+                    <h3 class="text-[18px] font-bold text-slate-900 mb-2">Fitur Terkunci</h3>
+                    <p class="text-[13px] text-slate-500 mb-8 leading-relaxed font-medium">
+                        Anda mengerjakan paket ini secara gratis. Beli akses premium untuk membuka <strong class="text-slate-700">Pembahasan Lengkap, Peringkat Nasional, dan Sertifikat Kelulusan</strong>.
+                    </p>
+                    <div class="flex flex-col gap-3">
+                        <Link :href="route('tryout.show', tryout.id)" class="w-full py-3.5 bg-[#007AFF] hover:bg-[#0056b3] text-white rounded-full text-[13px] font-semibold transition-all active:scale-95">
+                            Beli Akses Premium
+                        </Link>
+                        <button @click="showUpgradeModal = false" class="w-full py-3.5 bg-[#F2F2F7] hover:bg-[#E3E3E8] text-slate-700 rounded-full text-[13px] font-semibold transition-colors">
+                            Tutup
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
     </div>
 </template>
 
 <style scoped>
 .tabular-nums { font-variant-numeric: tabular-nums; }
+.animate-in { animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
 </style>
