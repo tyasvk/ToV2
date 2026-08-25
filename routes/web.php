@@ -71,6 +71,16 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     Route::post('/wallet/pay-pending/{transaction}', [WalletController::class, 'payPending'])->name('wallet.payPending');
     Route::post('/wallet/claim-voucher', [WalletController::class, 'claimVoucher'])->name('wallet.claim_voucher');
 
+    // --- PENDAFTARAN TRYOUT ---
+    Route::get('/tryout/{tryout}/register', [UserTryoutController::class, 'registerForm'])->name('tryout.register');
+    Route::post('/tryout/{tryout}/register', [TryoutController::class, 'processRegistration'])->name('tryout.processRegistration');
+    Route::post('/check-voucher-validity', [TryoutController::class, 'checkVoucher'])->name('voucher.check');
+    
+    // === FITUR BARU: UPLOAD PERSYARATAN GRATIS ===
+    Route::get('/tryout/{tryout}/upload-syarat', [UserTryoutController::class, 'uploadSyarat'])->name('tryout.upload-syarat');
+    Route::post('/tryout/{tryout}/upload-syarat', [UserTryoutController::class, 'storeSyarat'])->name('tryout.store-syarat');
+    Route::get('/tryout/{tryout}/status-syarat', [UserTryoutController::class, 'statusSyarat'])->name('tryout.status-syarat');
+    
     // --- TRYOUT ADIDAYA ---
     Route::get('/tryout/adidaya', [TryoutController::class, 'adidaya'])->name('tryout.adidaya');
 

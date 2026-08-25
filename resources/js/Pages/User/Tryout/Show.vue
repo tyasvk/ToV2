@@ -29,11 +29,13 @@ const formatDate = (dateString) => {
 };
 
 const pilihPaket = (pkg) => {
-  if (pkg.is_premium) {
-    router.get(route('tryout.register', props.tryout.id));
-  } else {
-    router.get(route('tryout.wait', props.tryout.id));
-  }
+    if (pkg.is_premium) {
+        // Alur Premium
+        router.get(route('tryout.premium', props.tryout.id));
+    } else {
+        // Alur Gratis -> Arahkan ke route upload-syarat yang baru
+        router.get(route('tryout.upload-syarat', props.tryout.id)); 
+    }
 };
 
 const getFeatures = (isPremium) => {
