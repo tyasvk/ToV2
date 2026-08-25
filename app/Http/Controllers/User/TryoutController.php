@@ -114,15 +114,34 @@ class TryoutController extends Controller
         ]);
     }
 
-    public function show(Tryout $tryout)
+public function show(Tryout $tryout)
     {
         $now = now();
         $isClosed = ($tryout->registration_end_at && $now->greaterThan($tryout->registration_end_at)) || 
                     ($tryout->end_date && $now->greaterThan($tryout->end_date));
 
+        // Tambahkan definisi paket Gratis dan Premium
+        $packages = [
+            [
+                'id' => 'gratis',
+                'name' => 'Gratis',
+                'price' => 0,
+                'description' => 'Akses 1x pengerjaan tanpa pembahasan lengkap.',
+                'is_premium' => false
+            ],
+            [
+                'id' => 'premium',
+                'name' => 'Premium',
+                'price' => $tryout->price > 0 ? $tryout->price : 50000,
+                'description' => 'Akses 3x pengerjaan, pembahasan, ranking, & sertifikat.',
+                'is_premium' => true
+            ]
+        ];
+
         return Inertia::render('User/Tryout/Show', [
             'tryout' => $tryout,
             'is_registration_closed' => $isClosed,
+            'packages' => $packages, // Kirim variabel packages ke Vue
         ]);
     }
 

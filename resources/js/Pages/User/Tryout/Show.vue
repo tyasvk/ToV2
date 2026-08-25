@@ -1,10 +1,11 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 
 const props = defineProps({
     tryout: Object,
     is_registration_closed: Boolean,
+    packages: Array,
 });
 
 const formatCurrency = (price) => {
@@ -20,11 +21,31 @@ const formatDate = (dateString) => {
     if (!dateString) return 'Tidak ditentukan';
     return new Date(dateString).toLocaleDateString('id-ID', { 
         day: 'numeric', 
-        month: 'long', 
+        month: 'short', 
         year: 'numeric', 
         hour: '2-digit', 
         minute: '2-digit' 
     }) + ' WIB';
+};
+
+const pilihPaket = (pkg) => {
+  if (pkg.is_premium) {
+    router.get(route('tryout.register', props.tryout.id));
+  } else {
+    router.get(route('tryout.wait', props.tryout.id));
+  }
+};
+
+// List fitur dinamis (ditambahkan Sertifikat Digital untuk Premium)
+const getFeatures = (isPremium) => {
+    return [
+        { name: 'Akses sistem CAT & Timer', included: true },
+        { name: isPremium ? 'Bisa dikerjakan 3 kali' : 'Hanya 1 kali pengerjaan', included: true },
+        { name: 'Perangkingan Nasional, Provinsi, Instansi', included: isPremium },
+        { name: 'Pembahasan Soal Lengkap', included: isPremium },
+        { name: 'Sertifikat Digital', included: isPremium },
+        { name: 'Tidak perlu upload persyaratan', included: isPremium },
+    ];
 };
 </script>
 
@@ -32,84 +53,143 @@ const formatDate = (dateString) => {
     <Head :title="tryout.title" />
 
     <AuthenticatedLayout>
-        <!-- Container Minimalis -->
-        <div class="max-w-4xl mx-auto px-4 py-8 sm:py-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div class="min-h-screen bg-transparent font-sans selection:bg-[#0071e3] selection:text-white animate-in fade-in duration-700 py-8 sm:py-12">
             
-            <!-- Tombol Kembali -->
-            <Link :href="route('tryout.index')" class="text-sm text-slate-500 hover:text-slate-900 mb-8 inline-flex items-center gap-2 transition-colors font-medium">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-                Kembali ke Katalog
-            </Link>
-
-            <!-- Card Utama -->
-            <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-10 shadow-sm flex flex-col md:flex-row gap-10 lg:gap-16">
+            <div class="max-w-4xl mx-auto px-4 sm:px-6">
                 
-                <!-- Kiri: Detail Informasi -->
-                <div class="flex-1 space-y-8">
-                    <div>
-                        <div class="inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider mb-4 border"
-                            :class="tryout.is_paid ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'">
-                            {{ tryout.is_paid ? 'Paket Premium' : 'Paket Gratis' }}
-                        </div>
-                        <h1 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
-                            {{ tryout.title }}
-                        </h1>
-                        <p class="text-slate-500 mt-4 text-sm sm:text-base leading-relaxed">
-                            {{ tryout.description || 'Tidak ada deskripsi tambahan untuk paket tryout ini.' }}
-                        </p>
-                    </div>
+                <!-- Navigasi -->
+                <div class="mb-6">
+                    <Link :href="route('tryout.index')" class="inline-flex items-center gap-1 text-[#0071e3] hover:opacity-80 text-[15px] font-medium transition-opacity">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 -ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                        </svg>
+                        Katalog
+                    </Link>
+                </div>
 
-                    <div class="grid grid-cols-2 gap-y-6 gap-x-4 pt-6 border-t border-slate-100">
-                        <div>
-                            <p class="text-xs text-slate-400 uppercase tracking-widest font-semibold mb-1">Durasi Pengerjaan</p>
-                            <p class="font-medium text-slate-800 text-lg">{{ tryout.duration }} <span class="text-sm text-slate-500">Menit</span></p>
+                <!-- Header -->
+                <div class="text-center mb-10">
+                    <h1 class="text-[28px] sm:text-[34px] font-semibold text-[#1d1d1f] tracking-tight mb-2">
+                        {{ tryout.title }}
+                    </h1>
+                    <p class="text-[14px] sm:text-[15px] text-[#86868b] leading-relaxed max-w-lg mx-auto">
+                        Pilih paket akses yang sesuai untuk memulai simulasi ujian Anda.
+                    </p>
+                </div>
+
+                <!-- Info Widget -->
+                <div class="mb-10">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                        
+                        <div class="bg-white rounded-[18px] p-4 flex flex-col items-center justify-center text-center shadow-[0_2px_8px_rgba(0,0,0,0.03)] border border-[#d2d2d7]/40">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-[#0071e3] mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span class="text-[11px] text-[#86868b] font-semibold uppercase tracking-wider mb-0.5">Durasi</span>
+                            <span class="text-[#1d1d1f] font-semibold text-[15px]">{{ tryout.duration }} Mnt</span>
                         </div>
-                        <div>
-                            <p class="text-xs text-slate-400 uppercase tracking-widest font-semibold mb-1">Total Soal</p>
-                            <p class="font-medium text-slate-800 text-lg">110 <span class="text-sm text-slate-500">Soal</span></p>
+
+                        <div class="bg-white rounded-[18px] p-4 flex flex-col items-center justify-center text-center shadow-[0_2px_8px_rgba(0,0,0,0.03)] border border-[#d2d2d7]/40">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-[#0071e3] mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <span class="text-[11px] text-[#86868b] font-semibold uppercase tracking-wider mb-0.5">Total Soal</span>
+                            <span class="text-[#1d1d1f] font-semibold text-[15px]">110 Butir</span>
                         </div>
-                        <div class="col-span-2">
-                            <p class="text-xs text-slate-400 uppercase tracking-widest font-semibold mb-1">Masa Pendaftaran</p>
-                            <p v-if="tryout.registration_start_at && tryout.registration_end_at" class="font-medium text-slate-800 text-sm">
-                                {{ formatDate(tryout.registration_start_at) }} <span class="text-slate-400 mx-2 font-normal">s/d</span> {{ formatDate(tryout.registration_end_at) }}
-                            </p>
-                            <p v-else class="font-medium text-emerald-600 text-sm">
-                                Selalu Terbuka
-                            </p>
+
+                        <div class="bg-white rounded-[18px] p-4 flex flex-col items-center justify-center text-center shadow-[0_2px_8px_rgba(0,0,0,0.03)] border border-[#d2d2d7]/40">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-[#0071e3] mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span class="text-[11px] text-[#86868b] font-semibold uppercase tracking-wider mb-0.5">Daftar</span>
+                            <span v-if="tryout.registration_start_at" class="text-[#1d1d1f] font-semibold text-[13px] leading-tight mt-0.5">
+                                {{ formatDate(tryout.registration_start_at).split(' ')[0] }}<br>s/d<br>{{ formatDate(tryout.registration_end_at).split(' ')[0] }}
+                            </span>
+                            <span v-else class="text-[#1d1d1f] font-semibold text-[14px]">Terbuka</span>
                         </div>
-                        <div class="col-span-2">
-                            <p class="text-xs text-slate-400 uppercase tracking-widest font-semibold mb-1">Mulai Ujian</p>
-                            <p v-if="tryout.started_at" class="font-medium text-blue-600 text-sm">
-                                {{ formatDate(tryout.started_at) }}
-                            </p>
-                            <p v-else class="font-medium text-emerald-600 text-sm">
-                                Kapan saja
-                            </p>
+
+                        <div class="bg-white rounded-[18px] p-4 flex flex-col items-center justify-center text-center shadow-[0_2px_8px_rgba(0,0,0,0.03)] border border-[#d2d2d7]/40">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-[#0071e3] mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span class="text-[11px] text-[#86868b] font-semibold uppercase tracking-wider mb-0.5">Mulai Ujian</span>
+                            <span v-if="tryout.started_at" class="text-[#1d1d1f] font-semibold text-[13px] leading-tight mt-0.5">
+                                {{ formatDate(tryout.started_at).split(' ')[0] }}<br>{{ formatDate(tryout.started_at).split(' ')[1] }} WIB
+                            </span>
+                            <span v-else class="text-[#1d1d1f] font-semibold text-[14px]">Kapan Saja</span>
                         </div>
+
                     </div>
                 </div>
 
-                <!-- Kanan: Panel Aksi (Harga & Tombol) -->
-                <div class="w-full md:w-72 shrink-0 flex flex-col justify-center">
-                    <div class="bg-slate-50 rounded-2xl p-6 sm:p-8 border border-slate-100 text-center flex flex-col h-full justify-center">
-                        <p class="text-xs text-slate-500 font-semibold uppercase tracking-widest mb-2">Investasi</p>
-                        <p class="text-3xl font-extrabold text-slate-900 tracking-tight mb-8">
-                            {{ formatCurrency(tryout.price) }}
-                        </p>
-
-                        <div v-if="is_registration_closed && tryout.registration_start_at && tryout.registration_end_at" class="bg-rose-50 text-rose-600 text-sm font-bold py-3.5 rounded-xl border border-rose-100">
-                            Pendaftaran Ditutup
+                <!-- Bagian Opsi Akses -->
+                <div class="pb-12">
+                    <h2 class="text-[19px] font-semibold text-center text-[#1d1d1f] mb-5 tracking-tight">Opsi Akses</h2>
+                    
+                    <div v-if="is_registration_closed && tryout.registration_start_at && tryout.registration_end_at" 
+                         class="max-w-sm mx-auto bg-white rounded-[20px] p-6 text-center shadow-[0_2px_8px_rgba(0,0,0,0.03)] border border-[#d2d2d7]/40">
+                        <div class="w-10 h-10 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
                         </div>
-                        <Link v-else :href="route('tryout.register', tryout.id)" class="bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold py-4 rounded-xl transition-all shadow-md hover:shadow-lg active:scale-95 block w-full">
-                            Daftar Sekarang
-                        </Link>
-                        
-                        <p v-if="!(is_registration_closed && tryout.registration_start_at && tryout.registration_end_at)" class="text-[10px] text-slate-400 mt-4 font-medium">
-                            Akses ujian akan otomatis terbuka pada jadwal yang ditentukan.
-                        </p>
+                        <h3 class="text-[17px] font-semibold text-[#1d1d1f] mb-1">Pendaftaran Ditutup</h3>
+                        <p class="text-[#86868b] text-[13px]">Sesi untuk tryout ini sudah tidak menerima pendaftaran baru.</p>
                     </div>
+
+                    <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 max-w-3xl mx-auto">
+                        
+                        <!-- Card Paket -->
+                        <div v-for="pkg in packages" :key="pkg.id"
+                             class="bg-white rounded-[22px] p-6 sm:p-7 flex flex-col justify-between transition-all duration-300 border shadow-[0_2px_12px_rgba(0,0,0,0.03)]"
+                             :class="pkg.is_premium ? 'border-[#0071e3]' : 'border-[#d2d2d7]/50 hover:border-[#d2d2d7]'">
+                            
+                            <!-- Header & Harga -->
+                            <div class="text-center">
+                                <h3 class="text-[19px] font-semibold text-[#1d1d1f] mb-1">{{ pkg.name }}</h3>
+                                <p class="text-[32px] sm:text-[36px] font-bold text-[#1d1d1f] tracking-tight my-2">
+                                    {{ formatCurrency(pkg.price).replace(',00', '') }}
+                                </p>
+                            </div>
+
+                            <!-- Daftar Perbedaan Fitur -->
+                            <div class="mt-5 mb-8 space-y-3.5 border-t border-[#d2d2d7]/40 pt-6">
+                                <div v-for="(feature, index) in getFeatures(pkg.is_premium)" :key="index" class="flex items-start gap-3">
+                                    
+                                    <!-- Ikon Ceklis (Tersedia) -->
+                                    <svg v-if="feature.included" xmlns="http://www.w3.org/2000/svg" class="w-[18px] h-[18px] text-[#0071e3] shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                                    </svg>
+                                    
+                                    <!-- Ikon Silang (Tidak Tersedia) -->
+                                    <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-[18px] h-[18px] text-[#d2d2d7] shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                                    </svg>
+                                    
+                                    <span class="text-[13px] leading-snug" :class="feature.included ? 'text-[#1d1d1f]' : 'text-[#86868b] line-through decoration-[#d2d2d7]'">
+                                        {{ feature.name }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Tombol Aksi -->
+                            <div class="mt-auto">
+                                <button @click="pilihPaket(pkg)"
+                                        class="w-full py-2.5 px-4 rounded-full text-[14px] font-medium transition-colors duration-200"
+                                        :class="pkg.is_premium 
+                                            ? 'bg-[#0071e3] text-white hover:bg-[#005bb5]' 
+                                            : 'bg-[#e8e8ed]/60 text-[#1d1d1f] hover:bg-[#d2d2d7]/50'">
+                                    Lanjutkan
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                    
+                    <p class="text-center text-[#86868b] text-[12px] mt-8 px-4">
+                        Akses ujian dan fitur lainnya mengikuti syarat dan ketentuan yang berlaku.
+                    </p>
                 </div>
 
             </div>
