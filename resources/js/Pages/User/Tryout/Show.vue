@@ -1,11 +1,13 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 
 const props = defineProps({
     tryout: Object,
     is_registration_closed: Boolean,
     packages: Array,
+    registrationStatus: String, // Status dari TryoutRegistration (pending, approved, rejected, null)
+    hasPaid: Boolean            // Apakah user sudah membeli paket Premium
 });
 
 const formatCurrency = (price) => {
@@ -28,16 +30,6 @@ const formatDate = (dateString) => {
     }) + ' WIB';
 };
 
-const pilihPaket = (pkg) => {
-    if (pkg.is_premium) {
-        // Alur Premium
-        router.get(route('tryout.premium', props.tryout.id));
-    } else {
-        // Alur Gratis -> Arahkan ke route upload-syarat yang baru
-        router.get(route('tryout.upload-syarat', props.tryout.id)); 
-    }
-};
-
 const getFeatures = (isPremium) => {
     return [
         { name: 'Akses sistem CAT & Timer', included: true },
@@ -54,7 +46,6 @@ const getFeatures = (isPremium) => {
     <Head :title="tryout.title" />
 
     <AuthenticatedLayout>
-        <!-- py-8 diubah menjadi py-5 untuk mobile agar konten naik ke atas -->
         <div class="min-h-screen bg-transparent font-sans selection:bg-[#0071e3] selection:text-white animate-in fade-in duration-700 py-5 sm:py-12">
             
             <div class="max-w-4xl mx-auto px-4 sm:px-6">
@@ -79,7 +70,7 @@ const getFeatures = (isPremium) => {
                     </p>
                 </div>
 
-                <!-- Info Widget (mb-10 diubah menjadi mb-6 untuk mobile) -->
+                <!-- Info Widget -->
                 <div class="mb-6 sm:mb-10">
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
                         
@@ -117,7 +108,7 @@ const getFeatures = (isPremium) => {
                             </svg>
                             <span class="text-[10px] sm:text-[11px] text-[#86868b] font-semibold uppercase tracking-wider mb-0.5">Mulai Ujian</span>
                             <span v-if="tryout.started_at" class="text-[#1d1d1f] font-semibold text-[11px] sm:text-[13px] leading-tight mt-0.5">
-                                {{ formatDate(tryout.started_at).split(' ')[0] }}<br>{{ formatDate(tryout.started_at).split(' ')[1] }} WIB
+                                {{ formatDate(tryout.started_at).split(' ')[0] }}<br>{{ formatDate(tryout.started_at).split(' ')[1] }}
                             </span>
                             <span v-else class="text-[#1d1d1f] font-semibold text-[13px] sm:text-[14px]">Kapan Saja</span>
                         </div>
@@ -140,10 +131,9 @@ const getFeatures = (isPremium) => {
                         <p class="text-[#86868b] text-[13px]">Sesi untuk tryout ini sudah tidak menerima pendaftaran baru.</p>
                     </div>
 
-                    <!-- gap-3 di mobile agar kedua paket terlihat menempel rapat -->
                     <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5 max-w-3xl mx-auto">
                         
-                        <!-- Card Paket (Padding dikurangi menjadi p-5 pada mobile) -->
+                        <!-- Card Paket -->
                         <div v-for="pkg in packages" :key="pkg.id"
                              class="bg-white rounded-[20px] sm:rounded-[22px] p-5 sm:p-7 flex flex-col justify-between transition-all duration-300 border shadow-[0_2px_12px_rgba(0,0,0,0.03)]"
                              :class="pkg.is_premium ? 'border-[#0071e3]' : 'border-[#d2d2d7]/50 hover:border-[#d2d2d7]'">
@@ -157,42 +147,61 @@ const getFeatures = (isPremium) => {
                                     </span>
                                 </div>
                                 <h3 class="text-[17px] sm:text-[19px] font-semibold text-[#1d1d1f] mb-0.5">{{ pkg.name }}</h3>
-                                <!-- Teks harga diperkecil sedikit di mobile (text-[28px]) -->
                                 <p class="text-[28px] sm:text-[36px] font-bold text-[#1d1d1f] tracking-tight my-1 sm:my-2">
                                     {{ formatCurrency(pkg.price).replace(',00', '') }}
                                 </p>
                             </div>
 
-                            <!-- Daftar Perbedaan Fitur (Spacing dikurangi menjadi space-y-2.5 di mobile) -->
+                            <!-- Daftar Fitur -->
                             <div class="mt-4 sm:mt-5 mb-5 sm:mb-8 space-y-2.5 sm:space-y-3.5 border-t border-[#d2d2d7]/40 pt-4 sm:pt-6">
                                 <div v-for="(feature, index) in getFeatures(pkg.is_premium)" :key="index" class="flex items-start gap-2.5 sm:gap-3">
                                     
-                                    <!-- Ikon Ceklis (Tersedia) -->
                                     <svg v-if="feature.included" xmlns="http://www.w3.org/2000/svg" class="w-[16px] h-[16px] sm:w-[18px] sm:h-[18px] text-[#0071e3] shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                                     </svg>
-                                    
-                                    <!-- Ikon Silang (Tidak Tersedia) -->
                                     <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-[16px] h-[16px] sm:w-[18px] sm:h-[18px] text-[#d2d2d7] shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
                                     </svg>
                                     
-                                    <!-- Teks fitur sedikit lebih kecil di mobile -->
                                     <span class="text-[12px] sm:text-[13px] leading-snug" :class="feature.included ? 'text-[#1d1d1f]' : 'text-[#86868b] line-through decoration-[#d2d2d7]'">
                                         {{ feature.name }}
                                     </span>
                                 </div>
                             </div>
 
-                            <!-- Tombol Aksi -->
+                            <!-- Tombol Aksi Dinamis -->
                             <div class="mt-auto">
-                                <button @click="pilihPaket(pkg)"
-                                        class="w-full py-2.5 px-4 rounded-full text-[13px] sm:text-[14px] font-medium transition-colors duration-200"
-                                        :class="pkg.is_premium 
-                                            ? 'bg-[#0071e3] text-white hover:bg-[#005bb5]' 
-                                            : 'bg-[#e8e8ed]/60 text-[#1d1d1f] hover:bg-[#d2d2d7]/50'">
-                                    Lanjutkan
-                                </button>
+                                
+                                <!-- JIKA PAKET PREMIUM -->
+                                <template v-if="pkg.is_premium">
+                                    <Link v-if="hasPaid" :href="route('tryout.history.detail', tryout.id)" class="w-full inline-flex items-center justify-center py-2.5 px-4 rounded-full text-[13px] sm:text-[14px] font-medium transition-colors duration-200 bg-[#0071e3] text-white hover:bg-[#005bb5]">
+                                        Mulai Ujian Premium
+                                    </Link>
+                                    <Link v-else :href="route('tryout.register', tryout.id)" class="w-full inline-flex items-center justify-center py-2.5 px-4 rounded-full text-[13px] sm:text-[14px] font-medium transition-colors duration-200 bg-[#0071e3] text-white hover:bg-[#005bb5]">
+                                        Beli Premium
+                                    </Link>
+                                </template>
+
+                                <!-- JIKA PAKET GRATIS -->
+                                <template v-else>
+                                    <button v-if="hasPaid" disabled class="w-full py-2.5 px-4 rounded-full text-[13px] sm:text-[14px] font-medium bg-[#e8e8ed]/60 text-slate-400 cursor-not-allowed">
+                                        Telah Memiliki Premium
+                                    </button>
+                                    <button v-else-if="registrationStatus === 'pending'" disabled class="w-full py-2.5 px-4 rounded-full text-[13px] sm:text-[14px] font-medium bg-[#e8e8ed] text-slate-500 cursor-not-allowed flex items-center justify-center gap-2">
+                                        <svg class="animate-spin h-4 w-4 text-slate-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Sedang Diverifikasi
+                                    </button>
+                                    <Link v-else-if="registrationStatus === 'approved'" :href="route('tryout.history.detail', tryout.id)" class="w-full inline-flex items-center justify-center py-2.5 px-4 rounded-full text-[13px] sm:text-[14px] font-medium transition-colors duration-200 bg-emerald-600 text-white hover:bg-emerald-700">
+                                        Mulai Ujian Gratis
+                                    </Link>
+                                    <Link v-else :href="route('tryout.upload-syarat', tryout.id)" class="w-full inline-flex items-center justify-center py-2.5 px-4 rounded-full text-[13px] sm:text-[14px] font-medium transition-colors duration-200 bg-[#e8e8ed]/60 text-[#1d1d1f] hover:bg-[#d2d2d7]/50">
+                                        {{ registrationStatus === 'rejected' ? 'Upload Ulang Syarat' : 'Lanjutkan Gratis' }}
+                                    </Link>
+                                </template>
+
                             </div>
                         </div>
 

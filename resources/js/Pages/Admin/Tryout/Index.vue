@@ -155,13 +155,22 @@ const formatCurrency = (price) => {
                             >
                         </div>
 
-                        <!-- Tombol Buat Paket -->
-                        <button @click="openCreateModal" class="w-full sm:w-auto px-4 py-2 bg-[#007AFF] hover:bg-[#0056b3] text-white rounded-[10px] font-semibold text-[12px] md:text-[13px] transition-colors flex items-center justify-center gap-1.5 active:scale-95 shrink-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                            </svg>
-                            Buat Paket
-                        </button>
+                        <!-- TOMBOL VERIFIKASI & BUAT PAKET -->
+                        <div class="flex w-full sm:w-auto gap-2">
+                            <!-- Tombol Verifikasi (Baru ditambahkan) -->
+                            <Link :href="route('admin.tryouts.verifikasi.index')" class="flex-1 sm:flex-none px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-[10px] font-semibold text-[12px] md:text-[13px] transition-colors flex items-center justify-center gap-1.5 active:scale-95 shadow-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                Verifikasi
+                            </Link>
+
+                            <!-- Tombol Buat Paket -->
+                            <button @click="openCreateModal" class="flex-1 sm:flex-none px-4 py-2 bg-[#007AFF] hover:bg-[#0056b3] text-white rounded-[10px] font-semibold text-[12px] md:text-[13px] transition-colors flex items-center justify-center gap-1.5 active:scale-95 shrink-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                </svg>
+                                Buat Paket
+                            </button>
+                        </div>
                     </div>
                 </div>
 

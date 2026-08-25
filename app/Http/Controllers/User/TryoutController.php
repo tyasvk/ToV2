@@ -8,6 +8,7 @@ use App\Models\Question;
 use App\Models\ExamAttempt;
 use App\Models\Transaction;
 use App\Models\WalletTransaction;
+use App\Models\TryoutRegistration; 
 use App\Models\User; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -25,12 +26,10 @@ class TryoutController extends Controller
     {
         $user = auth()->user();
         
-        // 1. Jika User adalah member VIP aktif, beri akses penuh
         if ($user->membership_expires_at && now()->lt($user->membership_expires_at)) {
             return true;
         }
 
-        // 2. Jika user sudah pernah membeli paket ini dengan status lunas
         return Transaction::where('tryout_id', $tryout->id)
             ->whereIn('status', ['paid', 'success'])
             ->where(function($query) use ($user) {
@@ -43,10 +42,11 @@ class TryoutController extends Controller
     /**
      * Gabungan Katalog & Tryout Saya
      */
-    public function index(Request $request)
+public function index(Request $request)
     {
         $user = auth()->user();
         $userId = $user->id; 
+        $userEmail = $user->email; // Tambahan untuk cek transaksi
         $isPremiumMember = $user->membership_expires_at && now()->lt($user->membership_expires_at);
 
         // --- 1. DATA KATALOG (Belum Dibeli & Belum Pernah Dikerjakan) ---
@@ -55,7 +55,6 @@ class TryoutController extends Controller
             ->where(function ($query) {
                 $query->whereNotIn('type', ['akbar', 'adidaya'])->orWhereNull('type');
             })
-            // Belum pernah dibeli
             ->whereDoesntHave('transactions', function($q) use ($user) {
                 $q->whereIn('status', ['paid', 'success'])
                   ->where(function($subQuery) use ($user) {
@@ -63,9 +62,15 @@ class TryoutController extends Controller
                                ->orWhereJsonContains('participants_data', $user->email);
                   });
             })
-            // Belum pernah dikerjakan (Akses Gratis)
             ->whereDoesntHave('examAttempts', function($q) use ($userId) {
                 $q->where('user_id', $userId);
+            })
+            // JANGAN tampilkan di katalog jika pengajuan gratisnya sudah disetujui (karena akan pindah ke Milik Saya)
+            ->whereNotIn('id', function($q) use ($userId) {
+                $q->select('tryout_id')
+                  ->from('tryout_registrations')
+                  ->where('user_id', $userId)
+                  ->where('status', 'approved');
             })
             ->when($request->search, fn($q, $s) => $q->where('title', 'like', "%{$s}%"))
             ->latest()
@@ -95,6 +100,13 @@ class TryoutController extends Controller
                 // ATAU pernah dikerjakan secara gratis
                 ->orWhereHas('examAttempts', function($eQ) use ($userId) {
                     $eQ->where('user_id', $userId);
+                })
+                // TAMPILKAN di Milik Saya jika pengajuan gratis disetujui admin
+                ->orWhereIn('id', function($sub) use ($userId) {
+                    $sub->select('tryout_id')
+                        ->from('tryout_registrations')
+                        ->where('user_id', $userId)
+                        ->where('status', 'approved');
                 });
             })->withCount(['examAttempts as attempts_count' => function($q) use ($userId) {
                 $q->where('user_id', $userId);
@@ -106,6 +118,35 @@ class TryoutController extends Controller
             ->latest()
             ->get();
 
+        // --- TAMBAHAN: LOGIKA UNTUK MENENTUKAN SISA KESEMPATAN DI TAB "MILIK SAYA" ---
+        $myTryouts->transform(function ($tryout) use ($userId, $userEmail, $isPremiumMember) {
+            $hasPremium = false;
+            if ($isPremiumMember) {
+                $hasPremium = true;
+            } else {
+                $hasPremium = \App\Models\Transaction::where('tryout_id', $tryout->id)
+                    ->whereIn('status', ['paid', 'success'])
+                    ->where(function($sq) use ($userId, $userEmail) {
+                        $sq->where('user_id', $userId)
+                           ->orWhereJsonContains('participants_data', $userEmail);
+                    })
+                    ->exists();
+            }
+
+            // Batas maksimal: 3x untuk Premium, 1x untuk Gratis
+            $maxAttempts = $hasPremium ? 3 : 1;
+            if ($tryout->type === 'akbar') {
+                $maxAttempts = 1;
+            }
+
+            // Memasukkan data ke dalam objek Vue
+            $tryout->user_access_type = $hasPremium ? 'Premium' : 'Gratis';
+            $tryout->max_attempts = $maxAttempts;
+            $tryout->remaining_attempts = max(0, $maxAttempts - $tryout->attempts_count);
+
+            return $tryout;
+        });
+
         return Inertia::render('User/Tryout/Index', [
             'catalogTryouts' => $catalogTryouts,
             'myTryouts' => $myTryouts,
@@ -114,13 +155,21 @@ class TryoutController extends Controller
         ]);
     }
 
-public function show(Tryout $tryout)
+    public function show(Tryout $tryout)
     {
         $now = now();
         $isClosed = ($tryout->registration_end_at && $now->greaterThan($tryout->registration_end_at)) || 
                     ($tryout->end_date && $now->greaterThan($tryout->end_date));
 
-        // Tambahkan definisi paket Gratis dan Premium
+        $user = auth()->user();
+
+        $registration = \App\Models\TryoutRegistration::where('user_id', $user->id)
+            ->where('tryout_id', $tryout->id)
+            ->latest()
+            ->first();
+
+        $hasPaid = $this->hasPremiumAccess($tryout);
+
         $packages = [
             [
                 'id' => 'gratis',
@@ -141,16 +190,71 @@ public function show(Tryout $tryout)
         return Inertia::render('User/Tryout/Show', [
             'tryout' => $tryout,
             'is_registration_closed' => $isClosed,
-            'packages' => $packages, // Kirim variabel packages ke Vue
+            'packages' => $packages,
+            'registrationStatus' => $registration ? $registration->status : null, 
+            'hasPaid' => $hasPaid,
         ]);
     }
 
-    /**
-     * Proses Pendaftaran (Pembelian Paket Premium)
-     */
+    public function uploadSyarat(Tryout $tryout)
+    {
+        $now = now();
+
+        if ($tryout->registration_start_at && $now->lt($tryout->registration_start_at)) {
+            return redirect()->route('tryout.show', $tryout->id)->with('error', 'Pendaftaran untuk tryout ini belum dibuka.');
+        }
+
+        if ($tryout->registration_end_at && $now->gt($tryout->registration_end_at)) {
+            return redirect()->route('tryout.show', $tryout->id)->with('error', 'Pendaftaran untuk tryout ini telah ditutup.');
+        }
+
+        return Inertia::render('User/Tryout/UploadSyarat', [
+            'tryout' => $tryout
+        ]);
+    }
+
+    public function storeSyarat(Request $request, Tryout $tryout)
+    {
+        $request->validate([
+            'proof_follow' => 'required|image|mimes:jpg,jpeg,png|max:2048',
+            'proof_comment' => 'required|image|mimes:jpg,jpeg,png|max:2048',
+        ], [
+            'proof_follow.required' => 'Bukti follow Instagram wajib diunggah.',
+            'proof_follow.image' => 'Bukti follow harus berupa file gambar.',
+            'proof_follow.max' => 'Ukuran gambar bukti follow maksimal 2MB.',
+            'proof_comment.required' => 'Bukti komentar & tag teman wajib diunggah.',
+            'proof_comment.image' => 'Bukti komentar harus berupa file gambar.',
+            'proof_comment.max' => 'Ukuran gambar bukti komentar maksimal 2MB.',
+        ]);
+
+        $followPath = $request->file('proof_follow')->store('proofs', 'public');
+        $commentPath = $request->file('proof_comment')->store('proofs', 'public');
+
+        TryoutRegistration::create([
+            'user_id' => auth()->id(),
+            'tryout_id' => $tryout->id,
+            'proof_follow' => $followPath,
+            'proof_comment' => $commentPath,
+            'status' => 'pending', 
+        ]);
+
+        return redirect()->route('tryout.status-syarat', $tryout->id);
+    }
+
+    public function statusSyarat(Tryout $tryout)
+    {
+        $registration = TryoutRegistration::where('user_id', auth()->id())
+            ->where('tryout_id', $tryout->id)
+            ->firstOrFail();
+
+        return Inertia::render('User/Tryout/StatusSyarat', [
+            'tryout' => $tryout->only(['id', 'title']),
+            'status' => $registration->status,
+        ]);
+    }
+
     public function processRegistration(Request $request, Tryout $tryout)
     {
-        // Tolak jika tryout ini tidak menyediakan opsi berbayar
         if (!$tryout->is_paid || $tryout->price <= 0) {
             return back()->withErrors(['message' => 'Paket ini sepenuhnya gratis, tidak perlu melakukan pembelian.']);
         }
@@ -285,7 +389,7 @@ public function show(Tryout $tryout)
         ]);
     }
 
-    public function myTryouts(Request $request)
+public function myTryouts(Request $request)
     {
         $user = auth()->user();
         $userEmail = $user->email;
@@ -310,6 +414,13 @@ public function show(Tryout $tryout)
                 // ATAU yang pernah dikerjakan secara gratis
                 ->orWhereHas('examAttempts', function($q) use ($userId) {
                     $q->where('user_id', $userId);
+                })
+                // TAMPILKAN di Milik Saya jika pengajuan gratis disetujui admin
+                ->orWhereIn('id', function($sub) use ($userId) {
+                    $sub->select('tryout_id')
+                        ->from('tryout_registrations')
+                        ->where('user_id', $userId)
+                        ->where('status', 'approved');
                 });
 
                 if ($isPremiumMember) {
@@ -327,97 +438,60 @@ public function show(Tryout $tryout)
             ->paginate(9)
             ->withQueryString();
 
+        // --- TAMBAHAN LOGIKA: MENENTUKAN TIPE AKSES DAN BATAS SISA KESEMPATAN ---
+        $tryouts->getCollection()->transform(function ($tryout) use ($userId, $userEmail, $isPremiumMember) {
+            
+            $hasPremium = false;
+            if ($isPremiumMember) {
+                $hasPremium = true;
+            } else {
+                $hasPremium = \App\Models\Transaction::where('tryout_id', $tryout->id)
+                    ->whereIn('status', ['paid', 'success'])
+                    ->where(function($sq) use ($userId, $userEmail) {
+                        $sq->where('user_id', $userId)
+                           ->orWhereJsonContains('participants_data', $userEmail);
+                    })
+                    ->exists();
+            }
+
+            // Batas maksimal: 3x untuk Premium, 1x untuk Gratis
+            $maxAttempts = $hasPremium ? 3 : 1;
+            if ($tryout->type === 'akbar') {
+                $maxAttempts = 1;
+            }
+
+            // Menyisipkan data baru ke objek Tryout untuk dibaca Vue
+            $tryout->user_access_type = $hasPremium ? 'Premium' : 'Gratis';
+            $tryout->max_attempts = $maxAttempts;
+            $tryout->remaining_attempts = max(0, $maxAttempts - $tryout->attempts_count);
+
+            return $tryout;
+        });
+
         return Inertia::render('User/Tryout/MyTryouts', [
             'tryouts' => $tryouts,
             'filters' => $request->only(['search']),
         ]);
     }
 
-    public function result(ExamAttempt $attempt)
-    {
-        if ($attempt->user_id !== auth()->id()) abort(403);
-        
-        $attempt->load('tryout');
-        $tryout = $attempt->tryout;
-
-        $backUrl = ($tryout->type === 'akbar') 
-            ? route('tryout-akbar.wait', $tryout->id) 
-            : route('tryout.history.detail', $tryout->id); 
-
-        $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65;
-        $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80;
-        $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
-
-        $firstAttempts = ExamAttempt::where('tryout_id', $tryout->id)
-            ->orderBy('created_at', 'asc')
-            ->get()
-            ->groupBy('user_id')
-            ->map(function ($userAttempts) {
-                return $userAttempts->first(); 
-            });
-
-        $totalParticipants = $firstAttempts->count();
-
-        $currentPassed = ($attempt->twk_score >= $pgTwk && $attempt->tiu_score >= $pgTiu && $attempt->tkp_score >= $pgTkp) ? 1 : 0;
-        $currentScoreString = sprintf('%d-%03d-%03d-%03d-%03d', $currentPassed, $attempt->total_score, $attempt->tkp_score, $attempt->tiu_score, $attempt->twk_score);
-
-        $rank = 1;
-        foreach ($firstAttempts as $userId => $firstAttempt) {
-            if ($userId === $attempt->user_id) continue; 
-
-            $isPassed = ($firstAttempt->twk_score >= $pgTwk && $firstAttempt->tiu_score >= $pgTiu && $firstAttempt->tkp_score >= $pgTkp) ? 1 : 0;
-            $compareScoreString = sprintf('%d-%03d-%03d-%03d-%03d', $isPassed, $firstAttempt->total_score, $firstAttempt->tkp_score, $firstAttempt->tiu_score, $firstAttempt->twk_score);
-
-            if (strcmp($compareScoreString, $currentScoreString) > 0) {
-                $rank++;
-            }
-        }
-
-        $scoreDetails = [
-            ['category' => 'Tes Wawasan Kebangsaan (TWK)', 'score' => $attempt->twk_score, 'passing_grade' => $pgTwk, 'is_passed' => $attempt->twk_score >= $pgTwk],
-            ['category' => 'Tes Intelegensia Umum (TIU)', 'score' => $attempt->tiu_score, 'passing_grade' => $pgTiu, 'is_passed' => $attempt->tiu_score >= $pgTiu],
-            ['category' => 'Tes Karakteristik Pribadi (TKP)', 'score' => $attempt->tkp_score, 'passing_grade' => $pgTkp, 'is_passed' => $attempt->tkp_score >= $pgTkp]
-        ];
-
-        $attempt->status = $attempt->is_passed ? 'lulus' : 'tidak_lulus';
-
-        $durationSeconds = 0;
-        if ($attempt->created_at && $attempt->completed_at) {
-            $durationSeconds = \Carbon\Carbon::parse($attempt->created_at)->diffInSeconds($attempt->completed_at);
-        }
-        
-        $maxDurationLimit = ($tryout->duration ?? 110) * 60;
-        
-        if ($durationSeconds > $maxDurationLimit || $durationSeconds <= 0) {
-            $durationSeconds = 45; 
-        }
-        
-        $totalQuestions = $tryout->questions()->count() ?? 110;
-        
-        $timeStats = [
-            'total_seconds' => max(1, $durationSeconds),
-            'average_seconds' => $totalQuestions > 0 ? max(0, floor($durationSeconds / $totalQuestions)) : 0,
-            'total_questions' => $totalQuestions,
-        ];
-
-        // Kirim status akses ke frontend Vue agar UI terkunci bagi pengguna gratis
-        $hasFullAccess = $this->hasPremiumAccess($tryout);
-
-        return Inertia::render('User/Tryout/Result', [
-            'attempt' => $attempt,
-            'tryout' => $tryout,
-            'totalScore' => $attempt->total_score,
-            'scoreDetails' => $scoreDetails,
-            'ranking' => ['rank' => $rank, 'total_participants' => $totalParticipants],
-            'timeStats' => $timeStats,
-            'backUrl' => $backUrl,
-            'hasFullAccess' => $hasFullAccess 
-        ]);
-    }
-
     public function historyDetail(Tryout $tryout)
     {
         $user = auth()->user();
+        $hasPremium = $this->hasPremiumAccess($tryout);
+
+        // Jika paket berbayar, pastikan user punya akses: (Premium ATAU Gratis Di-Approve ATAU Pernah Mengerjakan)
+        if ($tryout->is_paid && $tryout->price > 0) {
+            $hasAttempt = ExamAttempt::where('user_id', $user->id)->where('tryout_id', $tryout->id)->exists();
+            $isApproved = \App\Models\TryoutRegistration::where('user_id', $user->id)
+                ->where('tryout_id', $tryout->id)
+                ->where('status', 'approved')
+                ->exists();
+
+            if (!$hasPremium && !$hasAttempt && !$isApproved) {
+                return redirect()->route('tryout.show', $tryout->id)
+                    ->with('error', 'Akses ditolak. Selesaikan verifikasi gratis atau beli paket premium.');
+            }
+        }
         
         if ($tryout->type === 'akbar') {
             $attempt = ExamAttempt::where('user_id', $user->id)->where('tryout_id', $tryout->id)->latest()->first();
@@ -429,24 +503,29 @@ public function show(Tryout $tryout)
             ->orderBy('created_at', 'desc')
             ->get();
 
-        $hasFullAccess = $this->hasPremiumAccess($tryout);
+        // Limit Pengerjaan Berdasarkan Tipe Akses
+        $maxAttempts = $hasPremium ? 3 : 1;
+        if ($tryout->type === 'akbar') {
+            $maxAttempts = 1;
+        }
 
         return Inertia::render('User/Tryout/HistoryDetail', [
             'tryout' => $tryout,
             'attempts' => $attempts,
-            'hasFullAccess' => $hasFullAccess
+            'hasFullAccess' => $hasPremium,
+            'maxAttempts' => $maxAttempts // KIRIM DATA LIMIT KE VUE
         ]);
     }
 
     /**
-     * Validasi Akses Pengerjaan (SEMUA PENGGUNA BISA MENGERJAKAN)
+     * Validasi Akses Pengerjaan
      */
     private function validateAccess(Tryout $tryout)
     {
         $user = auth()->user();
         $now = now();
+        $hasPremium = $this->hasPremiumAccess($tryout);
         
-        // 1. Cek Masa Pengerjaan Belum Dimulai
         if ($tryout->started_at && $now->lt($tryout->started_at)) {
             $waktuBuka = \Carbon\Carbon::parse($tryout->started_at)->translatedFormat('d F Y H:i WIB');
             return [
@@ -457,7 +536,6 @@ public function show(Tryout $tryout)
             ];
         }
 
-        // 2. Cek Masa Pengerjaan Sudah Berakhir
         if ($tryout->end_date && $now->gt($tryout->end_date)) {
             $waktuTutup = \Carbon\Carbon::parse($tryout->end_date)->translatedFormat('d F Y H:i WIB');
             return [
@@ -468,10 +546,14 @@ public function show(Tryout $tryout)
             ];
         }
 
-        $maxAttempts = ($tryout->type === 'akbar') ? 1 : 3;
+        // --- ATURAN BATAS PENGERJAAN: PREMIUM 3X, GRATIS 1X ---
+        $maxAttempts = $hasPremium ? 3 : 1;
+        if ($tryout->type === 'akbar') {
+            $maxAttempts = 1;
+        }
+
         $attemptsCount = ExamAttempt::where('user_id', $user->id)->where('tryout_id', $tryout->id)->count();
 
-        // 3. Batas Kesempatan Ujian
         if ($attemptsCount >= $maxAttempts) {
             return [
                 'allowed' => false,
@@ -481,30 +563,24 @@ public function show(Tryout $tryout)
             ];
         }
 
-        // Semua diperbolehkan masuk ke halaman ujian
+        // Cegah mulai ujian jika gratis tapi belum di-approve admin (dan belum pernah nyoba)
+        if (!$hasPremium && $attemptsCount == 0 && $tryout->is_paid && $tryout->price > 0) {
+            $isApproved = \App\Models\TryoutRegistration::where('user_id', $user->id)
+                ->where('tryout_id', $tryout->id)
+                ->where('status', 'approved')
+                ->exists();
+
+            if (!$isApproved) {
+                return [
+                    'allowed' => false,
+                    'route' => 'tryout.show',
+                    'params' => $tryout->id,
+                    'message' => "Akses ditolak. Pengajuan gratis Anda belum disetujui."
+                ];
+            }
+        }
+
         return ['allowed' => true];
-    }
-
-    public function registerForm(Tryout $tryout)
-    {
-        $now = now();
-
-        if ($tryout->registration_start_at && $now->lt($tryout->registration_start_at)) {
-            return redirect()->route('tryout.show', $tryout->id)
-                ->with('error', 'Pendaftaran untuk tryout ini belum dibuka.');
-        }
-
-        if ($tryout->registration_end_at && $now->gt($tryout->registration_end_at)) {
-            return redirect()->route('tryout.show', $tryout->id)
-                ->with('error', 'Pendaftaran untuk tryout ini telah ditutup.');
-        }
-
-        if ($tryout->end_date && $now->greaterThan($tryout->end_date)) {
-            return redirect()->route('tryout.show', $tryout->id)
-                ->with('error', 'Masa pengerjaan tryout ini telah berakhir.');
-        }
-
-        return Inertia::render('User/Tryout/Register', ['tryout' => $tryout]);
     }
 
     public function wait(Tryout $tryout)
@@ -557,6 +633,37 @@ public function show(Tryout $tryout)
             'user' => $user,
             'attempt' => $attempt,
             'server_time_left' => $serverTimeLeft
+        ]);
+    }
+
+    /**
+     * Menampilkan halaman form pendaftaran/pembelian Premium
+     */
+    public function registerForm(Tryout $tryout)
+    {
+        $now = now();
+
+        // Validasi pembukaan pendaftaran
+        if ($tryout->registration_start_at && $now->lt($tryout->registration_start_at)) {
+            return redirect()->route('tryout.show', $tryout->id)
+                ->with('error', 'Pendaftaran untuk tryout ini belum dibuka.');
+        }
+
+        // Validasi penutupan pendaftaran
+        if ($tryout->registration_end_at && $now->gt($tryout->registration_end_at)) {
+            return redirect()->route('tryout.show', $tryout->id)
+                ->with('error', 'Pendaftaran untuk tryout ini telah ditutup.');
+        }
+
+        // Validasi masa pengerjaan berakhir
+        if ($tryout->end_date && $now->greaterThan($tryout->end_date)) {
+            return redirect()->route('tryout.show', $tryout->id)
+                ->with('error', 'Masa pengerjaan tryout ini telah berakhir.');
+        }
+
+        // Mengarah ke halaman Vue pembelian/pendaftaran
+        return Inertia::render('User/Tryout/Register', [
+            'tryout' => $tryout
         ]);
     }
 
@@ -744,9 +851,87 @@ public function show(Tryout $tryout)
         ]);
     }
 
-    /**
-     * KUNCI: Review / Pembahasan Hanya untuk Premium
-     */
+    public function result(ExamAttempt $attempt)
+    {
+        if ($attempt->user_id !== auth()->id()) abort(403);
+        
+        $attempt->load('tryout');
+        $tryout = $attempt->tryout;
+
+        $backUrl = ($tryout->type === 'akbar') 
+            ? route('tryout-akbar.wait', $tryout->id) 
+            : route('tryout.history.detail', $tryout->id); 
+
+        $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65;
+        $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80;
+        $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
+
+        $firstAttempts = ExamAttempt::where('tryout_id', $tryout->id)
+            ->orderBy('created_at', 'asc')
+            ->get()
+            ->groupBy('user_id')
+            ->map(function ($userAttempts) {
+                return $userAttempts->first(); 
+            });
+
+        $totalParticipants = $firstAttempts->count();
+
+        $currentPassed = ($attempt->twk_score >= $pgTwk && $attempt->tiu_score >= $pgTiu && $attempt->tkp_score >= $pgTkp) ? 1 : 0;
+        $currentScoreString = sprintf('%d-%03d-%03d-%03d-%03d', $currentPassed, $attempt->total_score, $attempt->tkp_score, $attempt->tiu_score, $attempt->twk_score);
+
+        $rank = 1;
+        foreach ($firstAttempts as $userId => $firstAttempt) {
+            if ($userId === $attempt->user_id) continue; 
+
+            $isPassed = ($firstAttempt->twk_score >= $pgTwk && $firstAttempt->tiu_score >= $pgTiu && $firstAttempt->tkp_score >= $pgTkp) ? 1 : 0;
+            $compareScoreString = sprintf('%d-%03d-%03d-%03d-%03d', $isPassed, $firstAttempt->total_score, $firstAttempt->tkp_score, $firstAttempt->tiu_score, $firstAttempt->twk_score);
+
+            if (strcmp($compareScoreString, $currentScoreString) > 0) {
+                $rank++;
+            }
+        }
+
+        $scoreDetails = [
+            ['category' => 'Tes Wawasan Kebangsaan (TWK)', 'score' => $attempt->twk_score, 'passing_grade' => $pgTwk, 'is_passed' => $attempt->twk_score >= $pgTwk],
+            ['category' => 'Tes Intelegensia Umum (TIU)', 'score' => $attempt->tiu_score, 'passing_grade' => $pgTiu, 'is_passed' => $attempt->tiu_score >= $pgTiu],
+            ['category' => 'Tes Karakteristik Pribadi (TKP)', 'score' => $attempt->tkp_score, 'passing_grade' => $pgTkp, 'is_passed' => $attempt->tkp_score >= $pgTkp]
+        ];
+
+        $attempt->status = $attempt->is_passed ? 'lulus' : 'tidak_lulus';
+
+        $durationSeconds = 0;
+        if ($attempt->created_at && $attempt->completed_at) {
+            $durationSeconds = \Carbon\Carbon::parse($attempt->created_at)->diffInSeconds($attempt->completed_at);
+        }
+        
+        $maxDurationLimit = ($tryout->duration ?? 110) * 60;
+        
+        if ($durationSeconds > $maxDurationLimit || $durationSeconds <= 0) {
+            $durationSeconds = 45; 
+        }
+        
+        $totalQuestions = $tryout->questions()->count() ?? 110;
+        
+        $timeStats = [
+            'total_seconds' => max(1, $durationSeconds),
+            'average_seconds' => $totalQuestions > 0 ? max(0, floor($durationSeconds / $totalQuestions)) : 0,
+            'total_questions' => $totalQuestions,
+        ];
+
+        $hasFullAccess = $this->hasPremiumAccess($tryout);
+
+        return Inertia::render('User/Tryout/Result', [
+            'attempt' => $attempt,
+            'tryout' => $tryout,
+            'totalScore' => $attempt->total_score,
+            'scoreDetails' => $scoreDetails,
+            'ranking' => ['rank' => $rank, 'total_participants' => $totalParticipants],
+            'timeStats' => $timeStats,
+            'backUrl' => $backUrl,
+            'hasFullAccess' => $hasFullAccess 
+        ]);
+    }
+
     public function review(ExamAttempt $attempt) 
     {
         if ($attempt->user_id !== auth()->id()) abort(403);
@@ -864,9 +1049,6 @@ public function show(Tryout $tryout)
         return redirect()->route('checkout.show', $transaction->id);
     }
 
-    /**
-     * KUNCI: Leaderboard Hanya untuk Premium
-     */
     public function leaderboard(Request $request, Tryout $tryout)
     {
         if (!$this->hasPremiumAccess($tryout)) {
@@ -915,9 +1097,6 @@ public function show(Tryout $tryout)
         ]);
     }
 
-    /**
-     * KUNCI: Sertifikat Hanya untuk Premium
-     */
     public function certificate(ExamAttempt $attempt)
     {
         if ($attempt->user_id !== auth()->id()) abort(403);

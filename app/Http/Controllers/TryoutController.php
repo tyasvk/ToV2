@@ -121,20 +121,26 @@ class TryoutController extends Controller
     /**
      * Menampilkan form upload persyaratan
      */
+/**
+     * Menampilkan halaman upload syarat pendaftaran
+     */
     public function uploadSyarat(Tryout $tryout)
     {
-        // Cek apakah user sudah pernah mendaftar (menunggu atau disetujui)
-        $existingReg = TryoutRegistration::where('user_id', auth()->id())
-            ->where('tryout_id', $tryout->id)
-            ->first();
+        $now = now();
 
-        // Jika sudah daftar, lempar ke halaman status agar tidak upload ulang
-        if ($existingReg && in_array($existingReg->status, ['pending', 'approved'])) {
-            return redirect()->route('tryout.status-syarat', $tryout->id);
+        // Validasi: Pastikan masa pendaftaran masih sesuai
+        if ($tryout->registration_start_at && $now->lt($tryout->registration_start_at)) {
+            return redirect()->route('tryout.show', $tryout->id)
+                ->with('error', 'Pendaftaran untuk tryout ini belum dibuka.');
+        }
+
+        if ($tryout->registration_end_at && $now->gt($tryout->registration_end_at)) {
+            return redirect()->route('tryout.show', $tryout->id)
+                ->with('error', 'Pendaftaran untuk tryout ini telah ditutup.');
         }
 
         return Inertia::render('User/Tryout/UploadSyarat', [
-            'tryout' => $tryout->only(['id', 'title', 'instagram_post_url']),
+            'tryout' => $tryout
         ]);
     }
 

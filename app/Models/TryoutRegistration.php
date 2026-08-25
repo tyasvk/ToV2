@@ -2,11 +2,16 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TryoutRegistration extends Model
 {
+    use HasFactory;
+
+    // Pastikan menggunakan tanda kutip untuk nama tabel
+    protected $table = 'tryout_registrations';
+
     protected $fillable = [
         'user_id',
         'tryout_id',
@@ -15,13 +20,19 @@ class TryoutRegistration extends Model
         'status',
     ];
 
-    public function user(): BelongsTo
+    /**
+     * Relasi ke model User
+     */
+    public function user()
     {
-        return $table->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'user_id', 'id');
     }
 
-    public function tryout(): BelongsTo
+    /**
+     * Relasi ke model Tryout
+     */
+    public function tryout()
     {
-        return $table->belongsTo(Tryout::class);
+        return $this->belongsTo(Tryout::class, 'tryout_id', 'id');
     }
 }

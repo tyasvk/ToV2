@@ -1,118 +1,103 @@
 <script setup>
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 
 const props = defineProps({
-    tryout: Object
+    tryout: Object,
 });
-
-// Logic untuk menentukan rute kembali berdasarkan tipe tryout
-const backUrl = computed(() => {
-    if (props.tryout.type === 'adidaya') {
-        return route('tryout.adidaya');
-    } else if (props.tryout.type === 'akbar') {
-        return route('tryout-akbar.index');
-    }
-    return route('tryout.index'); // Default untuk tryout umum
-});
-
-// Utility untuk format angka
-const formatNum = (num) => new Intl.NumberFormat('id-ID').format(num || 0);
 </script>
 
 <template>
-    <Head :title="'Persiapan: ' + tryout.title" />
+    <Head :title="`Persiapan Ujian - ${tryout.title}`" />
 
     <AuthenticatedLayout>
-        <div class="bg-slate-50 min-h-screen py-4 md:py-8">
-            <div class="max-w-2xl mx-auto px-4 sm:px-6">
-                
-                <div class="mb-4 flex items-center">
-                    <Link :href="backUrl" class="inline-flex items-center gap-1.5 p-1.5 -ml-1.5 rounded-lg text-slate-500 hover:bg-slate-200 transition-colors active:scale-95">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                        </svg>
-                        <span class="text-xs font-medium">Kembali</span>
-                    </Link>
+        <!-- Background menyatu dengan layout utama -->
+        <div class="min-h-screen bg-transparent w-full pb-24 md:pb-12 animate-in fade-in duration-500 overflow-x-hidden">
+            
+            <!-- Padding dan margin ini DISAMAKAN PERSIS dengan Index.vue (Katalog) -->
+            <div class="max-w-[1400px] mx-auto px-3 sm:px-4 md:px-5 pt-4 md:pt-6 space-y-4">
+
+                <!-- HEADER & KEMBALI -->
+                <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
+                    <div>
+                        <Link :href="route('tryout.index')" class="inline-flex items-center gap-1 text-[#007AFF] hover:underline text-[13px] md:text-[14px] font-bold transition-opacity mb-2">
+                            &larr; Kembali ke Katalog
+                        </Link>
+                        <h1 class="text-2xl md:text-3xl font-semibold text-slate-900 tracking-tight leading-none">Persiapan Ujian</h1>
+                        <p class="text-[12px] md:text-[13px] text-slate-500 font-medium mt-1">
+                            Harap baca tata tertib dan pastikan koneksi internet stabil sebelum memulai.
+                        </p>
+                    </div>
                 </div>
 
-                <div class="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    
-                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative">
-                        <div class="h-1 w-full bg-gradient-to-r from-blue-600 via-amber-500 to-blue-600 absolute top-0 left-0"></div>
-                        
-                        <div class="p-4 sm:p-6 text-center">
-                            <div class="mb-5">
-                                <h1 class="text-lg sm:text-xl font-medium text-slate-800 leading-tight mb-1">
-                                    {{ tryout.title }}
-                                </h1>
-                                <p class="text-slate-500 text-[11px] sm:text-xs">Ujian Simulasi (Responsive Mode)</p>
-                            </div>
+                <!-- CARD INFO UJIAN -->
+                <div class="bg-white rounded-[20px] p-4 sm:p-5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100/50 flex flex-col gap-4 relative overflow-hidden max-w-3xl">
+                    <!-- Ornamen Dekoratif di Pojok -->
+                    <div class="absolute -top-12 -right-12 w-32 h-32 bg-blue-50 rounded-full blur-2xl opacity-60 pointer-events-none"></div>
 
-                            <div class="grid grid-cols-2 gap-3">
-                                <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 flex flex-col items-center justify-center">
-                                    <div class="p-1.5 bg-amber-100 text-amber-600 rounded-full mb-1.5">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                    </div>
-                                    <p class="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Durasi</p>
-                                    <p class="text-base sm:text-lg font-medium text-slate-800">
-                                        {{ tryout.duration }} <span class="text-[10px] text-slate-500">Menit</span>
-                                    </p>
-                                </div>
-                                
-                                <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 flex flex-col items-center justify-center">
-                                    <div class="p-1.5 bg-blue-100 text-blue-600 rounded-full mb-1.5">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                    </div>
-                                    <p class="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Total Soal</p>
-                                    <p class="text-base sm:text-lg font-medium text-slate-800">
-                                        {{ formatNum(tryout.questions_count) }} <span class="text-[10px] text-slate-500">Butir</span>
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="bg-amber-50 rounded-xl border border-amber-200/80 p-3.5 flex gap-3 items-start shadow-sm">
-                        <div class="p-1 bg-amber-100 rounded-full shrink-0 mt-0.5">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <div class="flex items-center gap-3 border-b border-slate-100 pb-4 relative z-10">
+                        <div class="w-12 h-12 rounded-full bg-[#F0F4FF] text-[#007AFF] flex items-center justify-center shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
                         </div>
                         <div>
-                            <h3 class="text-xs font-medium text-amber-900 uppercase tracking-wider mb-0.5">Perhatian Sebelum Memulai</h3>
-                            <p class="text-[11px] text-amber-800/80 leading-relaxed">
-                                Waktu ujian akan otomatis berjalan mundur segera setelah Anda menekan tombol mulai di bawah ini. Pastikan koneksi internet Anda stabil.
-                            </p>
+                            <h2 class="text-[16px] md:text-[18px] font-semibold text-slate-900 leading-snug tracking-tight">{{ tryout.title }}</h2>
+                            <p class="text-[12px] text-slate-500 font-medium mt-0.5">Sistem CAT (Computer Assisted Test)</p>
                         </div>
                     </div>
 
-                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6">
-                        <div class="text-center mb-5">
-                            <h2 class="text-base font-medium text-slate-800">Mulai Pengerjaan</h2>
-                            <p class="text-[11px] sm:text-xs text-slate-500 mt-0.5">Sistem akan menyesuaikan secara otomatis dengan perangkat yang Anda gunakan.</p>
+                    <div class="grid grid-cols-2 gap-3 relative z-10">
+                        <div class="bg-[#F5F5F7]/80 rounded-[16px] p-3 md:p-4 flex flex-col items-center text-center border border-slate-50">
+                            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">Waktu Pengerjaan</span>
+                            <span class="text-[20px] md:text-[24px] font-bold text-slate-800 tracking-tight">{{ tryout.duration }} <span class="text-[12px] font-semibold text-slate-500">Mnt</span></span>
                         </div>
-
-                        <div>
-                            <Link :href="route('tryout.exam', tryout.id)"
-                                class="group w-full flex items-center justify-center p-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all active:scale-[0.98] shadow-sm shadow-blue-200"
-                            >
-                                <div class="flex items-center gap-2">
-                                    <span class="font-medium tracking-wide uppercase text-xs">Mulai Simulasi Sekarang</span>
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                                    </svg>
-                                </div>
-                            </Link>
+                        <div class="bg-[#F5F5F7]/80 rounded-[16px] p-3 md:p-4 flex flex-col items-center text-center border border-slate-50">
+                            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">Target Soal</span>
+                            <span class="text-[20px] md:text-[24px] font-bold text-slate-800 tracking-tight">{{ tryout.questions_count || 110 }} <span class="text-[12px] font-semibold text-slate-500">Soal</span></span>
                         </div>
                     </div>
-
                 </div>
+
+                <!-- CARD TATA TERTIB -->
+                <div class="bg-white rounded-[20px] p-4 sm:p-5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100/50 flex flex-col gap-3 max-w-3xl">
+                    <div class="flex items-center gap-2.5 mb-1">
+                        <div class="w-7 h-7 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <h3 class="text-[15px] font-semibold text-slate-900 tracking-tight">Tata Tertib & Ketentuan</h3>
+                    </div>
+                    
+                    <ul class="space-y-3">
+                        <li class="flex items-start gap-3">
+                            <div class="w-1.5 h-1.5 rounded-full bg-[#007AFF] mt-1.5 shrink-0"></div>
+                            <p class="text-[13px] text-slate-600 leading-relaxed font-medium">Waktu ujian akan otomatis berjalan sejak Anda menekan tombol <strong>Mulai Ujian</strong>.</p>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <div class="w-1.5 h-1.5 rounded-full bg-[#007AFF] mt-1.5 shrink-0"></div>
+                            <p class="text-[13px] text-slate-600 leading-relaxed font-medium">Usahakan <strong>jangan me-refresh (F5)</strong> browser atau menekan tombol <em>Back</em> selama ujian berlangsung untuk mencegah masalah pengiriman data.</p>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <div class="w-1.5 h-1.5 rounded-full bg-rose-400 mt-1.5 shrink-0"></div>
+                            <p class="text-[13px] text-rose-600 leading-relaxed font-medium">Apabila Anda keluar, waktu habis, atau Anda terputus dari server, jawaban akan tersimpan apa adanya dan <strong class="text-rose-700">jatah pengerjaan akan berkurang</strong>.</p>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- TOMBOL AKSI -->
+                <div class="pt-2 pb-6 flex flex-col sm:flex-row gap-3 max-w-3xl">
+                    <Link :href="route('tryout.index')" class="flex-1 text-center py-3 bg-[#F2F2F7] hover:bg-[#E3E3E8] text-slate-700 text-[13px] font-semibold rounded-full transition-colors active:scale-95">
+                        Batal
+                    </Link>
+
+                    <!-- Rute dikembalikan menggunakan ujian standar (ExamSheet biasa) -->
+                    <Link :href="route('tryout.exam', tryout.id)" class="flex-[2] text-center py-3 bg-[#007AFF] hover:bg-[#0062CC] text-white text-[13px] font-semibold rounded-full shadow-sm transition-colors active:scale-95">
+                        Saya Mengerti, Mulai Ujian
+                    </Link>
+                </div>
+
             </div>
         </div>
     </AuthenticatedLayout>

@@ -29,6 +29,7 @@ use App\Http\Controllers\Admin\MembershipPackageController;
 use App\Http\Controllers\Admin\AdminAffiliateController;
 use App\Http\Controllers\Admin\AdidayaManagerController;
 use App\Http\Controllers\Admin\VoucherController; 
+use App\Http\Controllers\Admin\TryoutRegistrationController;
 
 // Import Controller API Midtrans
 use App\Http\Controllers\Api\MidtransCallbackController;
@@ -77,8 +78,9 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     Route::post('/check-voucher-validity', [TryoutController::class, 'checkVoucher'])->name('voucher.check');
     
     // === FITUR BARU: UPLOAD PERSYARATAN GRATIS ===
+    // (Perhatikan route ini saya namakan tryout.store-register untuk disesuaikan dgn form Vue)
     Route::get('/tryout/{tryout}/upload-syarat', [UserTryoutController::class, 'uploadSyarat'])->name('tryout.upload-syarat');
-    Route::post('/tryout/{tryout}/upload-syarat', [UserTryoutController::class, 'storeSyarat'])->name('tryout.store-syarat');
+    Route::post('/tryout/{tryout}/upload-syarat', [UserTryoutController::class, 'storeSyarat'])->name('tryout.store-register');
     Route::get('/tryout/{tryout}/status-syarat', [UserTryoutController::class, 'statusSyarat'])->name('tryout.status-syarat');
     
     // --- TRYOUT ADIDAYA ---
@@ -88,11 +90,6 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     Route::get('/tryouts', [UserTryoutController::class, 'index'])->name('tryout.index');
     Route::get('/tryout/{tryout}', [UserTryoutController::class, 'show'])->name('tryout.show');
 
-    // --- PENDAFTARAN TRYOUT ---
-    Route::get('/tryout/{tryout}/register', [UserTryoutController::class, 'registerForm'])->name('tryout.register');
-    Route::post('/tryout/{tryout}/register', [TryoutController::class, 'processRegistration'])->name('tryout.processRegistration');
-    Route::post('/check-voucher-validity', [TryoutController::class, 'checkVoucher'])->name('voucher.check');
-    
     // --- API & MEMBERSHIP ---
     Route::post('/check-email-availability', [UserTryoutController::class, 'checkEmail'])->name('api.check.email');
     Route::get('/membership', [MembershipController::class, 'index'])->name('membership.index');
@@ -121,7 +118,7 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     // Menampilkan halaman bundling
     Route::get('/bundling', [TryoutController::class, 'bundlingIndex'])->name('user.bundling.index');
     
-    // Memproses checkout bundling (DIPERBARUI KE TRYOUTCONTROLLER)
+    // Memproses checkout bundling
     Route::post('/bundling/checkout', [TryoutController::class, 'processBundlingCheckout'])->name('user.bundling.checkout');
 
     // --- HASIL & RIWAYAT ---
@@ -175,10 +172,12 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::resource('tryouts', TryoutManagerController::class);
     Route::get('/tryouts/{tryout}/results', [\App\Http\Controllers\Admin\TryoutManagerController::class, 'results'])->name('tryouts.results');
     Route::delete('/tryouts/attempts/{attempt}', [\App\Http\Controllers\Admin\TryoutManagerController::class, 'destroyAttempt'])->name('tryouts.attempts.destroy');
-    // Tambahkan Rute Kalkulasi Ulang di sini:
-    Route::post('tryouts/{tryout}/recalculate', [TryoutManagerController::class, 'recalculate'])
-        ->name('tryouts.recalculate');
+    Route::post('tryouts/{tryout}/recalculate', [TryoutManagerController::class, 'recalculate'])->name('tryouts.recalculate');
     
+    // --- VERIFIKASI SYARAT --- (Perhatikan prefix dan name disesuaikan agar tidak dobel admin)
+    Route::get('/tryouts-verifikasi', [TryoutRegistrationController::class, 'index'])->name('tryouts.verifikasi.index');
+    Route::post('/tryouts-verifikasi/{registration}', [TryoutRegistrationController::class, 'update'])->name('tryouts.verifikasi.update');
+
     // --- 2. ADIDAYA MANAGEMENT ---
     Route::resource('adidaya-manage', AdidayaManagerController::class)->names('adidaya');
     Route::get('/adidaya-manage/{tryout}/results', [\App\Http\Controllers\Admin\TryoutManagerController::class, 'results'])->name('adidaya.results');
@@ -224,13 +223,5 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::post('/vouchers', [VoucherController::class, 'store'])->name('vouchers.store');
     Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->name('vouchers.destroy');
 });
-
-// ==========================================
-// RUTE BEBAS AKSES (WEBHOOK MIDTRANS)
-// ==========================================
-// Rute ini diletakkan di luar middleware auth dan dibebaskan dari proteksi CSRF
-// agar server Midtrans dapat mengirimkan notifikasi ke sini tanpa hambatan.
-//Route::post('/midtrans/callback', [MidtransCallbackController::class, 'handle'])
- //   ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
 require __DIR__.'/auth.php';

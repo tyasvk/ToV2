@@ -21,7 +21,6 @@ const props = defineProps({
 
 const searchQuery = ref('');
 const activeTab = ref('catalog'); 
-const selectedCategory = ref('all'); 
 
 // --- 1. SINKRONISASI DATA KATALOG ---
 const availableCatalogTryouts = computed(() => {
@@ -29,23 +28,14 @@ const availableCatalogTryouts = computed(() => {
     return (props.catalogTryouts || []).filter(t => !ownedTryoutIds.includes(t.id));
 });
 
-// --- 2. FITUR FILTER & PENCARIAN ---
+// --- 2. FITUR PENCARIAN ---
 const filteredTryouts = computed(() => {
     const baseData = activeTab.value === 'catalog' ? availableCatalogTryouts.value : (props.myTryouts || []);
     
+    if (!searchQuery.value) return baseData;
+
     return baseData.filter(t => {
-        const matchesSearch = t.title?.toLowerCase().includes(searchQuery.value.toLowerCase());
-        
-        let matchesCategory = false;
-        if (selectedCategory.value === 'all') {
-            matchesCategory = true;
-        } else if (selectedCategory.value === 'free') {
-            matchesCategory = (t.price == 0 || t.is_paid == false || t.is_paid == 0);
-        } else if (selectedCategory.value === 'premium') {
-            matchesCategory = (t.price > 0 || t.is_paid == true || t.is_paid == 1);
-        }
-        
-        return matchesSearch && matchesCategory;
+        return t.title?.toLowerCase().includes(searchQuery.value.toLowerCase());
     });
 });
 
@@ -127,7 +117,7 @@ const formatOnlyDate = (dateString) => {
                     </div>
                 </div>
 
-                <!-- CONTROL BAR (Tabs & Filters) -->
+                <!-- CONTROL BAR (Tabs) -->
                 <div class="bg-white rounded-[16px] p-1.5 flex flex-col md:flex-row items-center justify-between gap-2 shadow-[0_2px_8px_rgba(0,0,0,0.02)] border border-slate-100">
                     
                     <!-- Segmented Control -->
@@ -147,19 +137,6 @@ const formatOnlyDate = (dateString) => {
                             Milik Saya
                         </button>
                     </div>
-
-                    <!-- Kategori Pills -->
-                    <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full md:w-auto px-1">
-                        <button 
-                            v-for="cat in ['all', 'free', 'premium']"
-                            :key="cat"
-                            @click="selectedCategory = cat"
-                            :class="[selectedCategory === cat ? 'bg-slate-800 text-white' : 'bg-transparent text-slate-500 hover:bg-slate-100']"
-                            class="px-4 py-1 rounded-full text-[11px] font-semibold transition-all whitespace-nowrap shrink-0"
-                        >
-                            {{ cat === 'all' ? 'Semua' : (cat === 'free' ? 'Gratis' : 'Premium') }}
-                        </button>
-                    </div>
                 </div>
 
                 <!-- GRID CARDS -->
@@ -168,7 +145,7 @@ const formatOnlyDate = (dateString) => {
                     <div 
                         v-for="tryout in filteredTryouts" 
                         :key="tryout.id"
-                        class="bg-white rounded-[20px] p-4 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.06)] transition-all duration-300 flex flex-col items-center text-center h-full border border-slate-100/50"
+                        class="bg-white rounded-[20px] p-4 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.06)] transition-all duration-300 flex flex-col items-center text-center h-full border border-slate-100/50 relative"
                     >
                         
                         <!-- ============================================== -->
@@ -193,7 +170,7 @@ const formatOnlyDate = (dateString) => {
                                 <span>{{ tryout.duration || 100 }} Menit</span>
                             </div>
 
-                            <!-- Footer: Tombol Center Saja (Harga Dihapus) -->
+                            <!-- Footer: Tombol Center Saja -->
                             <div class="mt-auto w-full flex flex-col items-center justify-center">
                                 <Link :href="route('tryout.show', tryout.id)" 
                                       class="w-[95%] md:w-[90%] py-2 bg-[#007AFF] hover:bg-[#0062CC] text-white rounded-full text-[12px] font-semibold transition-colors active:scale-95 text-center">
@@ -206,7 +183,16 @@ const formatOnlyDate = (dateString) => {
                         <!-- KARTU TRYOUT SAYA                              -->
                         <!-- ============================================== -->
                         <template v-else>
-                            <div class="w-12 h-12 md:w-14 md:h-14 flex items-center justify-center mb-3 bg-transparent">
+                            
+                            <!-- BADGE AKSES (GRATIS/PREMIUM) -->
+                            <div class="absolute top-3 right-3">
+                                <span class="px-2.5 py-0.5 rounded-[6px] text-[9px] font-bold uppercase tracking-wide"
+                                      :class="tryout.user_access_type === 'Premium' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'">
+                                    {{ tryout.user_access_type || 'Gratis' }}
+                                </span>
+                            </div>
+
+                            <div class="w-12 h-12 md:w-14 md:h-14 flex items-center justify-center mb-3 bg-transparent mt-2">
                                 <img src="/images/logo.png" alt="Logo" class="w-full h-full object-contain drop-shadow-sm opacity-80" />
                             </div>
 
@@ -227,27 +213,40 @@ const formatOnlyDate = (dateString) => {
                             <div class="mt-auto w-full flex flex-col items-center justify-center">
                                 <span class="text-[11px] font-medium text-slate-500 mb-2">
                                     <template v-if="isUpcoming(tryout)">Mulai: {{ formatTime(tryout) }}</template>
-                                    <template v-else-if="getAttemptCount(tryout) >= 3">Selesai Dikerjakan</template>
-                                    <template v-else>Sisa {{ 3 - getAttemptCount(tryout) }}x Kesempatan</template>
+                                    <template v-else-if="tryout.remaining_attempts <= 0">Selesai Dikerjakan</template>
+                                    <template v-else>Sisa {{ tryout.remaining_attempts }} dari {{ tryout.max_attempts }}x</template>
                                 </span>
                                 
-                                <button v-if="isUpcoming(tryout)" 
-                                        disabled 
-                                        class="w-[95%] md:w-[90%] py-2 bg-[#E3E3E8] text-slate-400 rounded-full text-[12px] font-semibold cursor-not-allowed">
-                                    Tunggu
-                                </button>
-                                
-                                <Link v-else-if="getAttemptCount(tryout) >= 3" 
-                                      :href="route('tryout.history.detail', tryout.id)" 
-                                      class="w-[95%] md:w-[90%] py-2 bg-[#E3E3E8] hover:bg-[#D1D1D6] text-slate-800 rounded-full text-[12px] font-semibold transition-colors active:scale-95 text-center">
-                                    Riwayat
-                                </Link>
-                                
-                                <Link v-else 
-                                      :href="route('tryout.wait', tryout.id)" 
-                                      class="w-[95%] md:w-[90%] py-2 bg-[#007AFF] hover:bg-[#0062CC] text-white rounded-full text-[12px] font-semibold transition-colors active:scale-95 text-center">
-                                    Mulai
-                                </Link>
+                                <div class="w-full flex flex-col gap-2 items-center justify-center">
+                                    <!-- Jika Jadwal Belum Mulai -->
+                                    <button v-if="isUpcoming(tryout)" 
+                                            disabled 
+                                            class="w-[95%] md:w-[90%] py-2 bg-[#E3E3E8] text-slate-400 rounded-full text-[12px] font-semibold cursor-not-allowed">
+                                        Tunggu
+                                    </button>
+                                    
+                                    <!-- Jika Jatah Habis -->
+                                    <Link v-else-if="tryout.remaining_attempts <= 0" 
+                                          :href="route('tryout.history.detail', tryout.id)" 
+                                          class="w-[95%] md:w-[90%] py-2 bg-[#E3E3E8] hover:bg-[#D1D1D6] text-slate-800 rounded-full text-[12px] font-semibold transition-colors active:scale-95 text-center">
+                                        Riwayat
+                                    </Link>
+                                    
+                                    <!-- Jika Masih Bisa Dikerjakan -->
+                                    <div v-else class="w-[95%] md:w-[90%] flex gap-2">
+                                        <Link :href="route('tryout.wait', tryout.id)" 
+                                              class="flex-1 py-2 bg-[#007AFF] hover:bg-[#0062CC] text-white rounded-full text-[12px] font-semibold transition-colors active:scale-95 text-center">
+                                            Mulai
+                                        </Link>
+                                        
+                                        <!-- Tombol Riwayat Khusus Premium Yang Sudah Pernah Dikerjakan (Bersebelahan) -->
+                                        <Link v-if="tryout.user_access_type === 'Premium' && getAttemptCount(tryout) > 0" 
+                                              :href="route('tryout.history.detail', tryout.id)" 
+                                              class="flex-1 py-2 bg-[#F2F2F7] hover:bg-[#E3E3E8] text-slate-700 rounded-full text-[12px] font-semibold transition-colors active:scale-95 text-center">
+                                            Riwayat
+                                        </Link>
+                                    </div>
+                                </div>
                             </div>
                         </template>
 
