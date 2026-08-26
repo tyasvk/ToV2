@@ -166,7 +166,8 @@ const getOptionClass = (key) => {
     if (isTKP.value) {
         const point = getTkpPoint(q, key);
         if (isUserKey) {
-            return point == 5 ? 'bg-emerald-50 border-emerald-400 shadow-[0_2px_8px_rgba(16,185,129,0.15)]' : 'bg-[#F0F4FF] border-[#007AFF] shadow-[0_2px_8px_rgba(0,122,255,0.15)]';
+            // Hijau jika poin = 5, Merah jika kurang dari 5
+            return point == 5 ? 'bg-emerald-50 border-emerald-400 shadow-[0_2px_8px_rgba(16,185,129,0.15)]' : 'bg-rose-50 border-rose-400 shadow-[0_2px_8px_rgba(244,63,94,0.15)]';
         }
         return 'bg-white border-slate-200';
     }
@@ -182,8 +183,8 @@ const getCircleClass = (key) => {
     
     if (isTKP.value) {
         const point = getTkpPoint(q, key);
-        if (point == 5 && isUserKey) return 'bg-emerald-500 border-emerald-500 text-white';
-        if (isUserKey) return 'bg-[#007AFF] border-[#007AFF] text-white';
+        if (isUserKey && point == 5) return 'bg-emerald-500 border-emerald-500 text-white';
+        if (isUserKey && point < 5) return 'bg-rose-500 border-rose-500 text-white';
         return 'bg-[#F5F5F7] border-transparent text-slate-500';
     }
 
@@ -209,8 +210,9 @@ const getSidebarClass = (index) => {
     const isTkpQ = q?.type?.toUpperCase() === 'TKP' || q?.category?.toUpperCase() === 'TKP';
     if (isTkpQ) {
         const ans = getUserAnswer(q);
+        // Hijau jika poin 5, Merah jika poin < 5 (selain 5)
         if (getTkpPoint(q, ans) == 5) return base + 'bg-emerald-100 border-emerald-200 text-emerald-700';
-        return base + 'bg-blue-100 border-blue-200 text-[#007AFF]';
+        return base + 'bg-rose-100 border-rose-200 text-rose-700';
     } else {
         if (checkAnswer(q)) return base + 'bg-emerald-100 border-emerald-200 text-emerald-700';
         return base + 'bg-rose-100 border-rose-200 text-rose-700';
@@ -243,9 +245,8 @@ const getSidebarClass = (index) => {
             <div class="flex items-center gap-4">
                 <!-- Tally Rings (Desktop) -->
                 <div class="hidden lg:flex items-center gap-3 bg-[#F5F5F7] px-3 py-1.5 rounded-full border border-slate-200/60">
-                    <div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-full bg-emerald-400"></div><span class="text-[10px] font-bold text-slate-600">Benar</span></div>
-                    <div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-full bg-rose-400"></div><span class="text-[10px] font-bold text-slate-600">Salah</span></div>
-                    <div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-full bg-[#007AFF]"></div><span class="text-[10px] font-bold text-slate-600">TKP</span></div>
+                    <div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-full bg-emerald-400"></div><span class="text-[10px] font-bold text-slate-600">Benar / TKP Poin 5</span></div>
+                    <div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-full bg-rose-400"></div><span class="text-[10px] font-bold text-slate-600">Salah / TKP &lt; 5</span></div>
                 </div>
 
                 <button @click="isSidebarOpen = !isSidebarOpen" class="lg:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-lg border border-slate-200 bg-white">
@@ -307,7 +308,7 @@ const getSidebarClass = (index) => {
                                     <div class="mt-2.5 flex flex-wrap gap-1.5 items-center">
                                         <template v-if="isTKP">
                                             <span v-if="getTkpPoint(currentQuestion, key) == 5" class="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 uppercase">Poin Maksimal</span>
-                                            <span v-if="checkAnswer(currentQuestion, key).isUserKey" class="text-[9px] font-bold px-2 py-0.5 rounded border uppercase" :class="getTkpPoint(currentQuestion, key) == 5 ? 'text-emerald-700 bg-emerald-100 border-emerald-300' : 'text-[#007AFF] bg-[#F0F4FF] border-blue-200'">Jawaban Anda</span>
+                                            <span v-if="checkAnswer(currentQuestion, key).isUserKey" class="text-[9px] font-bold px-2 py-0.5 rounded border uppercase" :class="getTkpPoint(currentQuestion, key) == 5 ? 'text-emerald-700 bg-emerald-100 border-emerald-300' : 'text-rose-700 bg-rose-100 border-rose-300'">Jawaban Anda</span>
                                         </template>
                                         <template v-else>
                                             <span v-if="checkAnswer(currentQuestion, key).isCorrectKey" class="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 uppercase">Kunci Jawaban</span>

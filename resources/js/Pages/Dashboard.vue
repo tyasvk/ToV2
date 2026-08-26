@@ -31,7 +31,7 @@ const userAvatar = computed(() => {
     if (u.profile_photo_url && !u.profile_photo_url.includes('ui-avatars.com')) return u.profile_photo_url;
     const rawPath = u.profile_photo_path || u.avatar;
     if (rawPath) return `/storage/${rawPath.replace(/^\//, '')}`;
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || 'User')}&color=2563EB&background=EFF6FF`;
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || 'User')}&color=007AFF&background=F0F4FF`;
 });
 
 // --- PENGUMUMAN LINK FORMATTER ---
@@ -39,7 +39,7 @@ const formattedAnnouncement = computed(() => {
     if (!props.announcement) return '';
     const urlPattern = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
     return props.announcement.replace(urlPattern, (url) => 
-        `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline transition-colors break-all font-medium">${url}</a>`
+        `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-[#007AFF] hover:text-[#0062CC] underline transition-colors break-all font-semibold">${url}</a>`
     );
 });
 
@@ -91,187 +91,186 @@ onUnmounted(() => {
     <Head title="Dashboard - CPNS Nusantara" />
 
     <AuthenticatedLayout>
-        <div class="max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pt-4 md:pt-6">
+        <!-- Background transparan, menyatu dengan layout abu-abu lembut bawaan sistem -->
+        <div class="w-full bg-transparent pb-24 md:pb-32 font-sans animate-in fade-in duration-500">
+            
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 pt-6 md:pt-10 space-y-6 md:space-y-8">
 
-            <!-- Gap diperkecil menjadi 4 (16px) agar lebih compact -->
-            <div class="px-4 flex flex-col gap-4 md:gap-5">
-                
-                <!-- CARD 1: PROFILE IDENTITAS & SALDO AKTIF -->
-                <div class="order-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden relative p-4 md:p-5">
-                    <div class="absolute top-0 right-0 w-[200px] h-[200px] bg-gradient-to-bl from-blue-100/50 to-transparent rounded-full blur-[40px] pointer-events-none -mr-16 -mt-16"></div>
+                <!-- 1. GREETING PROFILE (Clean Header Style) -->
+                <div class="flex items-center gap-4 sm:gap-5 mb-2">
+                    <div class="relative shrink-0">
+                        <img :src="userAvatar" :alt="user.name" class="w-14 h-14 sm:w-[68px] sm:h-[68px] rounded-full object-cover shadow-[0_2px_8px_rgba(0,0,0,0.08)] border border-black/5" />
+                    </div>
+                    <div>
+                        <h1 class="text-[24px] sm:text-[32px] font-bold text-[#1D1D1F] tracking-tight leading-tight line-clamp-1">
+                            Halo, {{ user.name }}
+                        </h1>
+                        <div class="flex flex-wrap items-center gap-2 mt-1">
+                            <span class="font-mono text-[#007AFF] bg-[#007AFF]/10 px-2 py-0.5 rounded-[6px] text-[11px] sm:text-[12px] font-bold tracking-wider">
+                                #{{ user.participant_number || 'PENDING' }}
+                            </span>
+                            <span class="text-[13px] text-[#86868B] font-medium hidden sm:inline">•</span>
+                            <span class="text-[12px] sm:text-[13px] text-[#86868B] font-medium">
+                                Anggota sejak {{ formatDate(user.created_at) }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. ALERTS (Ujian & Pengumuman) -->
+                <div v-if="(activeExam && activeTimeLeft > 0) || announcement" class="space-y-4">
                     
-                    <!-- Bagian Atas: Profil User -->
-                    <div class="flex items-center gap-4 relative z-10">
-                        <div class="relative shrink-0">
-                            <!-- Ukuran avatar diperkecil dari w-16 ke w-14 di mobile -->
-                            <div class="relative w-14 h-14 md:w-16 md:h-16 bg-white rounded-xl overflow-hidden border-2 border-slate-100 shadow-sm">
-                                <img :src="userAvatar" :alt="user.name" class="w-full h-full object-cover" />
+                    <!-- Ujian Aktif (Live Activity Style) -->
+                    <div v-if="activeExam && activeTimeLeft > 0" class="bg-white border-2 border-[#FF9500] rounded-[24px] p-1.5 shadow-[0_8px_20px_rgba(255,149,0,0.12)] flex flex-col sm:flex-row items-center gap-2 overflow-hidden">
+                        <div class="w-full sm:flex-1 flex items-center gap-3 bg-[#FFF9E6] px-5 py-4 rounded-[20px]">
+                            <div class="relative flex h-3 w-3 shrink-0">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FF9500] opacity-60"></span>
+                                <span class="relative inline-flex rounded-full h-3 w-3 bg-[#FF9500]"></span>
                             </div>
-                            <div class="absolute -bottom-1 -right-1 bg-emerald-500 p-1 md:p-1 rounded-full shadow-sm border-2 border-white" title="Akun Aktif">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                                </svg>
+                            <div class="min-w-0 flex-1">
+                                <span class="text-[11px] font-bold text-[#FF9500] uppercase tracking-wider block mb-0.5">Ujian Berjalan</span>
+                                <h4 class="text-[15px] font-bold text-[#1D1D1F] truncate">{{ activeExam.title }}</h4>
                             </div>
                         </div>
-
-                        <div class="space-y-1 w-full flex-1">
-                            <h2 class="text-base md:text-lg text-slate-800 tracking-tight font-extrabold line-clamp-1">
-                                Halo, <span class="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">{{ user.name }}</span> 👋
-                            </h2>
-                            <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                                <span class="inline-flex items-center justify-center px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 text-[9px] md:text-[10px] font-mono font-bold rounded-md w-max">
-                                    #{{ user.participant_number || 'PENDING' }}
-                                </span>
-                                <span class="text-[9px] md:text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                    Bergabung: {{ formatDate(user.created_at) }}
+                        
+                        <div class="w-full sm:w-auto flex items-center justify-between sm:justify-end gap-3 px-3 sm:px-4 py-2 sm:py-0">
+                            <div class="flex flex-col items-center sm:items-end min-w-[80px]">
+                                <span class="text-[10px] text-[#86868B] font-bold uppercase tracking-wider mb-0.5">Sisa Waktu</span>
+                                <span class="text-[16px] font-bold font-mono text-[#1D1D1F] tabular-nums leading-none" :class="{'text-[#FF3B30] animate-pulse': activeTimeLeft <= 300}">
+                                    {{ formattedActiveTimeLeft }}
                                 </span>
                             </div>
+                            <Link :href="route('tryout.exam', activeExam.id)" class="px-6 py-3.5 bg-[#FF9500] hover:bg-[#E68600] text-white rounded-[16px] font-bold text-[14px] transition-all active:scale-[0.98] shadow-sm shrink-0">
+                                Lanjutkan
+                            </Link>
                         </div>
                     </div>
 
-                    <!-- Pemisah -->
-                    <hr class="border-slate-100 my-4 relative z-10" />
-
-                    <!-- Bagian Bawah: Saldo Aktif -->
-                    <div class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-3 md:p-4 shadow-md text-white flex items-center justify-between gap-3 relative z-10 overflow-hidden group">
-                        <div class="absolute -left-6 -bottom-6 w-20 h-20 bg-blue-500 opacity-20 rounded-full blur-xl"></div>
-
-                        <div class="flex items-center gap-3 relative z-10">
-                            <div class="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center backdrop-blur-sm text-lg border border-white/10 shrink-0">
-                                💎
-                            </div>
-                            <div class="min-w-0">
-                                <p class="text-[8px] md:text-[9px] font-bold text-indigo-200 uppercase tracking-widest mb-0.5 opacity-90">Saldo Dompet</p>
-                                <!-- Teks saldo diperkecil -->
-                                <p class="text-xl md:text-2xl font-extrabold text-white tracking-tight truncate">{{ formatCurrency(balance) }}</p>
-                            </div>
+                    <!-- Pengumuman Pusat -->
+                    <div v-if="announcement" class="bg-[#F0F4FF] border border-[#007AFF]/15 rounded-[24px] p-5 flex items-start gap-4">
+                        <div class="w-10 h-10 bg-white text-[#007AFF] rounded-full flex items-center justify-center shrink-0 shadow-sm border border-black/5">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                            </svg>
                         </div>
+                        <div class="pt-0.5">
+                            <h3 class="text-[12px] font-bold text-[#007AFF] uppercase tracking-wider mb-1">Informasi Pusat</h3>
+                            <p class="text-[14px] text-[#1D1D1F] font-medium leading-relaxed" v-html="formattedAnnouncement"></p>
+                        </div>
+                    </div>
+                </div>
 
-                        <Link :href="route('wallet.index')" class="relative z-10 shrink-0 flex items-center gap-1 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 transition-all px-3 py-2 md:px-4 md:py-2.5 rounded-lg text-[9px] md:text-[10px] font-bold uppercase tracking-widest shadow-sm active:scale-95">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
-                            <span class="hidden sm:inline">Top Up Saldo</span>
-                            <span class="sm:hidden">Isi</span>
+                <!-- 3. WALLET & UNIFIED STATS WIDGET -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6">
+                    
+                    <!-- Wallet (Apple Card Dark Style) -->
+                    <div class="lg:col-span-5 bg-[#000000] rounded-[32px] p-8 flex flex-col justify-between shadow-[0_12px_40px_rgba(0,0,0,0.15)] relative overflow-hidden min-h-[220px]">
+                        <div class="absolute right-[-20%] top-[-20%] w-[80%] h-[80%] bg-gradient-to-bl from-[#007AFF] to-[#AF52DE] rounded-full blur-[60px] opacity-40 pointer-events-none"></div>
+                        <div class="absolute left-[-10%] bottom-[-10%] w-[60%] h-[60%] bg-[#34C759] rounded-full blur-[60px] opacity-20 pointer-events-none"></div>
+                        
+                        <div class="relative z-10 mb-6">
+                            <p class="text-[12px] font-semibold text-[#86868B] uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H4.5A2.25 2.25 0 002.25 12v6.75A2.25 2.25 0 004.5 21h15a2.25 2.25 0 002.25-2.25V12z" /></svg>
+                                Saldo Dompet
+                            </p>
+                            <p class="text-[36px] sm:text-[44px] font-bold text-white tracking-tight leading-none truncate">
+                                {{ formatCurrency(balance) }}
+                            </p>
+                        </div>
+                        <Link :href="route('wallet.index')" class="relative z-10 w-full text-center px-6 py-4 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white font-semibold text-[14px] rounded-full transition-all active:scale-[0.98] border border-white/10">
+                            Isi Saldo
                         </Link>
                     </div>
+
+                    <!-- Unified Stats (Single Card iOS Widget Style) -->
+                    <div class="lg:col-span-7 bg-white rounded-[32px] shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-black/5 flex flex-row items-center divide-x divide-black/5 p-4 sm:p-6 h-full">
+                        
+                        <div class="flex-1 flex flex-col items-center justify-center p-2 text-center group">
+                            <div class="w-12 h-12 bg-[#F0F4FF] text-[#007AFF] rounded-full flex items-center justify-center text-xl mb-3 transition-transform group-hover:scale-110">👥</div>
+                            <p class="text-[22px] sm:text-[28px] font-bold text-[#1D1D1F] leading-none mb-1.5 truncate w-full">{{ total_user_display }}</p>
+                            <p class="text-[10px] sm:text-[11px] font-bold text-[#86868B] uppercase tracking-wider">Total User</p>
+                        </div>
+                        
+                        <div class="flex-1 flex flex-col items-center justify-center p-2 text-center group">
+                            <div class="w-12 h-12 bg-[#E5F5EA] text-[#34C759] rounded-full flex items-center justify-center text-xl mb-3 transition-transform group-hover:scale-110">📝</div>
+                            <p class="text-[22px] sm:text-[28px] font-bold text-[#1D1D1F] leading-none mb-1.5 truncate w-full">{{ stats?.completed_count || 0 }}</p>
+                            <p class="text-[10px] sm:text-[11px] font-bold text-[#86868B] uppercase tracking-wider">Total Ujian</p>
+                        </div>
+                        
+                        <div class="flex-1 flex flex-col items-center justify-center p-2 text-center group">
+                            <div class="w-12 h-12 bg-[#FFF9E6] text-[#FF9500] rounded-full flex items-center justify-center text-xl mb-3 transition-transform group-hover:scale-110">🎯</div>
+                            <p class="text-[22px] sm:text-[28px] font-bold text-[#1D1D1F] leading-none mb-1.5 truncate w-full">{{ stats?.average_score || 0 }}</p>
+                            <p class="text-[10px] sm:text-[11px] font-bold text-[#86868B] uppercase tracking-wider">Rata-Rata</p>
+                        </div>
+
+                    </div>
+
                 </div>
 
-                <!-- CARD 2: KUMPULAN WIDGET STATISTIK (Lebih Compact) -->
-                <div class="order-2 grid grid-cols-3 gap-2.5 md:gap-4">
-                    <!-- Total User -->
-                    <div class="bg-white p-3 md:p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center text-center gap-1 hover:-translate-y-0.5 hover:shadow-md transition-all">
-                        <div class="w-8 h-8 md:w-10 md:h-10 bg-indigo-50 text-indigo-500 rounded-lg flex items-center justify-center text-sm md:text-lg mb-0.5 border border-indigo-100">👥</div>
-                        <p class="text-lg md:text-xl font-extrabold text-slate-800 leading-none truncate w-full">{{ total_user_display }}</p>
-                        <p class="text-[8px] md:text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate w-full">Total User</p>
-                    </div>
-
-                    <!-- Total Ujian -->
-                    <div class="bg-white p-3 md:p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center text-center gap-1 hover:-translate-y-0.5 hover:shadow-md transition-all">
-                        <div class="w-8 h-8 md:w-10 md:h-10 bg-emerald-50 text-emerald-500 rounded-lg flex items-center justify-center text-sm md:text-lg mb-0.5 border border-emerald-100">📝</div>
-                        <p class="text-lg md:text-xl font-extrabold text-slate-800 leading-none truncate w-full">{{ stats?.completed_count || 0 }}</p>
-                        <p class="text-[8px] md:text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate w-full">Total Ujian</p>
-                    </div>
-
-                    <!-- Rata-rata Skor -->
-                    <div class="bg-white p-3 md:p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center text-center gap-1 hover:-translate-y-0.5 hover:shadow-md transition-all relative overflow-hidden group">
-                        <div class="w-8 h-8 md:w-10 md:h-10 bg-amber-50 text-amber-500 rounded-lg flex items-center justify-center text-sm md:text-lg mb-0.5 border border-amber-100 relative z-10">🎯</div>
-                        <p class="text-lg md:text-xl font-extrabold text-slate-800 leading-none truncate w-full relative z-10">{{ stats?.average_score || 0 }}</p>
-                        <p class="text-[8px] md:text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate w-full relative z-10">Rata-Rata</p>
-                        
-                        <div class="absolute -right-3 -bottom-3 w-16 h-16 opacity-5 pointer-events-none">
-                            <svg class="w-full h-full transform -rotate-90"><circle cx="50%" cy="50%" r="40%" stroke="currentColor" stroke-width="15%" fill="transparent" stroke-dasharray="100" stroke-dashoffset="0" class="text-amber-900" /></svg>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- CARD 3: MENU SKD & SKB CPNS -->
-                <div class="order-3 grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-                    <Link :href="route('tryout.index')" class="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl p-4 md:p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group flex items-center justify-between overflow-hidden active:scale-[0.98] relative">
-                        <div class="absolute right-0 top-0 w-24 h-24 bg-white/10 rounded-full blur-xl transform translate-x-5 -translate-y-5"></div>
-                        
-                        <div class="flex items-center gap-3 md:gap-4 relative z-10">
-                            <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center text-xl md:text-2xl border border-white/20">
-                                <span class="group-hover:scale-110 transition-transform duration-300">📚</span>
+                <!-- 4. MENUS (Settings Style List) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    
+                    <!-- Menu SKD -->
+                    <Link :href="route('tryout.index')" class="bg-white rounded-[28px] border border-black/5 p-5 sm:p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.06)] transition-all flex items-center justify-between group transform hover:-translate-y-1">
+                        <div class="flex items-center gap-4 sm:gap-5 min-w-0">
+                            <div class="w-14 h-14 bg-[#F0F4FF] text-[#007AFF] rounded-full flex items-center justify-center text-2xl shrink-0 group-hover:scale-105 transition-transform duration-300">
+                                📚
                             </div>
-                            <div class="text-left">
-                                <h3 class="text-sm md:text-base font-bold text-white tracking-tight">Tryout SKD CPNS</h3>
-                                <p class="text-[9px] md:text-[10px] text-blue-100 font-medium mt-0.5">Akses katalog simulasi SKD</p>
+                            <div class="min-w-0">
+                                <h3 class="text-[16px] sm:text-[18px] font-bold text-[#1D1D1F] group-hover:text-[#007AFF] transition-colors truncate">Tryout SKD CPNS</h3>
+                                <p class="text-[13px] text-[#86868B] font-medium mt-0.5 truncate">Akses katalog simulasi SKD terbaru</p>
                             </div>
                         </div>
-                        <div class="text-white/60 group-hover:text-white transition-colors transform group-hover:translate-x-1 relative z-10">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+                        <!-- Chevron Arrow bawaan Apple -->
+                        <div class="text-[#C7C7CC] group-hover:text-[#007AFF] transition-colors shrink-0 ml-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
                         </div>
                     </Link>
 
-                    <div class="bg-white border border-slate-200 rounded-xl p-4 md:p-5 shadow-sm opacity-80 cursor-not-allowed flex items-center justify-between">
-                        <div class="flex items-center gap-3 md:gap-4">
-                            <div class="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center text-xl md:text-2xl grayscale border border-slate-200">
+                    <!-- Menu SKB (Disabled) -->
+                    <div class="bg-[#F5F5F7]/80 rounded-[28px] border border-black/5 p-5 sm:p-6 shadow-sm flex items-center justify-between opacity-80 cursor-not-allowed">
+                        <div class="flex items-center gap-4 sm:gap-5 min-w-0">
+                            <div class="w-14 h-14 bg-white text-[#86868B] rounded-full flex items-center justify-center text-2xl shrink-0 grayscale shadow-sm border border-black/5">
                                 💼
                             </div>
-                            <div class="text-left">
-                                <h3 class="text-sm md:text-base font-bold text-slate-700 tracking-tight">Tryout SKB CPNS</h3>
-                                <span class="inline-block mt-1 px-2 py-0.5 bg-slate-200 text-slate-500 text-[8px] font-bold uppercase tracking-widest rounded">Segera Hadir</span>
+                            <div class="min-w-0">
+                                <h3 class="text-[16px] sm:text-[18px] font-bold text-[#1D1D1F] truncate">Tryout SKB CPNS</h3>
+                                <div class="mt-1">
+                                    <span class="inline-block px-2 py-0.5 bg-[#E3E3E8] text-[#86868B] text-[10px] font-bold uppercase tracking-widest rounded-md">Segera Hadir</span>
+                                </div>
                             </div>
                         </div>
+                        <div class="text-[#D1D1D6] shrink-0 ml-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+                        </div>
                     </div>
+
                 </div>
 
-                <!-- CARD 4: UJIAN AKTIF -->
-                <div v-if="activeExam && activeTimeLeft > 0" class="order-4 bg-white border-l-4 border-orange-500 p-4 rounded-xl shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative overflow-hidden">
-                    <div class="absolute right-0 top-0 w-24 h-full bg-orange-50 opacity-50 skew-x-12 translate-x-5 pointer-events-none"></div>
+                <!-- 5. BUNDLING PROMO (App Store Editorial Card) -->
+                <div class="relative w-full rounded-[32px] overflow-hidden shadow-[0_12px_40px_rgba(0,0,0,0.1)] group cursor-pointer border border-black/5" @click="router.visit(route('user.bundling.index'))">
+                    <!-- Background gradient & Blur -->
+                    <div class="absolute inset-0 bg-gradient-to-br from-[#007AFF] to-[#AF52DE] group-hover:scale-105 transition-transform duration-700 ease-out"></div>
+                    <div class="absolute inset-0 bg-black/10"></div>
                     
-                    <div class="flex items-center gap-3 relative z-10">
-                        <div class="w-10 h-10 bg-orange-100 rounded-lg text-orange-600 flex items-center justify-center shrink-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                            </svg>
-                        </div>
-                        <div class="space-y-0.5 overflow-hidden">
-                            <span class="text-[9px] font-bold text-orange-600 uppercase tracking-widest flex items-center gap-1.5">
-                                <span class="w-1.5 h-1.5 rounded-full bg-orange-500 animate-ping"></span>
-                                Ujian Berjalan
+                    <div class="relative z-10 p-8 md:p-12 flex flex-col md:flex-row items-center justify-between gap-6 md:gap-10">
+                        <div class="text-center md:text-left text-white max-w-lg">
+                            <span class="inline-block px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-[11px] font-bold uppercase tracking-widest mb-3 border border-white/20">
+                                Penawaran Spesial
                             </span>
-                            <h4 class="text-sm font-bold text-slate-800 line-clamp-1 tracking-tight">{{ activeExam.title }}</h4>
+                            <h3 class="text-[24px] sm:text-[32px] font-bold tracking-tight mb-2 leading-tight">
+                                Paket Bundling Tryout
+                            </h3>
+                            <p class="text-[14px] sm:text-[15px] font-medium text-white/90 leading-relaxed">
+                                Beli minimal 3 tryout arsip sekaligus untuk memaksimalkan latihan Anda dengan harga yang jauh lebih hemat.
+                            </p>
                         </div>
-                    </div>
-
-                    <div class="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-t-0 border-slate-100 pt-3 sm:pt-0 shrink-0 relative z-10">
-                        <div class="font-mono text-xs md:text-sm font-bold text-slate-800 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 flex flex-col items-center">
-                            <span class="text-[8px] text-slate-400 font-sans uppercase tracking-widest font-bold leading-none mb-1">Sisa Waktu</span>
-                            <span class="tabular-nums" :class="{ 'text-red-500 animate-pulse': activeTimeLeft <= 300 }">⏱️ {{ formattedActiveTimeLeft }}</span>
+                        
+                        <div class="shrink-0 w-full md:w-auto">
+                            <div class="w-full md:w-auto px-8 py-4 bg-white text-[#007AFF] rounded-full font-bold text-[15px] text-center shadow-lg transition-transform active:scale-[0.98]">
+                                Lihat Bundel
+                            </div>
                         </div>
-                        <Link :href="route('tryout.exam', activeExam.id)" class="px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-[9px] md:text-[10px] font-extrabold uppercase tracking-widest rounded-lg shadow-sm transition-colors active:scale-95">Lanjutkan</Link>
-                    </div>
-                </div>
-
-                <!-- CARD 5: PENGUMUMAN -->
-                <div v-if="announcement" class="order-5 bg-sky-50/70 border border-sky-100 rounded-xl p-4 shadow-sm flex items-start gap-3">
-                    <div class="shrink-0 text-sky-600 bg-white p-2 rounded-lg shadow-sm border border-sky-100">
-                        <svg class="w-4 h-4 md:w-5 md:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" /></svg>
-                    </div>
-                    <div class="flex-1 min-w-0 mt-0.5">
-                        <h3 class="text-[9px] text-sky-700 font-extrabold uppercase tracking-widest">Informasi Pusat</h3>
-                        <p class="text-[11px] md:text-xs text-slate-700 font-medium leading-relaxed mt-1" v-html="formattedAnnouncement"></p>
-                    </div>
-                </div>
-
-                <!-- CARD 6: BUNDLING PROMO -->
-                <div class="order-6 bg-slate-900 rounded-xl p-5 shadow-sm relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div class="absolute -right-10 -top-10 w-24 h-24 bg-indigo-500 opacity-40 rounded-full blur-[40px] pointer-events-none"></div>
-                    <div class="absolute -left-10 -bottom-10 w-24 h-24 bg-fuchsia-500 opacity-30 rounded-full blur-[40px] pointer-events-none"></div>
-                    
-                    <div class="relative z-10 text-center sm:text-left w-full sm:w-auto flex-1">
-                        <h3 class="text-white font-extrabold text-sm md:text-base flex items-center justify-center sm:justify-start gap-2 tracking-tight">
-                            <span class="text-lg drop-shadow-sm">📦</span> Paket Bundling Tryout
-                        </h3>
-                        <p class="text-slate-300 text-[10px] md:text-[11px] mt-1.5 leading-relaxed font-medium">
-                            Beli minimal 3 tryout arsip sekaligus untuk memaksimalkan latihanmu dengan harga yang lebih hemat.
-                        </p>
-                    </div>
-                    <div class="relative z-10 w-full sm:w-auto shrink-0">
-                        <Link :href="route('user.bundling.index')" class="flex items-center justify-center w-full sm:w-auto bg-white text-slate-900 px-4 py-2.5 rounded-lg font-extrabold text-[9px] md:text-[10px] uppercase tracking-widest hover:bg-indigo-50 hover:text-indigo-600 transition-colors shadow-sm active:scale-95">
-                            Lihat Bundling
-                        </Link>
                     </div>
                 </div>
 
@@ -282,32 +281,9 @@ onUnmounted(() => {
 
 <style scoped>
 .animate-in {
-    animation-duration: 0.5s;
-    animation-fill-mode: both;
     animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
-
-.slide-in-from-bottom-4 {
-    animation-name: slideInFromBottom;
+.tabular-nums {
+    font-variant-numeric: tabular-nums;
 }
-
-@keyframes slideInFromBottom {
-    0% {
-        opacity: 0;
-        transform: translateY(1rem);
-    }
-    100% {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-@keyframes pulseSlow {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.85; }
-}
-.animate-pulse-slow {
-    animation: pulseSlow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-.tabular-nums { font-variant-numeric: tabular-nums; }
 </style>

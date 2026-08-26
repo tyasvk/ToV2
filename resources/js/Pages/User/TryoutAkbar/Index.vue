@@ -18,49 +18,58 @@ const filteredEvents = computed(() => {
     });
 });
 
-const getStatusColor = (status) => {
+// Mengecek apakah statusnya sedang Berlangsung / Aktif untuk animasi LIVE
+const isLive = (status) => {
+    const s = (status || 'Berlangsung').toLowerCase();
+    return s === 'aktif' || s === 'berlangsung' || s === 'ongoing';
+};
+
+// Warna Status ala Badge Apple (Soft & Clean)
+const getStatusBadge = (status) => {
+    if (isLive(status)) {
+        return 'bg-white/90 text-[#007AFF] border-white/40 shadow-sm'; // Biru khas Apple untuk Aktif
+    }
+    
     switch (status?.toLowerCase()) {
-        case 'aktif': return 'bg-emerald-500 text-white';
-        case 'mendatang': return 'bg-amber-500 text-white';
-        default: return 'bg-slate-400 text-white';
+        case 'mendatang': 
+        case 'upcoming':
+            return 'bg-white/90 text-amber-600 border-white/40 shadow-sm';
+        default: 
+            return 'bg-white/90 text-slate-600 border-white/40 shadow-sm';
     }
 };
 
-const formatEventDateTime = (event) => {
-    const startDateRaw = event.started_at || event.start_date;
-    const endDateRaw = event.end_date || event.ended_at;
+// Gradasi ala Apple Music / App Store untuk Fallback Image
+const cardGradients = [
+    'from-[#FF2A54] via-[#FF5E3A] to-[#FF9B00]',
+    'from-[#007AFF] via-[#33C1FF] to-[#5AC8FA]',
+    'from-[#AF52DE] via-[#D53AF5] to-[#FF2A54]',
+    'from-[#34C759] via-[#30D158] to-[#34C759]'
+];
 
-    if (!startDateRaw) return 'Jadwal Belum Ditentukan';
+const getCardGradient = (index) => {
+    return cardGradients[index % cardGradients.length];
+};
+
+// HELPER: Memformat Tanggal Secara Spesifik
+const formatSpecificDate = (dateRaw) => {
+    if (!dateRaw) return 'Belum Ditentukan';
     
-    const start = new Date(startDateRaw);
-    if (isNaN(start.getTime())) return 'Jadwal Belum Ditentukan';
+    const d = new Date(dateRaw);
+    if (isNaN(d.getTime())) return 'Belum Ditentukan';
 
     const optionsDate = { day: '2-digit', month: 'short', year: 'numeric' };
     const optionsTime = { hour: '2-digit', minute: '2-digit' };
     
-    const startDateStr = start.toLocaleDateString('id-ID', optionsDate);
-    const startTimeStr = start.toLocaleTimeString('id-ID', optionsTime).replace('.', ':');
+    const dStr = d.toLocaleDateString('id-ID', optionsDate);
+    const tStr = d.toLocaleTimeString('id-ID', optionsTime).replace('.', ':');
 
-    if (!endDateRaw) {
-        return `${startDateStr} • ${startTimeStr} WIB`;
-    }
-
-    const end = new Date(endDateRaw);
-    if (isNaN(end.getTime())) {
-        return `${startDateStr} • ${startTimeStr} WIB`;
-    }
-
-    const endDateStr = end.toLocaleDateString('id-ID', optionsDate);
-    const endTimeStr = end.toLocaleTimeString('id-ID', optionsTime).replace('.', ':');
-
-    if (startDateStr === endDateStr) {
-        return `${startDateStr} • ${startTimeStr} - ${endTimeStr} WIB`;
-    } else {
-        return `${startDateStr} ${startTimeStr} - ${endDateStr} ${endTimeStr} WIB`;
-    }
+    return `${dStr} • ${tStr} WIB`;
 };
 
-// HELPER: Cek apakah user sudah daftar/upload bukti (punya transaksi)
+const formatStart = (event) => formatSpecificDate(event.started_at || event.start_date);
+const formatEnd = (event) => formatSpecificDate(event.end_date || event.ended_at);
+
 const hasRegistered = (event) => {
     return event.user_transaction || event.transaction || event.is_registered;
 };
@@ -70,134 +79,186 @@ const hasRegistered = (event) => {
     <Head title="Event Tryout Akbar - CPNS Nusantara" />
 
     <AuthenticatedLayout>
-        <div class="space-y-4 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 px-4 md:px-0">
-            
-            <div class="bg-white p-5 md:p-8 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5 relative overflow-hidden mt-4 md:mt-0">
-                <div class="absolute right-0 top-0 w-64 h-64 bg-blue-50 rounded-full blur-[60px] pointer-events-none -mr-20 -mt-20"></div>
+        <!-- Background Apple Default (#F5F5F7) -->
+        <div class="w-full bg-transparent pb-32 md:pb-24 animate-in fade-in duration-500 font-sans">
 
-                <div class="relative z-10 space-y-1.5 text-center md:text-left">
-                    <h1 class="text-xl md:text-3xl text-slate-900 tracking-tight uppercase font-normal">Tryout Akbar Nusantara</h1>
-                    <p class="text-sm text-slate-500 font-normal">Uji kemampuanmu bersama ribuan peserta lainnya secara serentak.</p>
-                </div>
+            <!-- Dipersempit maksimal 5xl agar teks panjang tetap nyaman dibaca, tidak terlalu melebar ekstrem -->
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 pt-6 md:pt-12 space-y-8 md:space-y-12">
 
-                <div class="flex items-center gap-3 w-full md:w-auto relative z-10">
-                    <div class="relative w-full md:w-72">
+                <!-- HEADER & PENCARIAN -->
+                <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 relative z-10">
+                    <div class="space-y-2 max-w-2xl">
+                        <h1 class="text-[28px] sm:text-[36px] lg:text-[42px] font-bold text-[#1D1D1F] tracking-tight leading-tight">
+                            Tryout Akbar Nusantara
+                        </h1>
+                        <p class="text-[15px] sm:text-[17px] text-[#86868B] font-medium leading-relaxed">
+                            Uji kemampuan terbaikmu bersama puluhan ribu pejuang seleksi kedinasan dan CPNS lainnya dalam satu simulasi serentak berskala nasional.
+                        </p>
+                    </div>
+
+                    <!-- Search Input ala Spotlight iOS -->
+                    <div class="relative w-full md:w-[320px] shrink-0">
                         <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                            <svg class="h-4 w-4 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                            <svg class="h-5 w-5 text-[#86868B]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3"/>
                             </svg>
                         </div>
                         <input 
                             v-model="searchQuery"
                             type="text" 
-                            placeholder="Cari event..."
-                            class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:bg-white focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-slate-700 placeholder:text-slate-400 shadow-sm outline-none font-normal"
+                            placeholder="Cari event simulasi..."
+                            class="w-full bg-[#E3E3E8]/80 hover:bg-[#E3E3E8] border-transparent rounded-[14px] pl-11 pr-4 py-3 sm:py-3.5 text-[15px] font-medium focus:bg-white focus:ring-4 focus:ring-[#007AFF]/20 focus:border-[#007AFF] transition-all duration-300 text-[#1D1D1F] placeholder:text-[#86868B] outline-none"
                         >
                     </div>
                 </div>
-            </div>
 
-            <div v-if="filteredEvents.length > 0" class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 pb-10">
-                <div 
-                    v-for="event in filteredEvents" 
-                    :key="event.id"
-                    class="group bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex flex-col"
-                >
-                    <div class="relative h-48 md:h-60 bg-slate-100 overflow-hidden border-b border-slate-100 shrink-0">
+                <!-- DAFTAR EVENT (Layout 1 Kolom Penuh - Melebar ke Samping di Desktop) -->
+                <div v-if="filteredEvents.length > 0" class="grid grid-cols-1 gap-8 pb-10">
+
+                    <div 
+                        v-for="(event, index) in filteredEvents" 
+                        :key="event.id"
+                        class="group relative bg-white rounded-[28px] sm:rounded-[32px] shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] border border-black/[0.03] overflow-hidden flex flex-col md:flex-row transition-all duration-500 transform hover:-translate-y-1.5"
+                    >
                         
-                        <div v-if="event.image" class="w-full h-full">
-                            <img 
-                                :src="'/storage/' + event.image" 
-                                class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                                alt="Banner Event"
-                            >
-                        </div>
-                        <div v-else class="w-full h-full bg-gradient-to-br from-[#004a87] to-blue-400 flex flex-col items-center justify-center p-4 group-hover:scale-105 transition-transform duration-700">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white/40 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
-                            </svg>
-                            <h3 class="text-white text-lg md:text-xl text-center uppercase tracking-widest drop-shadow-sm font-normal">
-                                Tryout Akbar<br>Nasional
-                            </h3>
-                        </div>
+                        <!-- Gambar Cover / Header App Store Style -->
+                        <!-- Di Mobile: tinggi tetap. Di Desktop: lebar 40% dari kartu -->
+                        <div class="relative h-60 md:h-auto md:w-[40%] overflow-hidden shrink-0 bg-[#F5F5F7]">
+                            <img v-if="event.image" :src="'/storage/' + event.image" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" alt="Banner Event">
 
-                        <div class="absolute top-3 left-3 md:top-4 md:left-4">
-                            <span :class="getStatusColor(event.status)" class="px-3 py-1 md:px-4 md:py-1.5 rounded-lg md:rounded-xl text-[10px] uppercase tracking-widest shadow-sm backdrop-blur-md border border-white/20 font-normal">
-                                {{ event.status || 'Berlangsung' }}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div class="p-4 md:p-6 flex-1 flex flex-col">
-                        
-                        <div class="bg-blue-50/50 border border-blue-100/50 rounded-xl p-2.5 md:p-3 flex items-center gap-2.5 md:gap-3 mb-3 md:mb-4">
-                            <div class="w-7 h-7 md:w-8 md:h-8 bg-white rounded-md md:rounded-lg flex items-center justify-center text-blue-600 shrink-0 shadow-sm border border-blue-100">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5 md:w-4 md:h-4">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+                            <!-- Fallback Gradient Abstrak (Jika tidak ada gambar) -->
+                            <div v-else class="absolute inset-0 w-full h-full bg-gradient-to-br flex flex-col items-center justify-center p-6 group-hover:scale-105 transition-transform duration-700 ease-out overflow-hidden" :class="getCardGradient(index)">
+                                <!-- Ornamen Blur Cair -->
+                                <div class="absolute -right-12 -bottom-12 w-48 h-48 bg-white/20 rounded-full blur-3xl mix-blend-overlay"></div>
+                                <div class="absolute -left-12 -top-12 w-40 h-40 bg-black/10 rounded-full blur-2xl mix-blend-overlay"></div>
+                                
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-16 w-16 text-white/90 mb-3 drop-shadow-sm">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.974 0-5.699-1.088-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418" />
                                 </svg>
+                                <h3 class="text-white text-[22px] sm:text-[26px] text-center tracking-tight font-semibold drop-shadow-sm leading-tight">
+                                    Tryout Akbar<br>Nasional
+                                </h3>
                             </div>
-                            <div class="flex flex-col min-w-0">
-                                <span class="text-[9px] text-blue-400 uppercase tracking-widest font-normal">Pelaksanaan (Mulai - Selesai)</span>
-                                <span class="text-[11px] md:text-xs text-blue-900 truncate tracking-wide font-normal">
-                                    {{ formatEventDateTime(event) }}
+
+                            <!-- Badge Status Transparan (Dilengkapi Animasi Live) -->
+                            <div class="absolute top-5 left-5 z-10">
+                                <span :class="getStatusBadge(event.status)" class="px-3.5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest backdrop-blur-xl border shadow-[0_2px_8px_rgba(0,0,0,0.08)] inline-flex items-center gap-2">
+                                    <!-- Indikator Dot Pulsing (Hanya aktif jika status Live/Berlangsung) -->
+                                    <span v-if="isLive(event.status)" class="relative flex h-2.5 w-2.5">
+                                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-60"></span>
+                                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-current"></span>
+                                    </span>
+                                    
+                                    {{ event.status || 'Berlangsung' }}
                                 </span>
                             </div>
                         </div>
 
-                        <div class="flex-1 space-y-2.5 md:space-y-3">
-                            <h2 class="text-base md:text-xl text-slate-900 leading-snug tracking-tight group-hover:text-blue-600 transition-colors uppercase line-clamp-2 font-normal">
+                        <!-- Informasi Event (Sebelah Kanan pada Desktop) -->
+                        <div class="p-6 sm:p-8 lg:p-10 flex-1 flex flex-col bg-white">
+
+                            <h2 class="text-[20px] sm:text-[24px] lg:text-[28px] font-semibold text-[#1D1D1F] leading-tight tracking-tight mb-3 break-words">
                                 {{ event.title }}
                             </h2>
-                            
-                            <p class="text-xs md:text-sm text-slate-500 line-clamp-2 leading-relaxed italic font-normal">
-                                {{ event.description || 'Siapkan diri Anda untuk menghadapi simulasi ujian kompetitif bersama ribuan peserta.' }}
+
+                            <p class="text-[14px] sm:text-[15px] lg:text-[16px] text-[#86868B] leading-relaxed font-normal mb-8 break-words">
+                                {{ event.description || 'Persiapkan mental dan strategi terbaikmu. Hadapi soal-soal berkualitas tinggi berstandar CAT BKN dengan sistem penilaian akurat.' }}
                             </p>
 
-                            <div class="flex flex-wrap gap-2 py-1.5 md:py-2">
-                                <div class="flex items-center gap-1.5 text-slate-600 bg-slate-50 border border-slate-100 px-2 py-1 rounded-md">
-                                    <svg class="w-3.5 h-3.5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
-                                    <span class="text-[10px] uppercase tracking-widest font-normal">{{ event.questions_count || 110 }} Soal</span>
+                            <div class="mt-auto space-y-6">
+                                
+                                <!-- Waktu & Info (iCloud Detail Box) -->
+                                <div class="bg-[#F5F5F7] rounded-[20px] p-5 sm:p-6 flex flex-col xl:flex-row xl:items-start justify-between gap-6">
+                                    
+                                    <!-- Pelaksanaan Atas-Bawah (Vertical Stack) -->
+                                    <div class="flex items-start gap-4 flex-1">
+                                        <!-- Ikon Kalender -->
+                                        <div class="w-11 h-11 rounded-full bg-white text-[#007AFF] flex items-center justify-center shrink-0 shadow-sm border border-black/5 hidden sm:flex">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+                                            </svg>
+                                        </div>
+                                        
+                                        <!-- Informasi Mulai & Selesai -->
+                                        <div class="flex flex-col gap-3 sm:gap-4 w-full min-w-0">
+                                            <!-- Mulai -->
+                                            <div class="flex flex-col min-w-0">
+                                                <span class="text-[11px] text-[#86868B] font-semibold uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                                                    Tryout Mulai
+                                                </span>
+                                                <span class="text-[14px] sm:text-[15px] text-[#1D1D1F] font-semibold leading-tight break-words">
+                                                    {{ formatStart(event) }}
+                                                </span>
+                                            </div>
+
+                                            <!-- Garis pemisah halus hanya di mobile -->
+                                            <div class="w-full h-px bg-black/5 sm:hidden"></div>
+
+                                            <!-- Selesai -->
+                                            <div class="flex flex-col min-w-0">
+                                                <span class="text-[11px] text-[#86868B] font-semibold uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                                                    Tryout Selesai
+                                                </span>
+                                                <span class="text-[14px] sm:text-[15px] text-[#1D1D1F] font-semibold leading-tight break-words">
+                                                    {{ formatEnd(event) }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Detail Soal & Waktu -->
+                                    <div class="flex xl:flex-col gap-3 xl:gap-2 xl:items-end border-t xl:border-t-0 xl:border-l border-black/5 pt-4 xl:pt-0 xl:pl-6 shrink-0 mt-4 xl:mt-0">
+                                        <div class="flex items-center gap-1.5">
+                                            <svg class="w-4 h-4 text-[#86868B]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+                                            <span class="text-[12px] text-[#1D1D1F] font-semibold">{{ event.questions_count || 110 }} Soal</span>
+                                        </div>
+                                        <div class="flex items-center gap-1.5">
+                                            <svg class="w-4 h-4 text-[#86868B]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                                            <span class="text-[12px] text-[#1D1D1F] font-semibold">{{ event.duration || 100 }} Menit</span>
+                                        </div>
+                                    </div>
+
                                 </div>
-                                <div class="flex items-center gap-1.5 text-slate-600 bg-slate-50 border border-slate-100 px-2 py-1 rounded-md">
-                                    <svg class="w-3.5 h-3.5 text-orange-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
-                                    <span class="text-[10px] uppercase tracking-widest font-normal">{{ event.duration || 100 }} Menit</span>
+
+                                <!-- Footer (Harga & Tombol iCloud Style - Menyatu di dalam Body) -->
+                                <div class="flex items-center justify-between gap-4 pt-2">
+                                    <div class="flex flex-col shrink-0">
+                                        <span class="text-[11px] text-[#86868B] font-semibold uppercase tracking-wider mb-0.5">Tiket Masuk</span>
+                                        <span class="text-[18px] sm:text-[24px] text-[#1D1D1F] font-bold tracking-tight leading-none">
+                                            {{ event.price > 0 ? `Rp ${event.price.toLocaleString('id-ID')}` : 'Gratis' }}
+                                        </span>
+                                    </div>
+
+                                    <Link 
+                                        :href="route('tryout-akbar.register', event.id)"
+                                        class="px-8 sm:px-10 py-3 sm:py-3.5 rounded-full text-[14px] sm:text-[15px] font-semibold transition-all active:scale-[0.98] text-center flex items-center justify-center gap-2"
+                                        :class="hasRegistered(event) ? 'bg-[#F2F2F7] hover:bg-[#E3E3E8] text-[#1D1D1F]' : 'bg-[#007AFF] hover:bg-[#0062CC] text-white shadow-[0_4px_14px_rgba(0,122,255,0.3)]'"
+                                    >
+                                        <span v-if="hasRegistered(event)">Masuk Kelas</span>
+                                        <span v-else>Daftar Sekarang</span>
+                                    </Link>
                                 </div>
                             </div>
+                            
                         </div>
 
-                        <div class="mt-4 md:mt-6 pt-4 md:pt-5 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div class="flex flex-col shrink-0 text-center md:text-left">
-                                <span class="text-[9px] text-slate-400 uppercase tracking-widest mb-0.5 font-normal">Tiket Masuk</span>
-                                <span class="text-sm md:text-base text-slate-900 tracking-tight leading-none font-normal">
-                                    {{ event.price > 0 ? `Rp ${event.price.toLocaleString('id-ID')}` : 'GRATIS' }}
-                                </span>
-                            </div>
-
-                            <Link 
-                                :href="route('tryout-akbar.register', event.id)"
-                                class="w-full md:w-auto px-6 md:px-8 py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all active:scale-95 shadow-sm text-center font-normal flex items-center justify-center gap-2"
-                                :class="hasRegistered(event) ? 'bg-slate-900 hover:bg-slate-800 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'"
-                            >
-                                <span v-if="hasRegistered(event)">Masuk</span>
-                                <span v-else>Daftar</span>
-
-                                <svg v-if="hasRegistered(event)" xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                                </svg>
-                            </Link>
-                        </div>
                     </div>
-                </div>
-            </div>
 
-            <div v-else class="bg-white border border-slate-200 rounded-2xl p-10 md:p-16 flex flex-col items-center text-center shadow-sm">
-                <div class="w-16 h-16 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-center mb-4">
-                    <svg class="w-8 h-8 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
-                    </svg>
                 </div>
-                <h3 class="text-base text-slate-900 mb-1 font-normal">Belum Ada Event</h3>
-                <p class="text-sm text-slate-500 max-w-sm font-normal">Nantikan informasi event Tryout Akbar selanjutnya melalui channel resmi kami.</p>
+
+                <!-- EMPTY STATE (Sangat Clean ala Apple) -->
+                <div v-else class="bg-white rounded-[32px] p-16 sm:p-24 flex flex-col items-center text-center shadow-[0_8px_30px_rgba(0,0,0,0.02)] border border-black/5 mt-4">
+                    <div class="w-20 h-20 bg-[#F5F5F7] text-[#86868B] rounded-full flex items-center justify-center mb-6">
+                        <svg class="w-10 h-10" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+                        </svg>
+                    </div>
+                    <h3 class="text-[20px] sm:text-[24px] text-[#1D1D1F] mb-2 font-semibold">Tidak Ada Event Tersedia</h3>
+                    <p class="text-[14px] sm:text-[15px] text-[#86868B] font-normal max-w-md px-4 leading-relaxed">
+                        Saat ini belum ada jadwal simulasi akbar. Pastikan akunmu sudah terdaftar untuk mendapat notifikasi saat event baru dibuka.
+                    </p>
+                </div>
+
             </div>
         </div>
     </AuthenticatedLayout>

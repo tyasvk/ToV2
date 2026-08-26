@@ -56,25 +56,23 @@ const buyMembership = () => {
     if (!selectedPlan.value) return;
 
     Swal.fire({
-        title: 'Konfirmasi Langganan',
+        title: 'Konfirmasi Lisensi',
         text: `Anda memilih paket Adidaya ${selectedPlan.value.label}. Lanjutkan ke pembayaran?`,
-        icon: 'question',
         showCancelButton: true,
-        confirmButtonColor: '#4f46e5',
-        cancelButtonColor: '#94a3b8',
-        confirmButtonText: 'Ya, Lanjutkan',
+        confirmButtonColor: '#007AFF',
+        cancelButtonColor: '#F5F5F7',
+        confirmButtonText: 'Lanjutkan',
         cancelButtonText: 'Batal', 
         reverseButtons: true,
         customClass: {
-            popup: 'rounded-[2rem] border-none shadow-2xl p-6 md:p-10',
-            title: 'font-medium text-slate-900 uppercase tracking-tight text-lg',
-            htmlContainer: 'text-slate-500 font-medium text-xs mt-2',
-            confirmButton: 'rounded-xl font-medium uppercase tracking-[0.2em] text-[9px] py-4 px-8 transition-all',
-            cancelButton: 'rounded-xl font-medium uppercase tracking-[0.2em] text-[9px] py-4 px-8 transition-all'
+            popup: 'rounded-[24px] border border-black/5 shadow-[0_10px_40px_rgba(0,0,0,0.1)] p-6 font-sans',
+            title: 'font-bold text-[#1D1D1F] tracking-tight text-[20px]',
+            htmlContainer: 'text-[#86868B] font-medium text-[14px] mt-1',
+            confirmButton: 'rounded-full font-semibold text-[14px] py-3 px-8 transition-all',
+            cancelButton: 'rounded-full font-semibold text-[14px] py-3 px-8 text-[#1D1D1F] transition-all hover:bg-[#E3E3E8]'
         }
     }).then((result) => {
         if (result.isConfirmed) {
-            // PERBAIKAN: Gunakan POST ke membership.buy untuk membuat transaksi terlebih dahulu
             router.post(route('membership.buy'), { 
                 plan_id: selectedPlan.value.id,
                 payment_method: 'gateway' 
@@ -97,109 +95,157 @@ const features = [
     <Head title="Membership Nusantara" />
 
     <AuthenticatedLayout>
-        <div class="max-w-4xl mx-auto px-4 py-8 md:py-10 space-y-6 animate-in fade-in duration-700">
+        <!-- Background transparan, padding bawah dikurangi -->
+        <div class="w-full bg-transparent pb-16 md:pb-24 font-sans animate-in fade-in duration-500">
             
-            <div class="relative overflow-hidden rounded-[2rem] bg-white border border-slate-200 shadow-sm p-6 md:p-8 flex flex-col sm:flex-row items-center justify-between gap-6 transition-all hover:shadow-md">
-                <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-left w-full">
-                    <div class="w-20 h-20 rounded-[1.5rem] flex items-center justify-center shrink-0 transition-colors"
-                         :class="isAdidayaActive ? 'bg-indigo-50 border border-indigo-100' : 'bg-slate-50 border border-slate-100'">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" 
-                             class="w-10 h-10" :class="isAdidayaActive ? 'text-indigo-600' : 'text-slate-400'">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
-                        </svg>
-                    </div>
-                    
-                    <div class="flex-1">
-                        <p class="text-[10px] text-slate-400 uppercase tracking-[0.25em] font-medium mb-1">Status Lisensi</p>
-                        <h2 class="text-2xl md:text-3xl font-medium text-slate-900 tracking-tight leading-none mb-3">
-                            {{ isAdidayaActive ? 'Nusantara Adidaya' : 'Basic Member' }}
-                        </h2>
-                        
-                        <div v-if="isAdidayaActive" class="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-lg">
-                            <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-                            <span class="text-[10px] font-medium text-emerald-600 uppercase tracking-widest">
-                                Aktif hingga: {{ formatDate(user.membership_expires_at) }}
-                            </span>
-                        </div>
-                        <p v-else class="text-[11px] text-slate-500 font-medium tracking-wide">
-                            Upgrade lisensi Anda untuk mendapatkan akses ke seluruh tryout premium.
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <div v-if="selectedPlan" class="relative bg-white border border-indigo-100 rounded-[2rem] p-6 md:p-8 shadow-lg shadow-indigo-900/5 transition-all overflow-hidden flex flex-col md:flex-row gap-8 items-start justify-between group">
-                <div class="absolute -right-20 -top-20 w-64 h-64 bg-indigo-50 rounded-full blur-[60px] opacity-60 pointer-events-none group-hover:bg-indigo-100 transition-colors duration-700"></div>
+            <!-- Padding top dan gap diperkecil (space-y-4 md:space-y-6) -->
+            <div class="max-w-4xl mx-auto px-4 sm:px-6 pt-4 md:pt-6 space-y-4 md:space-y-5">
                 
-                <div class="flex-1 w-full relative z-10">
-                    <div class="flex items-center gap-3 mb-4">
-                        <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
-                        <h3 class="text-[10px] font-medium text-indigo-600 uppercase tracking-[0.3em]">Nusantara Adidaya</h3>
-                        <span v-if="selectedPlan.duration >= 365" class="ml-2 px-2 py-1 bg-amber-50 border border-amber-100 rounded-md text-[8px] font-medium text-amber-600 uppercase tracking-widest hidden sm:block">
-                            Paling Hemat
-                        </span>
-                    </div>
+                <!-- STATUS KARTU (Lebih Pendek & Padat) -->
+                <div class="bg-white rounded-[24px] p-5 sm:p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-black/5 flex flex-col sm:flex-row items-center sm:items-center justify-between gap-4 sm:gap-5 transition-all">
                     
-                    <div class="flex items-baseline gap-2 mb-6 transition-all duration-300">
-                        <span class="text-4xl sm:text-5xl font-medium text-slate-900 tracking-tighter">{{ selectedPlan.priceFormatted }}</span>
-                        <span class="text-[10px] text-slate-400 font-medium uppercase tracking-widest">/ {{ selectedPlan.label }}</span>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4 mb-2">
-                        <div v-for="(feature, index) in features" :key="index" class="flex items-start gap-4">
-                            <div class="shrink-0 w-5 h-5 rounded-full bg-indigo-50 flex items-center justify-center mt-0.5 transition-colors">
-                                <svg class="w-3 h-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
-                            </div>
-                            <span class="text-xs font-medium text-slate-600 uppercase tracking-wide leading-relaxed">{{ feature }}</span>
+                    <div class="flex flex-col sm:flex-row items-center sm:items-center gap-4 sm:gap-5 text-center sm:text-left w-full">
+                        <!-- Ikon Profil Diperkecil (w-14 h-14) -->
+                        <div class="w-14 h-14 rounded-full flex items-center justify-center shrink-0 transition-colors shadow-sm border border-black/5"
+                             :class="isAdidayaActive ? 'bg-[#F0F4FF]' : 'bg-[#F5F5F7]'">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" 
+                                 class="w-7 h-7" :class="isAdidayaActive ? 'text-[#007AFF]' : 'text-[#86868B]'">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+                            </svg>
                         </div>
-                    </div>
-                </div>
-
-                <div class="w-full md:w-72 shrink-0 flex flex-col gap-4 relative z-10">
-                    <div v-if="!isAdidayaActive" class="w-full">
-                        <p class="text-[10px] font-medium text-slate-500 uppercase tracking-[0.2em] mb-2 text-center md:text-left">Pilih Durasi Paket</p>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button 
-                                v-for="plan in membershipPlans" 
-                                :key="plan.id"
-                                @click="selectedPlan = plan"
-                                :class="[
-                                    selectedPlan.id === plan.id 
-                                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200 border-indigo-600' 
-                                        : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50',
-                                    'border py-3 px-2 rounded-xl text-center transition-all duration-300 active:scale-95'
-                                ]"
-                            >
-                                <div class="text-[9px] uppercase tracking-widest font-medium mb-1">{{ plan.label }}</div>
-                                <div class="text-[10px] font-medium tracking-tight" :class="selectedPlan.id === plan.id ? 'text-indigo-100' : 'text-slate-700'">
-                                    {{ plan.priceFormatted }}
+                        
+                        <!-- Teks Diperkecil & Margin Dirapatkan -->
+                        <div class="flex-1 flex flex-col justify-center">
+                            <div class="flex flex-col sm:flex-row sm:items-center sm:gap-3 mb-1.5 sm:mb-1">
+                                <h2 class="text-[20px] sm:text-[22px] font-bold text-[#1D1D1F] tracking-tight leading-tight">
+                                    {{ isAdidayaActive ? 'Nusantara Adidaya' : 'Basic Member' }}
+                                </h2>
+                                <!-- Badge Status -->
+                                <div v-if="isAdidayaActive" class="inline-flex items-center justify-center sm:justify-start gap-1.5 mt-1 sm:mt-0">
+                                    <span class="px-2.5 py-1 bg-[#E5F5EA] text-[#34C759] border border-[#34C759]/20 rounded-full text-[10px] font-bold tracking-wide shadow-sm flex items-center gap-1.5">
+                                        <span class="relative flex h-1.5 w-1.5">
+                                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#34C759] opacity-60"></span>
+                                            <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#34C759]"></span>
+                                        </span>
+                                        Aktif hingga {{ formatDate(user.membership_expires_at) }}
+                                    </span>
                                 </div>
-                            </button>
+                            </div>
+                            
+                            <p v-if="!isAdidayaActive" class="text-[13px] sm:text-[14px] text-[#86868B] font-medium leading-relaxed m-0">
+                                Dapatkan akses tanpa batas ke seluruh tryout premium dengan melakukan upgrade lisensi Anda hari ini.
+                            </p>
                         </div>
                     </div>
 
-                    <button 
-                        @click="buyMembership"
-                        :disabled="isAdidayaActive || !selectedPlan"
-                        :class="isAdidayaActive 
-                            ? 'bg-slate-50 text-slate-400 border border-slate-100 cursor-not-allowed' 
-                            : 'bg-slate-900 text-white hover:bg-indigo-600 hover:shadow-lg hover:shadow-indigo-500/20 active:scale-[0.98]'"
-                        class="w-full py-4 rounded-xl text-[10px] font-medium uppercase tracking-[0.25em] transition-all duration-300 flex items-center justify-center gap-3 mt-auto border border-transparent"
-                    >
-                        <span>{{ isAdidayaActive ? 'Lisensi Telah Aktif' : 'Ambil Paket Adidaya' }}</span>
-                        <svg v-if="!isAdidayaActive" xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                        </svg>
-                    </button>
                 </div>
-            </div>
 
-            <div class="text-center pt-2 pb-8">
-                <p class="text-[9px] text-slate-400 font-medium uppercase tracking-[0.2em] leading-relaxed">
-                    Sistem pembayaran terenkripsi dan diverifikasi otomatis oleh Midtrans.
-                </p>
+                <!-- PILIHAN PAKET & FITUR (Lebih Padat) -->
+                <div v-if="selectedPlan" class="bg-white rounded-[24px] sm:rounded-[28px] p-5 sm:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-black/5 flex flex-col lg:flex-row gap-6 lg:gap-10">
+                    
+                    <!-- Fitur & Harga -->
+                    <div class="flex-1 flex flex-col">
+                        <div class="mb-6 border-b border-black/5 pb-6">
+                            <div class="flex items-center gap-2 mb-2.5">
+                                <div class="w-7 h-7 rounded-full bg-[#F0F4FF] flex items-center justify-center text-[#007AFF] shrink-0">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                </div>
+                                <h3 class="text-[16px] sm:text-[18px] font-bold text-[#1D1D1F]">Nusantara Adidaya</h3>
+                            </div>
+                            
+                            <div class="flex flex-wrap items-baseline gap-2">
+                                <span class="text-[32px] sm:text-[38px] font-bold text-[#1D1D1F] tracking-tight leading-none">
+                                    {{ selectedPlan.priceFormatted }}
+                                </span>
+                                <span class="text-[14px] sm:text-[15px] text-[#86868B] font-semibold">
+                                    / {{ selectedPlan.label }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="flex-1">
+                            <p class="text-[13px] font-bold text-[#1D1D1F] mb-4">Yang Anda dapatkan:</p>
+                            <!-- Space antar fitur dirapatkan (space-y-3) -->
+                            <div class="space-y-3">
+                                <div v-for="(feature, index) in features" :key="index" class="flex items-start gap-3">
+                                    <div class="shrink-0 mt-0.5">
+                                        <svg class="w-4 h-4 text-[#007AFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </div>
+                                    <span class="text-[13px] sm:text-[14px] font-medium text-[#1D1D1F] leading-snug break-words">
+                                        {{ feature }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pilihan Paket (Box Abu-abu Kanan, padding & ukuran diperkecil) -->
+                    <div class="w-full lg:w-[320px] shrink-0 bg-[#F5F5F7] rounded-[20px] sm:rounded-[24px] p-5 flex flex-col gap-5">
+                        
+                        <div v-if="!isAdidayaActive" class="w-full flex-1">
+                            <p class="text-[11px] font-bold text-[#86868B] uppercase tracking-wider mb-3 px-1">
+                                Pilih Durasi Langganan
+                            </p>
+                            
+                            <!-- List Pilihan Paket -->
+                            <div class="space-y-2.5">
+                                <button 
+                                    v-for="plan in membershipPlans" 
+                                    :key="plan.id"
+                                    @click="selectedPlan = plan"
+                                    class="w-full text-left p-3.5 rounded-[16px] border-2 transition-all duration-300 flex items-center justify-between group bg-white shadow-sm"
+                                    :class="selectedPlan.id === plan.id ? 'border-[#007AFF] ring-4 ring-[#007AFF]/10' : 'border-transparent hover:border-black/5'"
+                                >
+                                    <div class="flex flex-col min-w-0 pr-2">
+                                        <div class="text-[14px] font-bold mb-0.5 break-words" :class="selectedPlan.id === plan.id ? 'text-[#007AFF]' : 'text-[#1D1D1F]'">
+                                            {{ plan.label }}
+                                        </div>
+                                        <div v-if="plan.duration >= 365" class="text-[10px] font-semibold bg-[#F0F4FF] text-[#007AFF] px-2 py-0.5 rounded border border-[#007AFF]/20 w-fit">
+                                            Paling Hemat
+                                        </div>
+                                    </div>
+                                    <div class="text-[14px] font-semibold shrink-0" :class="selectedPlan.id === plan.id ? 'text-[#007AFF]' : 'text-[#86868B]'">
+                                        {{ plan.priceFormatted }}
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Tombol Lanjutkan -->
+                        <div class="mt-auto pt-1">
+                            <button 
+                                @click="buyMembership"
+                                :disabled="isAdidayaActive || !selectedPlan"
+                                :class="isAdidayaActive 
+                                    ? 'bg-[#E3E3E8] text-[#86868B] border border-black/5 cursor-not-allowed' 
+                                    : 'bg-[#007AFF] text-white hover:bg-[#0062CC] shadow-[0_4px_12px_rgba(0,122,255,0.3)] active:scale-[0.98]'"
+                                class="w-full py-3.5 rounded-full text-[14px] font-semibold transition-all duration-300 flex items-center justify-center gap-2"
+                            >
+                                <span>{{ isAdidayaActive ? 'Lisensi Telah Aktif' : 'Lanjutkan Pembayaran' }}</span>
+                                <svg v-if="!isAdidayaActive" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                            
+                            <p class="text-center text-[11px] text-[#86868B] font-medium mt-3 px-2">
+                                Transaksi aman dan terenkripsi. Diproses secara otomatis.
+                            </p>
+                        </div>
+                        
+                    </div>
+
+                </div>
+
             </div>
             
         </div>
     </AuthenticatedLayout>
 </template>
+
+<style scoped>
+.animate-in {
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+</style>

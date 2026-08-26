@@ -15,26 +15,13 @@ const safeTryout = computed(() => props.tryout || {});
 
 const search = ref('');
 const scope = ref('nasional'); // nasional, provinsi, instansi
-const itemsPerPage = ref(25);
+const itemsPerPage = ref(20); // Diubah default ke 20
 const currentPage = ref(1);
 
 // --- HELPER DATA ---
 const getAgency = (user) => {
     if (!user) return 'Instansi belum diatur';
     return user.agency_name || user.instansi || (user.user && user.user.agency_name) || 'Instansi belum diatur';
-};
-
-const isFemale = (user) => {
-    if (!user) return false;
-    const g = user.gender || (user.user && user.user.gender);
-    return g == 2 || g == '2' || g === 'Perempuan';
-};
-
-const getInitials = (name) => {
-    if (!name) return 'U';
-    const words = name.trim().split(' ');
-    if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
-    return name.substring(0, 2).toUpperCase();
 };
 
 const getDuration = (dur) => {
@@ -53,25 +40,32 @@ const goBack = () => {
     else router.visit('/dashboard');
 };
 
-// --- LOGIKA PERINGKAT (ANTI-BUG) ---
-
-// 1. Urutkan Nilai Secara Absolut (Aturan BKN)
+// --- LOGIKA PERINGKAT KETAT ATURAN BKN ---
 const baseRanked = computed(() => {
     let sorted = [...safeRankings.value];
     sorted.sort((a, b) => {
-        // Yang lulus ada di atas yang gagal
+        // 1. Status Passing Grade (Lulus di atas Gagal)
         if (a.is_passed !== b.is_passed) return a.is_passed ? -1 : 1; 
-        // Jika status lulus sama, urutkan berdasarkan skor tertinggi
+        
+        // 2. Nilai Total Tertinggi
         if (b.score !== a.score) return b.score - a.score;
+        
+        // 3. Nilai TKP Tertinggi
         if (b.tkp !== a.tkp) return b.tkp - a.tkp;
+        
+        // 4. Nilai TIU Tertinggi
         if (b.tiu !== a.tiu) return b.tiu - a.tiu;
+        
+        // 5. Nilai TWK Tertinggi
         if (b.twk !== a.twk) return b.twk - a.twk;
-        return a.duration - b.duration; // Yang lebih cepat di atas
+        
+        // 6. Waktu Pengerjaan Tercepat (Durasi terkecil di atas)
+        return a.duration - b.duration; 
     });
     return sorted;
 });
 
-// 2. Saring Scope (Nasional/Provinsi/Instansi) & Set Rank Number Asli
+// Saring Scope (Nasional/Provinsi/Instansi) & Set Rank Number Asli
 const scopeRanked = computed(() => {
     let list = baseRanked.value;
     
@@ -82,14 +76,14 @@ const scopeRanked = computed(() => {
         list = list.filter(u => getAgency(u).toLowerCase() === myAgency);
     }
     
-    // Beri nomor urut statis setelah difilter scope
+    // Beri nomor urut statis
     return list.map((user, index) => ({
         ...user,
         displayRank: index + 1 
     }));
 });
 
-// 3. Terapkan Pencarian (Hanya menyaring yang tampil, nomor urut tetap)
+// Terapkan Pencarian
 const finalRankings = computed(() => {
     let list = scopeRanked.value;
     if (search.value) {
@@ -102,31 +96,17 @@ const finalRankings = computed(() => {
     return list;
 });
 
-// 4. Pembagian Data (Podium vs Tabel)
-const topThree = computed(() => {
-    // Jika sedang mencari data, sembunyikan podium
-    if (search.value) return [];
-    return finalRankings.value.slice(0, 3);
-});
-
-const listToPaginate = computed(() => {
-    // Jika mencari data, tampilkan semuanya di tabel
-    if (search.value) return finalRankings.value;
-    // Jika tidak mencari, potong 3 teratas karena sudah di podium
-    return finalRankings.value.slice(3);
-});
-
-// 5. Pagination
+// Pagination 
 watch([itemsPerPage, search, scope], () => { currentPage.value = 1; });
 
-const totalPages = computed(() => Math.ceil(listToPaginate.value.length / itemsPerPage.value) || 1);
+const totalPages = computed(() => Math.ceil(finalRankings.value.length / itemsPerPage.value) || 1);
 
 const paginatedRankings = computed(() => {
     const start = (currentPage.value - 1) * itemsPerPage.value;
-    return listToPaginate.value.slice(start, start + itemsPerPage.value);
+    return finalRankings.value.slice(start, start + itemsPerPage.value);
 });
 
-// 6. Sinkronisasi Peringkat Anda secara Realtime
+// Sinkronisasi Peringkat Anda secara Realtime (Untuk Floating Bar)
 const activeMyRank = computed(() => {
     const me = scopeRanked.value.find(u => u.is_me);
     return me || null;
@@ -184,68 +164,10 @@ const activeMyRank = computed(() => {
                 </div>
 
                 <!-- ============================================== -->
-                <!-- PODIUM TOP 3 PESERTA                           -->
+                <!-- DAFTAR PERINGKAT (PURE LIST NO AVATAR)         -->
                 <!-- ============================================== -->
-                <div v-if="topThree.length > 0 && !search" class="pt-8 pb-4 px-2 flex items-end justify-center gap-2 sm:gap-6 relative z-10">
-                    
-                    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full sm:w-3/4 h-full bg-blue-400/10 blur-[60px] rounded-full pointer-events-none z-0"></div>
-
-                    <!-- RANK 2 (KIRI) -->
-                    <div v-if="topThree[1]" class="flex flex-col items-center w-28 sm:w-40 relative z-10 mb-4 sm:mb-8">
-                        <div class="relative mb-3">
-                            <div class="w-14 h-14 sm:w-20 sm:h-20 rounded-full border-[3px] border-[#E2E8F0] shadow-md bg-slate-100 flex items-center justify-center overflow-hidden">
-                                <img v-if="topThree[1].avatar" :src="'/storage/'+topThree[1].avatar" class="w-full h-full object-cover" />
-                                <span v-else class="text-lg sm:text-xl font-black text-slate-400" :class="isFemale(topThree[1]) ? 'text-rose-400' : ''">{{ getInitials(topThree[1].name) }}</span>
-                            </div>
-                            <div class="absolute -bottom-1 -right-1 sm:-bottom-2 sm:-right-2 bg-slate-400 text-white w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-black text-[12px] sm:text-[14px] shadow-sm border-2 border-white">2</div>
-                        </div>
-                        <div class="w-full bg-white/80 backdrop-blur border border-slate-200/50 shadow-sm rounded-xl p-2.5 sm:p-3 text-center border-t-[3px] border-t-slate-400">
-                            <h3 class="text-[11px] sm:text-[13px] font-bold text-slate-800 truncate w-full">{{ topThree[1].name }}</h3>
-                            <p class="text-[9px] sm:text-[10px] text-slate-500 font-medium truncate w-full mt-0.5">{{ getAgency(topThree[1]) }}</p>
-                            <div class="mt-2 text-slate-700 font-black text-[15px] sm:text-[18px] tabular-nums leading-none">{{ topThree[1].score }}</div>
-                        </div>
-                    </div>
-
-                    <!-- RANK 1 (TENGAH) -->
-                    <div v-if="topThree[0]" class="flex flex-col items-center w-32 sm:w-48 relative z-20">
-                        <div class="absolute -top-6 sm:-top-8 text-2xl sm:text-3xl animate-bounce drop-shadow-md">👑</div>
-                        <div class="relative mb-3">
-                            <div class="w-20 h-20 sm:w-28 sm:h-28 rounded-full border-[4px] border-[#FBBF24] shadow-xl shadow-amber-500/20 bg-amber-50 flex items-center justify-center overflow-hidden">
-                                <img v-if="topThree[0].avatar" :src="'/storage/'+topThree[0].avatar" class="w-full h-full object-cover" />
-                                <span v-else class="text-2xl sm:text-3xl font-black text-amber-500" :class="isFemale(topThree[0]) ? 'text-rose-400' : ''">{{ getInitials(topThree[0].name) }}</span>
-                            </div>
-                            <div class="absolute -bottom-1 -right-1 sm:-bottom-2 sm:-right-2 bg-amber-500 text-white w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-black text-[14px] sm:text-[16px] shadow-md border-[2.5px] border-white">1</div>
-                        </div>
-                        <div class="w-full bg-white/90 backdrop-blur border border-amber-100 shadow-md rounded-[16px] p-3 sm:p-4 text-center border-t-[4px] border-t-amber-400">
-                            <h3 class="text-[13px] sm:text-[15px] font-bold text-slate-900 truncate w-full">{{ topThree[0].name }}</h3>
-                            <p class="text-[9px] sm:text-[11px] text-slate-500 font-medium truncate w-full mt-0.5">{{ getAgency(topThree[0]) }}</p>
-                            <div class="mt-2.5 text-[#007AFF] font-black text-[20px] sm:text-[24px] tabular-nums leading-none">{{ topThree[0].score }}</div>
-                        </div>
-                    </div>
-
-                    <!-- RANK 3 (KANAN) -->
-                    <div v-if="topThree[2]" class="flex flex-col items-center w-28 sm:w-40 relative z-10 mb-4 sm:mb-8">
-                        <div class="relative mb-3">
-                            <div class="w-14 h-14 sm:w-20 sm:h-20 rounded-full border-[3px] border-[#F97316] shadow-md bg-orange-50 flex items-center justify-center overflow-hidden">
-                                <img v-if="topThree[2].avatar" :src="'/storage/'+topThree[2].avatar" class="w-full h-full object-cover" />
-                                <span v-else class="text-lg sm:text-xl font-black text-orange-500" :class="isFemale(topThree[2]) ? 'text-rose-400' : ''">{{ getInitials(topThree[2].name) }}</span>
-                            </div>
-                            <div class="absolute -bottom-1 -right-1 sm:-bottom-2 sm:-right-2 bg-orange-500 text-white w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-black text-[12px] sm:text-[14px] shadow-sm border-2 border-white">3</div>
-                        </div>
-                        <div class="w-full bg-white/80 backdrop-blur border border-slate-200/50 shadow-sm rounded-xl p-2.5 sm:p-3 text-center border-t-[3px] border-t-orange-400">
-                            <h3 class="text-[11px] sm:text-[13px] font-bold text-slate-800 truncate w-full">{{ topThree[2].name }}</h3>
-                            <p class="text-[9px] sm:text-[10px] text-slate-500 font-medium truncate w-full mt-0.5">{{ getAgency(topThree[2]) }}</p>
-                            <div class="mt-2 text-slate-700 font-black text-[15px] sm:text-[18px] tabular-nums leading-none">{{ topThree[2].score }}</div>
-                        </div>
-                    </div>
-
-                </div>
-
-                <!-- ============================================== -->
-                <!-- DAFTAR PERINGKAT LAINNYA                       -->
-                <!-- ============================================== -->
-                <div class="space-y-3 relative z-10">
-                    <div v-if="listToPaginate.length === 0" class="text-center py-12 bg-white rounded-[20px] shadow-sm border border-slate-100">
+                <div class="space-y-3 relative z-10 pt-2">
+                    <div v-if="paginatedRankings.length === 0" class="text-center py-12 bg-white rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-slate-100">
                         <p class="text-[13px] text-slate-500 font-medium">Tidak ada data peserta ditemukan.</p>
                     </div>
 
@@ -253,52 +175,58 @@ const activeMyRank = computed(() => {
                          class="bg-white rounded-[20px] p-4 sm:p-5 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all"
                          :class="rank.is_me ? 'ring-2 ring-[#007AFF] bg-[#F0F4FF] border-transparent' : 'border-slate-100/80 hover:shadow-[0_4px_16px_rgba(0,0,0,0.04)]'">
                         
-                        <!-- Info Peserta -->
+                        <!-- Info Peserta (Tanpa Icon/Avatar) -->
                         <div class="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
-                            <div class="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-full flex items-center justify-center font-black text-[13px] sm:text-[14px]"
-                                 :class="rank.is_me ? 'bg-[#007AFF] text-white shadow-sm' : 'bg-[#F5F5F7] text-slate-500'">
+                            
+                            <!-- Nomor Peringkat dengan Warna Khusus 1, 2, 3 -->
+                            <div class="w-10 h-10 sm:w-12 sm:h-12 shrink-0 rounded-full flex items-center justify-center font-black text-[14px] sm:text-[16px] shadow-sm tabular-nums"
+                                 :class="{
+                                     'bg-[#FBBF24] text-amber-900 border border-amber-300': rank.displayRank === 1 && !search,
+                                     'bg-[#E2E8F0] text-slate-700 border border-slate-300': rank.displayRank === 2 && !search,
+                                     'bg-[#F97316] text-orange-900 border border-orange-300': rank.displayRank === 3 && !search,
+                                     'bg-[#007AFF] text-white border-transparent': rank.is_me && (rank.displayRank > 3 || search),
+                                     'bg-[#F5F5F7] text-slate-600 border-transparent': !rank.is_me && (rank.displayRank > 3 || search)
+                                 }">
                                 {{ rank.displayRank }}
-                            </div>
-
-                            <div class="w-10 h-10 shrink-0 rounded-full bg-[#E2E8F0] overflow-hidden flex items-center justify-center text-[12px] font-bold text-slate-500 border border-slate-200/50">
-                                <img v-if="rank.avatar" :src="'/storage/'+rank.avatar" class="w-full h-full object-cover" />
-                                <span v-else>{{ getInitials(rank.name) }}</span>
                             </div>
 
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center gap-2 mb-0.5">
-                                    <h4 class="text-[13px] sm:text-[14px] font-bold text-slate-900 truncate" :class="rank.is_me ? 'text-[#007AFF]' : ''">{{ rank.name }}</h4>
+                                    <h4 class="text-[14px] sm:text-[15px] font-bold text-slate-900 truncate" :class="rank.is_me ? 'text-[#007AFF]' : ''">
+                                        {{ rank.name }}
+                                        <span v-if="rank.displayRank === 1 && !search" class="text-amber-500 ml-1">👑</span>
+                                    </h4>
                                     <span v-if="rank.is_me" class="px-1.5 py-0.5 bg-[#007AFF] text-white text-[8px] sm:text-[9px] font-bold rounded uppercase tracking-wider shrink-0">Anda</span>
                                 </div>
                                 <div class="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-[11px] font-medium text-slate-500">
-                                    <span class="truncate max-w-[140px] sm:max-w-full">{{ getAgency(rank) }}</span>
+                                    <span class="truncate max-w-[160px] sm:max-w-full">{{ getAgency(rank) }}</span>
                                     <span class="w-1 h-1 rounded-full bg-slate-300 shrink-0"></span>
-                                    <span>{{ getDuration(rank.duration) }}</span>
+                                    <span class="shrink-0">Waktu: {{ getDuration(rank.duration) }}</span>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Rincian Nilai & Status -->
-                        <div class="flex items-center justify-between sm:justify-end gap-4 sm:gap-5 pl-[3.2rem] sm:pl-0 pt-2 sm:pt-0 border-t border-slate-100 sm:border-0">
+                        <div class="flex items-center justify-between sm:justify-end gap-4 sm:gap-6 pl-[3.8rem] sm:pl-0 pt-3 sm:pt-0 border-t border-slate-100 sm:border-0">
                             <!-- Rincian TWK TIU TKP -->
                             <div class="flex gap-1.5 sm:gap-2">
-                                <div class="flex flex-col items-center justify-center w-10 sm:w-12 h-10 sm:h-11 bg-white border border-slate-100 rounded-[10px] shadow-sm">
+                                <div class="flex flex-col items-center justify-center w-11 sm:w-14 h-11 sm:h-12 bg-[#F5F5F7] rounded-[10px]">
                                     <span class="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase">TWK</span>
-                                    <span class="text-[11px] sm:text-[13px] font-bold text-slate-700 tabular-nums leading-none mt-0.5">{{ rank.twk }}</span>
+                                    <span class="text-[12px] sm:text-[14px] font-bold text-slate-700 tabular-nums leading-none mt-0.5">{{ rank.twk }}</span>
                                 </div>
-                                <div class="flex flex-col items-center justify-center w-10 sm:w-12 h-10 sm:h-11 bg-white border border-slate-100 rounded-[10px] shadow-sm">
+                                <div class="flex flex-col items-center justify-center w-11 sm:w-14 h-11 sm:h-12 bg-[#F5F5F7] rounded-[10px]">
                                     <span class="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase">TIU</span>
-                                    <span class="text-[11px] sm:text-[13px] font-bold text-slate-700 tabular-nums leading-none mt-0.5">{{ rank.tiu }}</span>
+                                    <span class="text-[12px] sm:text-[14px] font-bold text-slate-700 tabular-nums leading-none mt-0.5">{{ rank.tiu }}</span>
                                 </div>
-                                <div class="flex flex-col items-center justify-center w-10 sm:w-12 h-10 sm:h-11 bg-white border border-slate-100 rounded-[10px] shadow-sm">
+                                <div class="flex flex-col items-center justify-center w-11 sm:w-14 h-11 sm:h-12 bg-[#F5F5F7] rounded-[10px]">
                                     <span class="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase">TKP</span>
-                                    <span class="text-[11px] sm:text-[13px] font-bold text-slate-700 tabular-nums leading-none mt-0.5">{{ rank.tkp }}</span>
+                                    <span class="text-[12px] sm:text-[14px] font-bold text-slate-700 tabular-nums leading-none mt-0.5">{{ rank.tkp }}</span>
                                 </div>
                             </div>
 
                             <!-- Total & Lulus/Gagal -->
-                            <div class="flex flex-col items-end min-w-[60px] sm:min-w-[70px]">
-                                <span class="text-[18px] sm:text-[22px] font-black tracking-tight tabular-nums leading-none" :class="rank.is_passed ? 'text-emerald-600' : 'text-slate-800'">
+                            <div class="flex flex-col items-end min-w-[60px] sm:min-w-[80px]">
+                                <span class="text-[20px] sm:text-[24px] font-black tracking-tight tabular-nums leading-none" :class="rank.is_passed ? 'text-emerald-600' : 'text-slate-800'">
                                     {{ rank.score }}
                                 </span>
                                 <span class="text-[8px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded mt-1.5 uppercase tracking-widest border" 
@@ -318,7 +246,7 @@ const activeMyRank = computed(() => {
                     <div class="flex items-center gap-2 text-[11px] sm:text-[12px] text-slate-500 font-semibold">
                         <span>Tampilkan:</span>
                         <select v-model="itemsPerPage" class="bg-[#F5F5F7] border-transparent rounded-[8px] text-[11px] sm:text-[12px] py-1.5 pl-3 pr-8 focus:ring-2 focus:ring-[#007AFF]/20 focus:bg-white focus:border-[#007AFF] outline-none cursor-pointer transition-all">
-                            <option :value="25">25 Baris</option>
+                            <option :value="20">20 Baris</option>
                             <option :value="50">50 Baris</option>
                             <option :value="100">100 Baris</option>
                         </select>
@@ -334,13 +262,13 @@ const activeMyRank = computed(() => {
                 <!-- ============================================== -->
                 <!-- STICKY BOTTOM BAR : PERINGKAT SAYA             -->
                 <!-- ============================================== -->
-                <div v-if="activeMyRank" class="sticky bottom-4 sm:bottom-6 z-50 pt-2 pb-4">
+                <div v-if="activeMyRank && activeMyRank.displayRank > 3" class="sticky bottom-4 sm:bottom-6 z-50 pt-2 pb-4">
                     <div class="bg-white/95 backdrop-blur-xl border border-slate-200/80 shadow-[0_8px_30px_rgba(0,0,0,0.12)] rounded-[24px] p-3 sm:p-4 w-full flex items-center justify-between gap-3 sm:gap-4 ring-1 ring-white/50">
                         
                         <div class="flex items-center gap-2.5 sm:gap-4 min-w-0">
-                            <!-- Bulatan Biru Menampilkan Nomor Peringkat (Misal: 100, 5, dll) -->
-                            <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[#007AFF] text-white flex items-center justify-center font-black text-[14px] sm:text-[17px] shadow-sm shrink-0 tabular-nums">
-                                {{ activeMyRank.rank }}
+                            <!-- Bulatan Biru Menampilkan Nomor Peringkat Asli -->
+                            <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[#007AFF] text-white flex items-center justify-center font-black text-[14px] sm:text-[17px] shadow-sm shrink-0 tabular-nums px-1">
+                                {{ activeMyRank.displayRank }}
                             </div>
                             <div class="min-w-0 flex flex-col justify-center">
                                 <div class="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-0.5">
