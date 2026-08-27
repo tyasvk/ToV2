@@ -15,7 +15,7 @@ const safeTryout = computed(() => props.tryout || {});
 
 const search = ref('');
 const scope = ref('nasional'); // nasional, provinsi, instansi
-const itemsPerPage = ref(20); // Diubah default ke 20
+const itemsPerPage = ref(20); 
 const currentPage = ref(1);
 
 // --- HELPER DATA ---
@@ -76,7 +76,7 @@ const scopeRanked = computed(() => {
         list = list.filter(u => getAgency(u).toLowerCase() === myAgency);
     }
     
-    // Beri nomor urut statis
+    // Beri nomor urut statis sesuai kategori scope aktif
     return list.map((user, index) => ({
         ...user,
         displayRank: index + 1 
@@ -117,7 +117,6 @@ const activeMyRank = computed(() => {
     <Head :title="`Peringkat - ${safeTryout?.title}`" />
 
     <AuthenticatedLayout>
-        <!-- Background transparan menyatu dengan layout utama -->
         <div class="min-h-screen bg-transparent w-full pb-36 animate-in fade-in duration-500 overflow-x-hidden">
             
             <div class="max-w-5xl mx-auto px-3 sm:px-6 pt-4 md:pt-8 space-y-5 relative">
@@ -164,21 +163,19 @@ const activeMyRank = computed(() => {
                 </div>
 
                 <!-- ============================================== -->
-                <!-- DAFTAR PERINGKAT (PURE LIST NO AVATAR)         -->
+                <!-- DAFTAR PERINGKAT KARTU (CARD LIST)             -->
                 <!-- ============================================== -->
                 <div class="space-y-3 relative z-10 pt-2">
                     <div v-if="paginatedRankings.length === 0" class="text-center py-12 bg-white rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-slate-100">
-                        <p class="text-[13px] text-slate-500 font-medium">Tidak ada data peserta ditemukan.</p>
+                        <p class="text-[13px] text-slate-500 font-medium">Tidak ada data peserta ditemukan pada kategori ini.</p>
                     </div>
 
                     <div v-for="(rank) in paginatedRankings" :key="'rank-'+rank.id" 
                          class="bg-white rounded-[20px] p-4 sm:p-5 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all"
                          :class="rank.is_me ? 'ring-2 ring-[#007AFF] bg-[#F0F4FF] border-transparent' : 'border-slate-100/80 hover:shadow-[0_4px_16px_rgba(0,0,0,0.04)]'">
                         
-                        <!-- Info Peserta (Tanpa Icon/Avatar) -->
+                        <!-- Info Peserta -->
                         <div class="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
-                            
-                            <!-- Nomor Peringkat dengan Warna Khusus 1, 2, 3 -->
                             <div class="w-10 h-10 sm:w-12 sm:h-12 shrink-0 rounded-full flex items-center justify-center font-black text-[14px] sm:text-[16px] shadow-sm tabular-nums"
                                  :class="{
                                      'bg-[#FBBF24] text-amber-900 border border-amber-300': rank.displayRank === 1 && !search,
@@ -208,7 +205,6 @@ const activeMyRank = computed(() => {
 
                         <!-- Rincian Nilai & Status -->
                         <div class="flex items-center justify-between sm:justify-end gap-4 sm:gap-6 pl-[3.8rem] sm:pl-0 pt-3 sm:pt-0 border-t border-slate-100 sm:border-0">
-                            <!-- Rincian TWK TIU TKP -->
                             <div class="flex gap-1.5 sm:gap-2">
                                 <div class="flex flex-col items-center justify-center w-11 sm:w-14 h-11 sm:h-12 bg-[#F5F5F7] rounded-[10px]">
                                     <span class="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase">TWK</span>
@@ -224,7 +220,6 @@ const activeMyRank = computed(() => {
                                 </div>
                             </div>
 
-                            <!-- Total & Lulus/Gagal -->
                             <div class="flex flex-col items-end min-w-[60px] sm:min-w-[80px]">
                                 <span class="text-[20px] sm:text-[24px] font-black tracking-tight tabular-nums leading-none" :class="rank.is_passed ? 'text-emerald-600' : 'text-slate-800'">
                                     {{ rank.score }}
@@ -266,7 +261,6 @@ const activeMyRank = computed(() => {
                     <div class="bg-white/95 backdrop-blur-xl border border-slate-200/80 shadow-[0_8px_30px_rgba(0,0,0,0.12)] rounded-[24px] p-3 sm:p-4 w-full flex items-center justify-between gap-3 sm:gap-4 ring-1 ring-white/50">
                         
                         <div class="flex items-center gap-2.5 sm:gap-4 min-w-0">
-                            <!-- Bulatan Biru Menampilkan Nomor Peringkat Asli -->
                             <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[#007AFF] text-white flex items-center justify-center font-black text-[14px] sm:text-[17px] shadow-sm shrink-0 tabular-nums px-1">
                                 {{ activeMyRank.displayRank }}
                             </div>

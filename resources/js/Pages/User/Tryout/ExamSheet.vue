@@ -1,6 +1,6 @@
 <script setup>
 import { Head, router, usePage } from '@inertiajs/vue3';
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
 import axios from 'axios';
 
 const props = defineProps({
@@ -18,8 +18,8 @@ const page = usePage();
 const currentIndex = ref(0);
 const answers = ref({});
 const isSidebarOpen = ref(false); 
+const isShortQuestion = ref(false); // Deteksi baris soal
 
-// LOGIKA PENGUNCI TIMER (Mencegah bug waktu melebihi durasi asli)
 const maxDurationSeconds = (props.tryout?.duration || 100) * 60; 
 let initialSeconds = maxDurationSeconds;
 
@@ -43,33 +43,40 @@ const currentQuestion = computed(() => {
     return props.questions[currentIndex.value] || null;
 });
 
+// Deteksi tinggi konten soal saat berganti soal
+watch(currentIndex, async () => {
+    await nextTick();
+    const qContent = document.getElementById('question-content');
+    if (qContent) {
+        // Jika tinggi soal kurang dari 50px (biasanya 1-2 baris), set isShortQuestion = true
+        isShortQuestion.value = qContent.offsetHeight < 50;
+    }
+});
+
 const subtestLabel = computed(() => {
     const type = currentQuestion.value?.type;
     if (type === 'TWK') return 'Tes Wawasan Kebangsaan - TWK';
     if (type === 'TIU') return 'Tes Intelegensia Umum - TIU';
-    if (type === 'TKP') return 'Tes Karakteristik Pribadi - TCP';
+    if (type === 'TKP') return 'Tes Karakteristik Pribadi - TKP';
     return type || '-';
 });
 
 const answeredCount = computed(() => {
     if (!props.questions) return 0;
-    // Hanya hitung jawaban yang ID-nya benar-benar ada di daftar soal saat ini
     return props.questions.filter(q => answers.value[q.id] !== undefined && answers.value[q.id] !== null && answers.value[q.id] !== '').length;
 });
 const unansweredCount = computed(() => (props.questions?.length || 0) - answeredCount.value);
 
 // --- 2. LOGIKA LIFECYCLE ---
 onMounted(() => {
-    // Mencegat perpindahan halaman, baik dari tombol kembali browser maupun menu internal aplikasi
     unregisterInertiaHook = router.on('before', (event) => {
         if (isAllowLeave.value) return true; 
         
-        event.preventDefault(); // Batalkan perpindahan instan
-        showConfirmModal.value = true; // Munculkan modal konfirmasi kustom dengan informasi soal belum dijawab
+        event.preventDefault(); 
+        showConfirmModal.value = true; 
         return false;
     });
 
-    // Deteksi Penalti Sesi 3x Kesempatan Masuk
     const tabSessionKey = `exam_active_tab_${props.attempt?.id}`;
     const isRefreshed = sessionStorage.getItem(tabSessionKey);
 
@@ -84,7 +91,6 @@ onMounted(() => {
     }
     sessionStorage.setItem(tabSessionKey, '1');
 
-    // Load Jawaban & Indeks Terakhir
     props.questions?.forEach(q => {
         if (q.user_answer) answers.value[q.id] = q.user_answer;
     });
@@ -93,9 +99,14 @@ onMounted(() => {
     if (savedAnswers) answers.value = { ...answers.value, ...JSON.parse(savedAnswers) };
     
     const savedIndex = localStorage.getItem(indexKey.value);
-    if (savedIndex) currentIndex.value = parseInt(savedIndex);
+    if (savedIndex) {
+        currentIndex.value = parseInt(savedIndex);
+    } else {
+        // Trigger watch untuk hitung tinggi konten awal
+        const qContent = document.getElementById('question-content');
+        if (qContent) isShortQuestion.value = qContent.offsetHeight < 50;
+    }
     
-    // Timer Realtime Countdown
     timer = setInterval(() => {
         if (timeLeft.value > 0) {
             timeLeft.value--;
@@ -140,13 +151,8 @@ const autoSubmit = () => {
     });
 };
 
-const finishExam = () => {
-    showConfirmModal.value = true;
-};
-
-const cancelLeave = () => {
-    showConfirmModal.value = false;
-};
+const finishExam = () => showConfirmModal.value = true;
+const cancelLeave = () => showConfirmModal.value = false;
 
 const goTo = (index) => { 
     currentIndex.value = index; 
@@ -280,9 +286,12 @@ const formatTime = (seconds) => {
                                 <img :src="'/storage/' + currentQuestion.image" class="w-full h-auto bg-slate-50 p-1" alt="Gambar Soal">
                             </div>
 
-                            <div class="text-xs sm:text-sm leading-relaxed text-slate-700 mb-5 font-normal whitespace-pre-wrap select-none" v-html="currentQuestion?.content"></div>
+                            <div id="question-content" class="text-xs sm:text-sm leading-relaxed text-slate-700 font-normal whitespace-pre-wrap select-none html-content" 
+                                 :class="isShortQuestion ? 'mb-2' : 'mb-6'"
+                                 v-html="currentQuestion?.content"></div>
                             
-                            <div class="space-y-2 mt-auto">
+                            <!-- Margin/Padding Dinamis ke Atas (Bila Soal Pendek) -->
+                            <div class="space-y-2" :class="isShortQuestion ? 'mt-2' : 'mt-auto'">
                                 <label v-for="(option, key) in currentQuestion?.options" :key="key" 
                                     class="flex items-start gap-3 p-2.5 sm:p-3 rounded-xl border cursor-pointer transition-all active:scale-[0.99]"
                                     :class="answers[currentQuestion?.id] === key ? 'bg-blue-50/50 border-blue-300 ring-1 ring-blue-100' : 'border-slate-200 hover:bg-slate-50'">
@@ -295,7 +304,8 @@ const formatTime = (seconds) => {
                                     </div>
 
                                     <div class="flex-1 flex flex-col">
-                                        <span v-if="option" class="text-xs sm:text-sm font-normal text-slate-600 leading-relaxed">{{ option }}</span>
+                                        <!-- OPSI MENGGUNAKAN v-html KARENA DARI EDITOR (MENDUKUNG LATEX & HTML) -->
+                                        <div v-if="option" class="text-xs sm:text-sm font-normal text-slate-600 leading-relaxed html-content" v-html="option"></div>
                                         
                                         <div v-if="currentQuestion?.option_images && currentQuestion.option_images[key]" class="mt-2">
                                             <img :src="'/storage/' + currentQuestion.option_images[key]" 
@@ -325,6 +335,7 @@ const formatTime = (seconds) => {
             </section>
         </main>
 
+        <!-- Modal Konfirmasi Selesai Ujian -->
         <div v-if="showConfirmModal" class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm transition-opacity">
             <div class="bg-white rounded-2xl shadow-xl max-w-sm w-full overflow-hidden animate-in">
                 <div class="bg-rose-50 p-4 border-b border-rose-100 flex items-center justify-center gap-2 text-rose-600">
@@ -358,6 +369,21 @@ const formatTime = (seconds) => {
 </template>
 
 <style scoped>
+/* Pengaturan QuillEditor Output agar opsi jawaban rata dan inline */
+.html-content :deep(p) {
+    margin: 0;
+    display: inline;
+}
+.html-content :deep(img) {
+    max-height: 120px;
+    width: auto;
+    border-radius: 6px;
+    display: inline-block;
+    vertical-align: middle;
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+
 .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }

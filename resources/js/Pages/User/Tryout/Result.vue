@@ -8,6 +8,7 @@ const props = defineProps({
     tryout: Object,
     totalScore: Number,
     scoreDetails: Array,
+    materialScores: Object, // Prop baru untuk data analisis materi
     ranking: Object,
     timeStats: Object, 
     backUrl: String,
@@ -28,24 +29,24 @@ const formatTime = (seconds) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = Math.floor(seconds % 60);
-    
+
     if (h > 0) return `${h}j ${m}m ${s}d`;
     if (m > 0) return `${m}m ${s}d`;
     return `${s} detik`;
 };
+
+// Logika Akordion Analisis Materi
+const activeMaterialTab = ref('TWK');
 </script>
 
 <template>
     <Head title="Hasil Tryout" />
 
     <AuthenticatedLayout>
-        <!-- Background transparan menyatu dengan layout utama -->
         <div class="min-h-screen bg-transparent w-full pb-24 md:pb-12 animate-in fade-in duration-500 overflow-x-hidden">
-            
-            <!-- Padding dan margin disamakan dengan Katalog -->
+
             <div class="max-w-4xl mx-auto px-3 sm:px-4 md:px-5 pt-4 md:pt-6 space-y-4">
 
-                <!-- HEADER & KEMBALI -->
                 <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
                     <div>
                         <Link :href="dynamicBackUrl" class="inline-flex items-center gap-1 text-[#007AFF] hover:underline text-[13px] md:text-[14px] font-bold transition-opacity mb-2">
@@ -58,9 +59,7 @@ const formatTime = (seconds) => {
                     </div>
                 </div>
 
-                <!-- CARD 1: TOTAL SKOR & STATUS -->
                 <div class="bg-white rounded-[20px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100/50 overflow-hidden relative">
-                    <!-- Efek Gradasi Halus di Pojok -->
                     <div class="absolute -top-16 -right-16 w-48 h-48 rounded-full blur-[60px] opacity-20 pointer-events-none" :class="attempt.is_passed ? 'bg-emerald-500' : 'bg-rose-500'"></div>
 
                     <div class="p-5 md:p-6 flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
@@ -108,13 +107,12 @@ const formatTime = (seconds) => {
                     </div>
                 </div>
 
-                <!-- CARD 2: RINCIAN NILAI -->
                 <div class="bg-white rounded-[20px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100/50 p-5 md:p-6">
                     <h3 class="text-[12px] font-bold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2.5 mb-4">Rincian Ambang Batas</h3>
-                    
+
                     <div class="space-y-4">
                         <div v-for="(detail, index) in scoreDetails" :key="index" class="bg-[#F5F5F7]/80 rounded-[16px] p-3.5 border border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
-                            
+
                             <div class="flex-1">
                                 <div class="flex items-center justify-between mb-1.5">
                                     <h4 class="font-semibold text-slate-900 text-[13px] md:text-[14px]">{{ detail.category }}</h4>
@@ -122,13 +120,12 @@ const formatTime = (seconds) => {
                                         {{ detail.is_passed ? 'Lulus' : 'Gagal' }}
                                     </span>
                                 </div>
-                                
+
                                 <div class="w-full bg-[#E3E3E8] rounded-full h-2.5 mb-1.5 relative overflow-hidden">
                                     <div class="h-2.5 rounded-full transition-all duration-1000" 
                                          :class="detail.is_passed ? 'bg-emerald-500' : 'bg-rose-500'" 
                                          :style="`width: ${Math.min(100, (detail.score / (detail.passing_grade * 1.5)) * 100)}%`">
                                     </div>
-                                    <!-- Garis Passing Grade -->
                                     <div class="absolute top-0 bottom-0 border-l-[3px] border-slate-900 z-10" :style="`left: ${(detail.passing_grade / (detail.passing_grade * 1.5)) * 100}%`"></div>
                                 </div>
                                 <p class="text-[10px] text-slate-500 font-medium">Garis hitam menunjukkan Passing Grade ({{ detail.passing_grade }})</p>
@@ -144,12 +141,39 @@ const formatTime = (seconds) => {
                     </div>
                 </div>
 
-                <!-- ========================================== -->
-                <!-- TOMBOL AKSI (TERKUNCI JIKA AKSES GRATIS)   -->
-                <!-- ========================================== -->
+                <div class="bg-white rounded-[20px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100/50 p-5 md:p-6">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-4">
+                        <h3 class="text-[12px] font-bold text-slate-900 uppercase tracking-widest">Analisis Materi</h3>
+                    </div>
+
+                    <div class="flex bg-[#F2F2F7] p-1 rounded-[12px] mb-4">
+                        <button @click="activeMaterialTab = 'TWK'" :class="activeMaterialTab === 'TWK' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'" class="flex-1 py-1.5 rounded-[8px] text-[12px] font-bold transition-all">TWK</button>
+                        <button @click="activeMaterialTab = 'TIU'" :class="activeMaterialTab === 'TIU' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'" class="flex-1 py-1.5 rounded-[8px] text-[12px] font-bold transition-all">TIU</button>
+                        <button @click="activeMaterialTab = 'TKP'" :class="activeMaterialTab === 'TKP' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'" class="flex-1 py-1.5 rounded-[8px] text-[12px] font-bold transition-all">TKP</button>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div v-for="(data, topic) in materialScores[activeMaterialTab]" :key="topic" class="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                            <div class="min-w-0 flex-1">
+                                <h4 class="text-[13px] font-semibold text-slate-800 truncate">{{ topic }}</h4>
+                                <div class="w-full bg-[#E3E3E8] rounded-full h-1.5 mt-2 overflow-hidden">
+                                    <div class="h-1.5 rounded-full bg-[#007AFF]" :style="`width: ${Math.min(100, (data.score / data.max_score) * 100)}%`"></div>
+                                </div>
+                            </div>
+                            <div class="ml-4 text-right shrink-0">
+                                <span class="text-[15px] font-black text-slate-900">{{ data.score }}</span>
+                                <span class="text-[11px] font-medium text-slate-500 block">/ {{ data.max_score }}</span>
+                            </div>
+                        </div>
+
+                        <div v-if="Object.keys(materialScores[activeMaterialTab] || {}).length === 0" class="text-center py-6">
+                            <p class="text-[12px] text-slate-400 font-medium">Belum ada analisis materi untuk subtes ini.</p>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="flex flex-col sm:flex-row gap-2.5 pt-2 pb-6">
-                    
-                    <!-- TOMBOL PEMBAHASAN -->
+
                     <button v-if="!hasFullAccess" @click="showUpgradeModal = true" class="flex-1 flex justify-center items-center gap-1.5 py-3 bg-[#F2F2F7] hover:bg-[#E3E3E8] text-slate-400 text-[13px] font-semibold rounded-full transition-colors active:scale-95">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                         Pembahasan
@@ -157,8 +181,7 @@ const formatTime = (seconds) => {
                     <Link v-else :href="route('tryout.review', attempt.id)" class="flex-1 flex justify-center items-center py-3 bg-slate-900 hover:bg-slate-800 text-white text-[13px] font-semibold rounded-full shadow-sm transition-colors active:scale-95">
                         Lihat Pembahasan
                     </Link>
-                    
-                    <!-- TOMBOL PERINGKAT -->
+
                     <button v-if="!hasFullAccess" @click="showUpgradeModal = true" class="flex-1 flex justify-center items-center gap-1.5 py-3 bg-[#F2F2F7] hover:bg-[#E3E3E8] text-slate-400 text-[13px] font-semibold rounded-full transition-colors active:scale-95">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                         Papan Peringkat
@@ -167,7 +190,6 @@ const formatTime = (seconds) => {
                         Lihat Peringkat
                     </Link>
 
-                    <!-- TOMBOL SERTIFIKAT -->
                     <button v-if="!hasFullAccess" @click="showUpgradeModal = true" class="flex-1 flex justify-center items-center gap-1.5 py-3 bg-[#F2F2F7] hover:bg-[#E3E3E8] text-slate-400 text-[13px] font-semibold rounded-full transition-colors active:scale-95">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                         Sertifikat
@@ -183,13 +205,10 @@ const formatTime = (seconds) => {
             </div>
         </div>
 
-        <!-- ============================================== -->
-        <!-- MODAL POP-UP UPGRADE PREMIUM                   -->
-        <!-- ============================================== -->
         <Teleport to="body">
             <div v-if="showUpgradeModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
                 <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" @click="showUpgradeModal = false"></div>
-                
+
                 <div class="relative bg-white rounded-[24px] p-6 md:p-8 max-w-sm w-full text-center shadow-2xl animate-in zoom-in-95 duration-200 z-10">
                     <div class="w-14 h-14 bg-[#F5F5F7] rounded-full flex items-center justify-center text-2xl mx-auto mb-4">
                         🔒

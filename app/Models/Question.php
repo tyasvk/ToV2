@@ -15,6 +15,7 @@ class Question extends Model
         'options', 
         'option_images', // <--- TAMBAHKAN INI DI SINI
         'correct_answer', 
+        'sub_category', // <--- TAMBAHKAN INI
         'tkp_scores', 
         'explanation',
         'order',

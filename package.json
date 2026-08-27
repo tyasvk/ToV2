@@ -24,9 +24,11 @@
     "dependencies": {
         "@heroicons/vue": "^2.2.0",
         "@vueup/vue-quill": "^1.5.3",
+        "apexcharts": "^7.0.0",
         "dayjs": "^1.11.19",
         "lodash": "^4.17.23",
         "sweetalert2": "^11.26.17",
+        "vue3-apexcharts": "^1.11.1",
         "vuedraggable": "^4.1.0"
     }
 }

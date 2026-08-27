@@ -40,85 +40,108 @@ class TryoutController extends Controller
     }
 
     /**
+     * Fitur khusus Member Adidaya (Premium) untuk mengklaim TO ke Milik Saya secara gratis
+     */
+    public function claimTryout(Tryout $tryout)
+    {
+        $user = auth()->user();
+        
+        // Pastikan dia benar-benar member aktif
+        if (!$user->membership_expires_at || now()->greaterThan($user->membership_expires_at)) {
+            return back()->with('error', 'Fitur klaim ini hanya untuk member Adidaya aktif.');
+        }
+
+        // Cek apakah sudah pernah diklaim sebelumnya (mencegah double klik)
+        $exists = Transaction::where('user_id', $user->id)->where('tryout_id', $tryout->id)->where('status', 'paid')->exists();
+        if ($exists) {
+            return back()->with('success', 'Tryout sudah berhasil diklaim sebelumnya.');
+        }
+
+        // Buat record transaksi 'Klaim Gratis'
+        Transaction::create([
+            'user_id' => $user->id,
+            'tryout_id' => $tryout->id,
+            'invoice_code' => 'CLAIM-' . strtoupper(Str::random(10)),
+            'unit_price' => 0,
+            'qty' => 1,
+            'amount' => 0,
+            'participants_data' => [$user->email],
+            'status' => 'paid', // Langsung lunas karena member
+            'metadata' => [
+                'note' => 'Klaim otomatis member Adidaya'
+            ]
+        ]);
+
+        return back()->with('success', 'Tryout berhasil diklaim ke daftar Milik Saya!');
+    }
+
+    /**
      * Gabungan Katalog & Tryout Saya
      */
 public function index(Request $request)
     {
         $user = auth()->user();
         $userId = $user->id; 
-        $userEmail = $user->email; // Tambahan untuk cek transaksi
+        $userEmail = $user->email; 
         $isPremiumMember = $user->membership_expires_at && now()->lt($user->membership_expires_at);
 
-        // --- 1. DATA KATALOG (Belum Dibeli & Belum Pernah Dikerjakan) ---
+        // --- QUERY DASAR UNTUK TO YANG SUDAH JADI "MILIK SAYA" ---
+        // (Berlaku untuk semua user, baik gratis maupun premium)
+        $ownedTryoutIdsQuery = function($q) use ($user, $userId, $userEmail) {
+            // 1. Pernah dibeli (transaksi sukses) / Diklaim Premium (Transaksi harga 0 status paid)
+            $q->whereHas('transactions', function($tQ) use ($user, $userEmail) {
+                $tQ->whereIn('status', ['paid', 'success'])
+                  ->where(function($sq) use ($user, $userEmail) {
+                      $sq->where('user_id', $user->id)
+                         ->orWhereJsonContains('participants_data', $userEmail);
+                  });
+            })
+            // 2. ATAU pernah dikerjakan (ada di tabel exam_attempts)
+            ->orWhereHas('examAttempts', function($eQ) use ($userId) {
+                $eQ->where('user_id', $userId);
+            })
+            // 3. ATAU pengajuan gratis disetujui
+            ->orWhereIn('id', function($sub) use ($userId) {
+                $sub->select('tryout_id')
+                    ->from('tryout_registrations')
+                    ->where('user_id', $userId)
+                    ->where('status', 'approved');
+            });
+        };
+
+        // --- 1. DATA KATALOG (TO Tersedia yang BELUM dimiliki) ---
         $catalogTryouts = Tryout::query()
             ->where('is_published', true)
             ->where(function ($query) {
                 $query->whereNotIn('type', ['akbar', 'adidaya'])->orWhereNull('type');
             })
-            ->whereDoesntHave('transactions', function($q) use ($user) {
-                $q->whereIn('status', ['paid', 'success'])
-                  ->where(function($subQuery) use ($user) {
-                      $subQuery->where('user_id', $user->id)
-                               ->orWhereJsonContains('participants_data', $user->email);
-                  });
-            })
-            ->whereDoesntHave('examAttempts', function($q) use ($userId) {
-                $q->where('user_id', $userId);
-            })
-            // JANGAN tampilkan di katalog jika pengajuan gratisnya sudah disetujui (karena akan pindah ke Milik Saya)
-            ->whereNotIn('id', function($q) use ($userId) {
-                $q->select('tryout_id')
-                  ->from('tryout_registrations')
-                  ->where('user_id', $userId)
-                  ->where('status', 'approved');
+            // Kecualikan semua TO yang masuk kategori "Milik Saya"
+            ->where(function($q) use ($ownedTryoutIdsQuery) {
+                $q->whereNot(function($subQ) use ($ownedTryoutIdsQuery) {
+                    $ownedTryoutIdsQuery($subQ);
+                });
             })
             ->when($request->search, fn($q, $s) => $q->where('title', 'like', "%{$s}%"))
             ->latest()
             ->get();
 
-        // --- 2. DATA TRYOUT SAYA (Sudah Dibeli ATAU Pernah Dikerjakan Gratis) ---
-        $myTryoutsQuery = Tryout::query()
+        // --- 2. DATA TRYOUT SAYA ---
+        $myTryouts = Tryout::query()
             ->where('is_published', true)
             ->where(function ($query) {
                 $query->whereNotIn('type', ['akbar', 'adidaya'])->orWhereNull('type');
-            });
-
-        if ($isPremiumMember) {
-            $myTryoutsQuery->withCount(['examAttempts as attempts_count' => function($q) use ($userId) {
+            })
+            ->where(function($q) use ($ownedTryoutIdsQuery) {
+                $ownedTryoutIdsQuery($q);
+            })
+            ->withCount(['examAttempts as attempts_count' => function($q) use ($userId) {
                 $q->where('user_id', $userId);
-            }]);
-        } else {
-            $myTryoutsQuery->where(function($q) use ($user, $userId) {
-                // Pernah beli
-                $q->whereHas('transactions', function($tQ) use ($user) {
-                    $tQ->whereIn('status', ['paid', 'success'])
-                      ->where(function($sq) use ($user) {
-                          $sq->where('user_id', $user->id)
-                            ->orWhereJsonContains('participants_data', $user->email);
-                      });
-                })
-                // ATAU pernah dikerjakan secara gratis
-                ->orWhereHas('examAttempts', function($eQ) use ($userId) {
-                    $eQ->where('user_id', $userId);
-                })
-                // TAMPILKAN di Milik Saya jika pengajuan gratis disetujui admin
-                ->orWhereIn('id', function($sub) use ($userId) {
-                    $sub->select('tryout_id')
-                        ->from('tryout_registrations')
-                        ->where('user_id', $userId)
-                        ->where('status', 'approved');
-                });
-            })->withCount(['examAttempts as attempts_count' => function($q) use ($userId) {
-                $q->where('user_id', $userId);
-            }]);
-        }
-
-        $myTryouts = $myTryoutsQuery
+            }])
             ->when($request->search, fn($q, $s) => $q->where('title', 'like', "%{$s}%"))
             ->latest()
             ->get();
 
-        // --- TAMBAHAN: LOGIKA UNTUK MENENTUKAN SISA KESEMPATAN DI TAB "MILIK SAYA" ---
+        // --- LOGIKA SISA KESEMPATAN MILIK SAYA ---
         $myTryouts->transform(function ($tryout) use ($userId, $userEmail, $isPremiumMember) {
             $hasPremium = false;
             if ($isPremiumMember) {
@@ -133,13 +156,9 @@ public function index(Request $request)
                     ->exists();
             }
 
-            // Batas maksimal: 3x untuk Premium, 1x untuk Gratis
             $maxAttempts = $hasPremium ? 3 : 1;
-            if ($tryout->type === 'akbar') {
-                $maxAttempts = 1;
-            }
+            if ($tryout->type === 'akbar') $maxAttempts = 1;
 
-            // Memasukkan data ke dalam objek Vue
             $tryout->user_access_type = $hasPremium ? 'Premium' : 'Gratis';
             $tryout->max_attempts = $maxAttempts;
             $tryout->remaining_attempts = max(0, $maxAttempts - $tryout->attempts_count);
@@ -389,7 +408,7 @@ public function index(Request $request)
         ]);
     }
 
-public function myTryouts(Request $request)
+    public function myTryouts(Request $request)
     {
         $user = auth()->user();
         $userEmail = $user->email;
@@ -667,6 +686,66 @@ public function myTryouts(Request $request)
         ]);
     }
 
+/**
+     * Menampilkan Halaman Peringkat Nasional (Dropdown Tryout & Tab)
+     */
+    public function ranking(\Illuminate\Http\Request $request)
+    {
+        // 1. Ambil daftar Tryout aktif untuk Dropdown
+        $tryouts = \App\Models\Tryout::where('is_active', true)
+            ->orderBy('created_at', 'desc')
+            ->get(['id', 'title']);
+
+        $leaderboard = collect([]);
+        $selectedTryoutId = $request->tryout_id;
+
+        if ($selectedTryoutId) {
+            // 2. Ambil SEMUA data peserta untuk tryout ini
+            $query = \App\Models\ExamAttempt::with('user')
+                ->where('tryout_id', $selectedTryoutId)
+                ->whereNotNull('completed_at');
+
+            // 3. Eksekusi dan Sorting BKN
+            $leaderboard = $query->get()
+                ->groupBy('user_id')
+                ->map(function ($attempts) {
+                    return $attempts->sortByDesc('total_score')->first();
+                })
+                ->sortByDesc(function ($attempt) {
+                    return sprintf('%03d%03d%03d%03d', 
+                        $attempt->total_score, 
+                        $attempt->tkp_score, 
+                        $attempt->tiu_score, 
+                        $attempt->twk_score
+                    );
+                })
+                ->values() 
+                ->map(function ($attempt, $index) {
+                    $namaInstansi = $attempt->user->agency_name ?? 'Instansi belum diatur';
+
+                    return [
+                        'rank' => $index + 1, // Peringkat Nasional Asli
+                        'user_name' => $attempt->user->name ?? 'Anonim', 
+                        'instansi' => $namaInstansi,
+                        'agency_name' => $namaInstansi, // Dikirim untuk difilter Vue
+                        'province_code' => $attempt->user->province_code ?? null, // Dikirim untuk difilter Vue
+                        'is_current_user' => $attempt->user_id === auth()->id(),
+                        'total_score' => $attempt->total_score,
+                        'twk_score' => $attempt->twk_score,
+                        'tiu_score' => $attempt->tiu_score,
+                        'tkp_score' => $attempt->tkp_score,
+                        'is_passed' => $attempt->is_passed,
+                    ];
+                });
+        }
+
+        return \Inertia\Inertia::render('User/Ranking/Index', [
+            'tryouts' => $tryouts,
+            'leaderboard' => $leaderboard,
+            'selectedTryoutId' => (int) $selectedTryoutId,
+        ]);
+    }
+
     public function exam(Tryout $tryout)
     {
         $check = $this->validateAccess($tryout);
@@ -851,11 +930,12 @@ public function myTryouts(Request $request)
         ]);
     }
 
-    public function result(ExamAttempt $attempt)
+public function result(ExamAttempt $attempt)
     {
         if ($attempt->user_id !== auth()->id()) abort(403);
         
-        $attempt->load('tryout');
+        // Memuat tryout beserta soalnya untuk menghitung sub-materi
+        $attempt->load(['tryout', 'tryout.questions']);
         $tryout = $attempt->tryout;
 
         $backUrl = ($tryout->type === 'akbar') 
@@ -897,6 +977,30 @@ public function myTryouts(Request $request)
             ['category' => 'Tes Karakteristik Pribadi (TKP)', 'score' => $attempt->tkp_score, 'passing_grade' => $pgTkp, 'is_passed' => $attempt->tkp_score >= $pgTkp]
         ];
 
+        // --- TAMBAHAN: KALKULASI SKOR MATERI / SUB-KATEGORI ---
+        $answers = is_string($attempt->answers) ? json_decode($attempt->answers, true) : ($attempt->answers ?? []);
+        $materialScores = ['TWK' => [], 'TIU' => [], 'TKP' => []];
+
+        foreach ($tryout->questions as $q) {
+            $topic = $q->sub_category ?? 'Umum'; 
+            $ans = $answers[$q->id] ?? null;
+            
+            if (!isset($materialScores[$q->type][$topic])) {
+                $materialScores[$q->type][$topic] = ['score' => 0, 'max_score' => 0];
+            }
+
+            if ($q->type === 'TKP') {
+                $tkpScoreMap = is_string($q->tkp_scores) ? json_decode($q->tkp_scores, true) : $q->tkp_scores;
+                $materialScores[$q->type][$topic]['score'] += (int) ($tkpScoreMap[$ans] ?? 0);
+                $materialScores[$q->type][$topic]['max_score'] += 5; // Nilai max per soal TKP adalah 5
+            } else {
+                $materialScores[$q->type][$topic]['max_score'] += 5;
+                if ((string)$ans === (string)$q->correct_answer) {
+                    $materialScores[$q->type][$topic]['score'] += 5;
+                }
+            }
+        }
+
         $attempt->status = $attempt->is_passed ? 'lulus' : 'tidak_lulus';
 
         $durationSeconds = 0;
@@ -925,6 +1029,7 @@ public function myTryouts(Request $request)
             'tryout' => $tryout,
             'totalScore' => $attempt->total_score,
             'scoreDetails' => $scoreDetails,
+            'materialScores' => $materialScores, // --- DATA INI DIKIRIM KE VUE ---
             'ranking' => ['rank' => $rank, 'total_participants' => $totalParticipants],
             'timeStats' => $timeStats,
             'backUrl' => $backUrl,
@@ -1049,11 +1154,84 @@ public function myTryouts(Request $request)
         return redirect()->route('checkout.show', $transaction->id);
     }
 
-    public function leaderboard(Request $request, Tryout $tryout)
+    /**
+     * Menampilkan Halaman Grafik Analitik Perkembangan Nilai
+     */
+    public function progress()
+    {
+        $user = auth()->user();
+        
+        // Ambil semua TO yang sudah selesai dikerjakan, beserta relasi soalnya
+        $attempts = \App\Models\ExamAttempt::with('tryout.questions')
+            ->where('user_id', $user->id)
+            ->whereNotNull('completed_at')
+            ->orderBy('created_at', 'asc')
+            ->get();
+
+        $categories = [];
+        $seriesMain = [
+            'total' => [], 'twk' => [], 'tiu' => [], 'tkp' => []
+        ];
+        $subtests = [];
+
+        foreach ($attempts as $idx => $attempt) {
+            // Label nama TO di grafik (dibatasi 15 huruf agar rapi)
+            $title = $attempt->tryout->title ?? ('Tryout ' . ($idx + 1));
+            $shortTitle = \Illuminate\Support\Str::limit($title, 15);
+            
+            // Hindari nama duplikat di grafik jika user mengulang TO yang sama
+            $label = in_array($shortTitle, $categories) ? $shortTitle . ' (V'.($idx+1).')' : $shortTitle;
+            $categories[] = $label;
+
+            // Data Grafik Garis (Nilai Utama)
+            $seriesMain['total'][] = $attempt->total_score;
+            $seriesMain['twk'][] = $attempt->twk_score;
+            $seriesMain['tiu'][] = $attempt->tiu_score;
+            $seriesMain['tkp'][] = $attempt->tkp_score;
+
+            // --- KALKULASI SUBTES (Materi) ---
+            $answers = is_string($attempt->answers) ? json_decode($attempt->answers, true) : ($attempt->answers ?? []);
+            $tryoutQuestions = $attempt->tryout->questions ?? [];
+
+            $subtestScore = ['TWK' => [], 'TIU' => [], 'TKP' => []];
+
+            foreach ($tryoutQuestions as $q) {
+                // CATATAN: Ganti 'sub_category' di bawah ini dengan nama kolom materi/topik di tabel questions Anda.
+                // Jika tidak ada kolomnya, sistem otomatis mengubahnya menjadi 'Umum'.
+                $topic = $q->sub_category ?? $q->materi ?? $q->topic ?? 'Umum'; 
+                $ans = $answers[$q->id] ?? null;
+                
+                if (!isset($subtestScore[$q->type][$topic])) {
+                    $subtestScore[$q->type][$topic] = 0;
+                }
+
+                if ($q->type === 'TKP') {
+                    $tkpScoreMap = is_string($q->tkp_scores) ? json_decode($q->tkp_scores, true) : $q->tkp_scores;
+                    $subtestScore[$q->type][$topic] += (int) ($tkpScoreMap[$ans] ?? 0);
+                } else {
+                    if ((string)$ans === (string)$q->correct_answer) {
+                        $subtestScore[$q->type][$topic] += 5;
+                    }
+                }
+            }
+
+            $subtests[$label] = $subtestScore;
+        }
+
+        return \Inertia\Inertia::render('User/Analytics/Index', [
+            'chartData' => [
+                'categories' => $categories,
+                'main' => $seriesMain,
+                'subtests' => $subtests
+            ]
+        ]);
+    }
+
+public function leaderboard(Request $request, Tryout $tryout)
     {
         if (!$this->hasPremiumAccess($tryout)) {
             return redirect()->route('tryout.history.detail', $tryout->id)
-                ->with('error', 'Peringkat Nasional hanya tersedia untuk pengguna berbayar (Premium). Silakan beli paket ini terlebih dahulu.');
+                ->with('error', 'Papan Peringkat hanya tersedia untuk pengguna berbayar (Premium). Silakan beli paket ini terlebih dahulu.');
         }
 
         $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65; 
@@ -1065,6 +1243,7 @@ public function myTryouts(Request $request)
             ->orderBy('created_at', 'asc')
             ->get();
 
+        // Ambil pengerjaan pertama (atau terbaik) per user
         $firstAttempts = $allAttempts->groupBy('user_id')->map->first()->values();
 
         $rankings = $firstAttempts->map(function($a) use ($pgTwk, $pgTiu, $pgTkp) {
@@ -1073,10 +1252,8 @@ public function myTryouts(Request $request)
                 'id' => $a->id,
                 'user_id' => $a->user_id,
                 'name' => $a->user ? $a->user->name : 'User', 
-                'avatar' => $a->user ? $a->user->avatar : null,
-                'agency_name' => $a->user ? ($a->user->agency_name ?? $a->user->instansi) : null, 
+                'agency_name' => $a->user ? ($a->user->agency_name ?? $a->user->instansi) : 'Instansi belum diatur', 
                 'province_code' => $a->user ? $a->user->province_code : null,
-                'gender' => $a->user ? $a->user->gender : null, 
                 'score' => $a->total_score, 
                 'twk' => $a->twk_score, 
                 'tiu' => $a->tiu_score, 

@@ -4,14 +4,18 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 
 const props = defineProps({
     announcement: String,
+    manual_total_users: Number, // Tambahan prop untuk total user
     flash: Object
 });
 
 const form = useForm({
-    announcement: props.announcement || ''
+    announcement: props.announcement || '',
+    manual_total_users: props.manual_total_users || 0, // Inisialisasi dari prop
 });
 
 const submit = () => {
+    // Pastikan methodnya sesuai dengan route (put/post) di web.php Anda.
+    // Di kode lama Anda menggunakan put, jadi kita pertahankan put.
     form.put(route('admin.settings.update'), {
         preserveScroll: true,
     });
@@ -22,46 +26,86 @@ const submit = () => {
     <Head title="Pengaturan Sistem - Admin" />
 
     <AuthenticatedLayout>
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <!-- Background Abu-abu Sistem iCloud -->
+        <div class="w-full bg-[#F5F5F7] min-h-screen pb-20 md:pb-28 font-sans animate-in fade-in duration-500">
             
-            <div class="flex flex-col gap-1">
-                <h1 class="text-xl md:text-2xl font-medium text-slate-900 tracking-tight uppercase">Pengaturan Sistem</h1>
-                <p class="text-xs sm:text-sm text-slate-500 font-normal">
-                    Kelola pengaturan aplikasi, termasuk teks pengumuman untuk peserta.
-                </p>
-            </div>
+            <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 md:pt-10 space-y-6">
+                
+                <!-- HEADER -->
+                <div class="flex flex-col gap-1.5 px-2">
+                    <h1 class="text-[24px] sm:text-[32px] font-bold text-[#1D1D1F] tracking-tight leading-tight">Pengaturan Sistem</h1>
+                    <p class="text-[13px] sm:text-[14px] text-[#86868B] font-medium">
+                        Kelola pengaturan aplikasi, pengumuman, dan tampilan dashboard.
+                    </p>
+                </div>
 
-            <div v-if="flash?.success" class="p-4 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-600 text-xs font-medium shadow-sm">
-                {{ flash.success }}
-            </div>
-
-            <div class="bg-white border border-slate-200 rounded-[1.5rem] p-5 md:p-8 shadow-sm">
-                <form @submit.prevent="submit" class="space-y-5">
-                    <div>
-                        <label for="announcement" class="block text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-widest mb-2.5">
-                            Teks Pengumuman Dashboard
-                        </label>
-                        <textarea
-                            id="announcement"
-                            v-model="form.announcement"
-                            rows="4"
-                            placeholder="Ketikkan pengumuman yang ingin disampaikan ke peserta di sini..."
-                            class="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 focus:bg-white focus:ring-0 rounded-xl px-4 py-3 text-xs sm:text-sm font-normal text-slate-800 transition-colors resize-none"
-                        ></textarea>
-                        <p v-if="form.errors.announcement" class="text-[10px] text-rose-500 mt-1.5 font-medium">{{ form.errors.announcement }}</p>
-                        <p class="text-[10px] sm:text-[11px] text-slate-400 font-normal mt-2 leading-relaxed">
-                            Teks ini akan muncul di halaman depan dashboard semua peserta. Kosongkan lalu simpan jika Anda tidak ingin menampilkan pengumuman apa pun.
-                        </p>
+                <!-- ALERT SUCCESS -->
+                <div v-if="flash?.success" class="px-5 py-3.5 bg-[#E5F5EA] border border-[#34C759]/20 rounded-[16px] flex items-center gap-3 shadow-sm transition-all">
+                    <div class="w-7 h-7 rounded-full bg-[#34C759] flex items-center justify-center text-white shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
                     </div>
+                    <p class="text-[13px] font-bold text-[#1D1D1F]">{{ flash.success }}</p>
+                </div>
 
-                    <div class="flex justify-end pt-4 border-t border-slate-100">
-                        <button type="submit" :disabled="form.processing" class="w-full sm:w-auto px-6 py-3 bg-slate-900 text-white rounded-xl text-[10px] sm:text-xs font-medium uppercase tracking-wider hover:bg-blue-600 transition-colors disabled:opacity-50 shadow-sm active:scale-95">
-                            {{ form.processing ? 'Menyimpan...' : 'Simpan Pengaturan' }}
-                        </button>
-                    </div>
-                </form>
+                <!-- MAIN CARD -->
+                <div class="bg-white border border-black/5 rounded-[24px] md:rounded-[32px] p-6 md:p-10 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
+                    <form @submit.prevent="submit" class="space-y-8">
+                        
+                        <!-- Input Pengumuman -->
+                        <div>
+                            <label for="announcement" class="block text-[12px] sm:text-[13px] font-bold text-[#1D1D1F] mb-2">
+                                Teks Pengumuman Dashboard
+                            </label>
+                            <textarea
+                                id="announcement"
+                                v-model="form.announcement"
+                                rows="4"
+                                placeholder="Ketikkan pengumuman yang ingin disampaikan ke peserta di sini..."
+                                class="w-full bg-[#F5F5F7] border border-transparent focus:border-[#007AFF]/40 focus:bg-white focus:ring-4 focus:ring-[#007AFF]/10 rounded-[16px] px-4 py-3.5 text-[14px] font-medium text-[#1D1D1F] placeholder:text-[#86868B] transition-all resize-none shadow-inner"
+                            ></textarea>
+                            <p v-if="form.errors.announcement" class="text-[12px] text-[#FF3B30] mt-2 font-bold">{{ form.errors.announcement }}</p>
+                            <p class="text-[11px] sm:text-[12px] text-[#86868B] font-medium mt-2 leading-relaxed">
+                                Teks ini akan muncul di halaman depan dashboard semua peserta. Kosongkan lalu simpan jika Anda tidak ingin menampilkan pengumuman apa pun.
+                            </p>
+                        </div>
+
+                        <hr class="border-black/5">
+
+                        <!-- Input Manipulasi Total User -->
+                        <div>
+                            <label for="manual_total_users" class="block text-[12px] sm:text-[13px] font-bold text-[#1D1D1F] mb-2">
+                                Manipulasi Total User (Tampilan Dashboard)
+                            </label>
+                            <input
+                                id="manual_total_users"
+                                v-model="form.manual_total_users"
+                                type="number"
+                                min="0"
+                                placeholder="Contoh: 5000"
+                                class="w-full sm:w-1/2 bg-[#F5F5F7] border border-transparent focus:border-[#007AFF]/40 focus:bg-white focus:ring-4 focus:ring-[#007AFF]/10 rounded-[16px] px-4 py-3.5 text-[14px] font-bold text-[#1D1D1F] placeholder:text-[#86868B] transition-all shadow-inner"
+                            />
+                            <p v-if="form.errors.manual_total_users" class="text-[12px] text-[#FF3B30] mt-2 font-bold">{{ form.errors.manual_total_users }}</p>
+                            <p class="text-[11px] sm:text-[12px] text-[#86868B] font-medium mt-2 leading-relaxed">
+                                Isi dengan angka lebih dari <span class="font-bold">0</span> untuk mengganti angka asli. Biarkan <span class="font-bold">0</span> untuk menampilkan total user asli secara otomatis dari database.
+                            </p>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="flex justify-end pt-4">
+                            <button 
+                                type="submit" 
+                                :disabled="form.processing" 
+                                class="w-full sm:w-auto px-8 py-3.5 bg-[#007AFF] hover:bg-[#0062CC] text-white rounded-full text-[13px] font-bold transition-all disabled:opacity-50 shadow-[0_4px_14px_rgba(0,122,255,0.3)] active:scale-95 flex items-center justify-center gap-2"
+                            >
+                                <svg v-if="form.processing" class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                {{ form.processing ? 'Menyimpan...' : 'Simpan Pengaturan' }}
+                            </button>
+                        </div>
+
+                    </form>
+                </div>
+
             </div>
-
         </div>
     </AuthenticatedLayout>
 </template>

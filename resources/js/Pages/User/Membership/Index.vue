@@ -8,15 +8,13 @@ const page = usePage();
 const user = computed(() => page.props.auth.user);
 const isRefreshing = ref(false);
 
-// 1. PERBAIKAN: Fungsi Hard Refresh untuk membersihkan cache Inertia
-// Ini memaksa browser memuat data auth.user paling baru langsung dari database
+// Fungsi Refresh Inertia
 const refreshStatus = () => {
     isRefreshing.value = true;
     router.reload({
         only: ['auth'],
         onFinish: () => {
             isRefreshing.value = false;
-            // Fallback: Jika Inertia masih nge-cache, kita paksa browser reload penuh
             if (!isAdidayaActive.value) {
                 window.location.reload();
             }
@@ -24,27 +22,30 @@ const refreshStatus = () => {
     });
 };
 
-// Auto-refresh sekali saat halaman dimuat (berguna saat user baru saja di-redirect dari Payment Gateway)
 onMounted(() => {
     setTimeout(() => {
         router.reload({ only: ['auth'] });
-    }, 1500); // Jeda 1.5 detik memberi waktu bagi webhook backend untuk selesai memproses DB
+    }, 1500); 
 });
 
-// 2. LOGIKA TANGGAL ANTI-GAGAL
+// Pengurai Tanggal Anti-Gagal
+const getValidDate = (dateStr) => {
+    if (!dateStr) return null;
+    const cleanStr = String(dateStr).replace('T', ' ').replace('Z', '').split('.')[0].replace(/-/g, '/');
+    const d = new Date(cleanStr);
+    return isNaN(d.getTime()) ? null : d;
+};
+
 const isAdidayaActive = computed(() => {
     if (!user.value?.membership_expires_at) return false;
-    
-    // Konversi string tanggal dari database dengan aman
-    const expiryDate = new Date(user.value.membership_expires_at.replace(/-/g, '/').replace('T', ' '));
-    const now = new Date();
-    
-    return expiryDate.getTime() > now.getTime();
+    const expiryDate = getValidDate(user.value.membership_expires_at);
+    if (!expiryDate) return false;
+    return expiryDate > new Date();
 });
 
 const formatDate = (dateString) => {
-    if (!dateString) return '';
-    const d = new Date(dateString.replace(/-/g, '/').replace('T', ' '));
+    const d = getValidDate(dateString);
+    if (!d) return '';
     return d.toLocaleDateString('id-ID', {
         day: 'numeric',
         month: 'long',
@@ -83,12 +84,12 @@ const buyMembership = () => {
     if (!selectedPlan.value) return;
 
     Swal.fire({
-        title: 'Konfirmasi Lisensi',
-        text: `Anda memilih paket Adidaya ${selectedPlan.value.label}. Lanjutkan ke pembayaran?`,
+        title: 'Lanjutkan ke Checkout?',
+        text: `Anda akan diarahkan ke halaman checkout untuk memilih metode pembayaran (Dompet/QRIS).`,
         showCancelButton: true,
-        confirmButtonColor: '#1D1D1F',
+        confirmButtonColor: '#1D1D1F', 
         cancelButtonColor: '#F8FAFC',
-        confirmButtonText: 'Lanjutkan',
+        confirmButtonText: 'Lanjut Checkout',
         cancelButtonText: 'Batal', 
         reverseButtons: true,
         customClass: {
@@ -101,8 +102,8 @@ const buyMembership = () => {
     }).then((result) => {
         if (result.isConfirmed) {
             router.post(route('membership.buy'), { 
-                plan_id: selectedPlan.value.id,
-                payment_method: 'gateway' 
+                plan_id: selectedPlan.value.id
+                // Kita tidak lagi mengirim 'payment_method' di sini karena akan dipilih di Checkout
             });
         }
     });
@@ -122,10 +123,8 @@ const features = [
     <Head title="Membership Nusantara" />
 
     <AuthenticatedLayout>
-        <!-- Background Clean Premium -->
         <div class="w-full bg-[#F8FAFC] min-h-screen pb-16 md:pb-24 font-sans animate-in fade-in duration-500 relative overflow-hidden">
 
-            <!-- Pendaran Latar Belakang Sangat Halus -->
             <div class="fixed top-[-10%] right-[-10%] w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[100px] pointer-events-none z-0"></div>
             <div class="fixed bottom-[-10%] left-[-10%] w-[450px] h-[450px] bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none z-0"></div>
 
@@ -149,7 +148,6 @@ const features = [
                                     {{ isAdidayaActive ? 'Nusantara Adidaya' : 'Basic Member' }}
                                 </h2>
                                 
-                                <!-- Badge Status -->
                                 <div v-if="isAdidayaActive" class="inline-flex items-center justify-center sm:justify-start gap-1.5 mt-1 sm:mt-0">
                                     <span class="px-2.5 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full text-[10px] font-bold tracking-wide shadow-sm flex items-center gap-1.5">
                                         <span class="relative flex h-1.5 w-1.5">
@@ -167,7 +165,6 @@ const features = [
                         </div>
                     </div>
 
-                    <!-- TOMBOL REFRESH MANUAL (Hanya muncul jika belum aktif) -->
                     <div v-if="!isAdidayaActive" class="shrink-0 w-full sm:w-auto mt-2 sm:mt-0 border-t sm:border-t-0 border-slate-100 pt-3 sm:pt-0">
                         <button 
                             @click="refreshStatus" 
@@ -176,7 +173,7 @@ const features = [
                         >
                             <svg v-if="isRefreshing" class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                             <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
-                            {{ isRefreshing ? 'Mengecek...' : 'Cek Status Pembayaran' }}
+                            {{ isRefreshing ? 'Mengecek...' : 'Cek Status Akun' }}
                         </button>
                     </div>
 
@@ -210,7 +207,7 @@ const features = [
                             <div class="space-y-3.5">
                                 <div v-for="(feature, index) in features" :key="index" class="flex items-start gap-3">
                                     <div class="shrink-0 mt-0.5">
-                                        <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3">
+                                        <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" stroke-width="3">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                                         </svg>
                                     </div>
@@ -264,15 +261,11 @@ const features = [
                                 class="w-full py-4 rounded-full text-[14px] font-bold transition-all duration-300 flex items-center justify-center gap-2"
                             >
                                 <svg v-if="isAdidayaActive" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
-                                <span>{{ isAdidayaActive ? 'Lisensi Telah Aktif' : 'Lanjutkan Pembayaran' }}</span>
+                                <span>{{ isAdidayaActive ? 'Lisensi Telah Aktif' : 'Lanjutkan ke Checkout' }}</span>
                                 <svg v-if="!isAdidayaActive" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
                                 </svg>
                             </button>
-
-                            <p class="text-center text-[11px] text-slate-400 font-medium mt-3 px-2">
-                                Transaksi aman dan terenkripsi. Diproses secara otomatis.
-                            </p>
                         </div>
 
                     </div>

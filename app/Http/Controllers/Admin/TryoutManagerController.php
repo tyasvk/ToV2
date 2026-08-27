@@ -100,6 +100,119 @@ public function update(Request $request, Tryout $tryout)
     }
 
     /**
+     * Mengambil daftar bot di Tryout ini (Untuk ditampilkan di Vue)
+     */
+    public function getDummies($id)
+    {
+        $dummies = \App\Models\ExamAttempt::where('tryout_id', $id)
+            ->whereHas('user', function($q) {
+                $q->where('email', 'like', 'bot_%'); // Memastikan hanya mengambil bot
+            })
+            ->join('users', 'exam_attempts.user_id', '=', 'users.id')
+            ->select('exam_attempts.*', 'users.name', 'users.email', 'users.agency_name')
+            ->orderBy('exam_attempts.total_score', 'desc')
+            ->get();
+
+        return response()->json($dummies);
+    }
+
+    /**
+     * Menghapus seluruh bot di Tryout ini
+     */
+    public function clearDummies($id)
+    {
+        // Cari ID user bot yang mengerjakan TO ini
+        $userIds = \App\Models\ExamAttempt::where('tryout_id', $id)
+            ->whereHas('user', function($q) {
+                $q->where('email', 'like', 'bot_%');
+            })->pluck('user_id');
+
+        // Hapus riwayat ujian mereka
+        \App\Models\ExamAttempt::where('tryout_id', $id)->whereIn('user_id', $userIds)->delete();
+        
+        // Hapus akun bot-nya
+        \App\Models\User::whereIn('id', $userIds)->delete();
+
+        return back()->with('success', 'Semua peserta bot berhasil dihapus dari Tryout ini!');
+    }
+
+    /**
+     * Generate Peserta Dummy / Bot untuk Leaderboard Tryout
+     */
+/**
+     * Generate Peserta Dummy / Bot untuk Leaderboard Tryout
+     */
+    public function generateDummies(\Illuminate\Http\Request $request, $id)
+    {
+        $request->validate([
+            'amount' => 'required|integer|min:1|max:500' 
+        ]);
+
+        $tryout = \App\Models\Tryout::findOrFail($id);
+        $amount = $request->amount;
+        
+        $faker = \Faker\Factory::create('id_ID');
+
+        $instansiPusat = [
+            'Kementerian Hukum dan Hak Asasi Manusia', 'Kementerian Keuangan', 
+            'Kementerian Pendidikan, Kebudayaan, Riset, dan Teknologi', 'Kejaksaan Agung RI', 
+            'Badan Intelijen Negara', 'Kementerian Kesehatan', 'Kementerian Agama',
+            'Kementerian Pertahanan', 'Kementerian Perhubungan', 'Badan Pusat Statistik',
+            'Badan Kepegawaian Negara', 'Kementerian Luar Negeri', 'Kementerian ATR/BPN'
+        ];
+
+        $instansiDaerah = [
+            'Pemerintah Provinsi Jawa Barat', 'Pemerintah Provinsi Jawa Tengah', 
+            'Pemerintah Provinsi Jawa Timur', 'Pemerintah Provinsi DKI Jakarta',
+            'Pemerintah Kota Surabaya', 'Pemerintah Kabupaten Bogor', 'Pemerintah Kota Medan',
+            'Pemerintah Provinsi Banten', 'Pemerintah Provinsi Bali'
+        ];
+
+        $provinsiList = ['11', '12', '13', '31', '32', '33', '34', '35', '51', '73'];
+
+        // OPTIMASI: Enkripsi password HANYA 1 KALI saja di luar looping!
+        // Ini akan mempercepat proses dari yang tadinya puluhan detik menjadi kurang dari 1 detik.
+        $dummyPassword = bcrypt('dummy_bot_password');
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($amount, $faker, $tryout, $instansiPusat, $instansiDaerah, $provinsiList, $dummyPassword) {
+            for ($i = 0; $i < $amount; $i++) {
+                
+                $isPusat = rand(1, 100) <= 75; 
+                $assignedInstansi = $isPusat 
+                    ? $faker->randomElement($instansiPusat) 
+                    : $faker->randomElement($instansiDaerah);
+
+                $user = \App\Models\User::create([
+                    'name' => $faker->name(),
+                    'email' => 'bot_' . \Illuminate\Support\Str::random(8) . '@cpnsnusantara.dummy',
+                    'password' => $dummyPassword, // <-- Gunakan password yang sama agar ringan
+                    'agency_name' => $assignedInstansi,
+                    'province_code' => $faker->randomElement($provinsiList),
+                    'email_verified_at' => now(),
+                ]);
+
+                $twk = $faker->numberBetween(50, 135); 
+                $tiu = $faker->numberBetween(60, 155); 
+                $tkp = $faker->numberBetween(130, 210); 
+                $total = $twk + $tiu + $tkp;
+
+                \App\Models\ExamAttempt::create([
+                    'user_id' => $user->id,
+                    'tryout_id' => $tryout->id,
+                    'twk_score' => $twk,
+                    'tiu_score' => $tiu,
+                    'tkp_score' => $tkp,
+                    'total_score' => $total,
+                    'answers' => [], 
+                    'completed_at' => now()->subMinutes(rand(1, 10000)), 
+                ]);
+            }
+        });
+
+        return back()->with('success', "Berhasil menambahkan {$amount} peserta fiktif ke Tryout ini!");
+    }
+
+    /**
      * Menampilkan hasil pengerjaan (leaderboard) untuk suatu tryout dengan Pencarian & Paginasi
      */
     public function results(Request $request, Tryout $tryout)

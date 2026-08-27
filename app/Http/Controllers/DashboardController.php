@@ -47,15 +47,16 @@ class DashboardController extends Controller
             }
         }
 
-        // 2. LOGIC TOTAL USER (Bisa diatur manual dari admin atau sesuaikan dengan DB)
-        // Pastikan key 'total_user_mode' dan 'total_user_manual_value' ada atau di-seeder di tabel settings.
-        $totalUserMode = Setting::where('key', 'total_user_mode')->value('value') ?? 'database';
+        // ==========================================================
+        // 2. LOGIC TOTAL USER (Bisa diatur manual dari Pengaturan Admin)
+        // ==========================================================
+        $manualTotalUsersSetting = Setting::where('key', 'manual_total_users')->value('value');
+        $realTotalUsers = User::count();
         
-        if ($totalUserMode === 'manual') {
-            $totalUserDisplay = (int) Setting::where('key', 'total_user_manual_value')->value('value') ?? 0;
-        } else {
-            $totalUserDisplay = User::count();
-        }
+        // Jika manual_total_users diset > 0, gunakan angka itu. Jika 0, gunakan angka asli.
+        $displayTotalUsers = ($manualTotalUsersSetting && (int)$manualTotalUsersSetting > 0) 
+            ? (int)$manualTotalUsersSetting 
+            : $realTotalUsers;
 
         // 3. STATISTIK USER
         $completedAttempts = ExamAttempt::where('user_id', $user->id)->whereNotNull('completed_at')->get();
@@ -68,8 +69,9 @@ class DashboardController extends Controller
             'activeExam' => $activeExam, // Dioper ke frontend
             'balance' => $user->balance ?? 0,
             'stats' => $stats,
-            'total_user_display' => $totalUserDisplay, // Mengirim data total user ke frontend
-            'announcement' => Setting::where('key', 'announcement')->first()?->value ?? null
+            // Format angka menjadi ribuan (Contoh: 1.500)
+            'total_user_display' => number_format($displayTotalUsers, 0, ',', '.'), 
+            'announcement' => Setting::where('key', 'announcement')->value('value') ?? ''
         ]);
     }
 

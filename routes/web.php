@@ -121,6 +121,18 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     // Memproses checkout bundling
     Route::post('/bundling/checkout', [TryoutController::class, 'processBundlingCheckout'])->name('user.bundling.checkout');
 
+    // --- HASIL, RIWAYAT & RANKING ---
+    Route::get('/ranking', [UserTryoutController::class, 'ranking'])->name('ranking.index'); // <-- TAMBAHKAN BARIS INI
+
+    // --- HASIL, RIWAYAT, RANKING & GRAFIK ---
+    Route::get('/ranking', [UserTryoutController::class, 'ranking'])->name('ranking.index');
+    
+    // =========== TAMBAHKAN BARIS INI ===========
+    Route::get('/progress', [UserTryoutController::class, 'progress'])->name('tryout.progress');
+
+    // =========== TAMBAHKAN BARIS INI ===========
+    Route::post('/tryouts/{tryout}/claim', [UserTryoutController::class, 'claimTryout'])->name('tryout.claim');
+
     // --- HASIL & RIWAYAT ---
     Route::get('/tryouts/result/{attempt}', [UserTryoutController::class, 'result'])->name('tryout.result');
     Route::get('/tryouts/review/{attempt}', [UserTryoutController::class, 'review'])->name('tryout.review');
@@ -201,6 +213,15 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     // Transaction Management
     Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
     Route::post('/transactions/{transaction}/approve', [TransactionController::class, 'approve'])->name('transactions.approve');
+
+    // =========== TAMBAHKAN BARIS INI ===========
+    Route::post('/transactions/{transaction}/reject', [TransactionController::class, 'reject'])->name('transactions.reject');
+    // ===========================================
+
+    // --- ROUTE BOT PESERTA FIKTIF ---
+    Route::post('/tryouts/{tryout}/generate-dummies', [TryoutManagerController::class, 'generateDummies'])->name('admin.tryouts.dummies');
+    Route::get('/tryouts/{tryout}/dummies', [TryoutManagerController::class, 'getDummies'])->name('admin.tryouts.dummies.list');
+    Route::delete('/tryouts/{tryout}/dummies', [TryoutManagerController::class, 'clearDummies'])->name('admin.tryouts.dummies.clear');
 
     // Membership Settings
     Route::get('/membership-setting', [MembershipSettingController::class, 'index'])->name('membership-setting.index');

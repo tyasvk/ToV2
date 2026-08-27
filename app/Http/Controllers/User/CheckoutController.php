@@ -213,6 +213,26 @@ class CheckoutController extends Controller
                         ->update(['status' => 'paid', 'payment_method' => 'wallet']);
                 }
                 
+                // ============================================================
+                // LOGIKA AKTIVASI MEMBERSHIP
+                // ============================================================
+                $metadata = is_string($transaction->metadata) ? json_decode($transaction->metadata, true) : $transaction->metadata;
+                
+                if (isset($metadata['type']) && $metadata['type'] === 'membership') {
+                    $durationDays = $metadata['days'] ?? 0;
+                    
+                    // Cek apakah user sudah punya masa aktif sebelumnya
+                    $hasActiveMembership = $user->membership_expires_at && Carbon::parse($user->membership_expires_at)->isFuture();
+                    $currentExpiry = $hasActiveMembership ? Carbon::parse($user->membership_expires_at) : now();
+                    
+                    // Tambahkan masa aktif (bypass Mass-Assignment dengan save)
+                    $user->membership_expires_at = $currentExpiry->addDays($durationDays);
+                    $user->save();
+                    
+                    Log::info("DEBUG MEMBERSHIP: Berhasil aktivasi paket {$metadata['plan_name']} untuk user {$user->id} via Dompet.");
+                }
+                // ============================================================
+
                 Log::info("DEBUG KOMISI: Memproses transaksi {$transaction->id} untuk user {$user->id}");
 
                 $totalProductPurchases = Transaction::where('user_id', $user->id)
@@ -245,7 +265,7 @@ class CheckoutController extends Controller
                 }
             });
             
-            return redirect()->route('dashboard')->with('success', 'Pembayaran Berhasil!');
+            return redirect()->route('dashboard')->with('success', 'Pembayaran Berhasil! Akses Anda telah aktif.');
         }
         return back();
     }

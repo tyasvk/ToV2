@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 
 // --- PROPS DARI CONTROLLER ---
@@ -21,6 +21,7 @@ const props = defineProps({
 
 const searchQuery = ref('');
 const activeTab = ref('catalog'); 
+const isClaiming = ref(null); // Menyimpan ID tryout yang sedang loading klaim
 
 // --- 1. SINKRONISASI DATA KATALOG ---
 const availableCatalogTryouts = computed(() => {
@@ -53,12 +54,6 @@ const getStartDate = (tryout) => {
     return dateStr.includes(' ') ? dateStr.replace(' ', 'T') : dateStr;
 };
 
-const getEndDate = (tryout) => {
-    const dateStr = tryout.end_time || tryout.end_date || tryout.ended_at;
-    if (!dateStr) return null;
-    return dateStr.includes(' ') ? dateStr.replace(' ', 'T') : dateStr;
-};
-
 const isUpcoming = (tryout) => {
     const startStr = getStartDate(tryout);
     if (!startStr) return false;
@@ -83,6 +78,22 @@ const formatOnlyDate = (dateString) => {
     return new Intl.DateTimeFormat('id-ID', {
         day: 'numeric', month: 'long', year: 'numeric'
     }).format(date);
+};
+
+// --- 4. AKSI KLAIM ---
+const claimTryout = (tryoutId) => {
+    isClaiming.value = tryoutId;
+    router.post(route('tryout.claim', tryoutId), {}, {
+        preserveScroll: true,
+        onSuccess: () => {
+            isClaiming.value = null;
+            // Pindahkan tampilan ke tab Milik Saya setelah sukses klaim
+            activeTab.value = 'my_tryouts';
+        },
+        onError: () => {
+            isClaiming.value = null;
+        }
+    });
 };
 </script>
 
@@ -145,7 +156,7 @@ const formatOnlyDate = (dateString) => {
                     <div 
                         v-for="tryout in filteredTryouts" 
                         :key="tryout.id"
-                        class="bg-white rounded-[20px] p-4 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.06)] transition-all duration-300 flex flex-col items-center text-center h-full border border-slate-100/50 relative"
+                        class="bg-white rounded-[20px] p-4 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.06)] transition-all duration-300 flex flex-col items-center text-center h-full border border-slate-100/50 relative overflow-hidden"
                     >
                         
                         <!-- ============================================== -->
@@ -170,12 +181,27 @@ const formatOnlyDate = (dateString) => {
                                 <span>{{ tryout.duration || 100 }} Menit</span>
                             </div>
 
-                            <!-- Footer: Tombol Center Saja -->
+                            <!-- Footer: Logika Tombol Klaim / Daftar -->
                             <div class="mt-auto w-full flex flex-col items-center justify-center">
-                                <Link :href="route('tryout.show', tryout.id)" 
-                                      class="w-[95%] md:w-[90%] py-2 bg-[#007AFF] hover:bg-[#0062CC] text-white rounded-full text-[12px] font-semibold transition-colors active:scale-95 text-center">
-                                    Daftar
-                                </Link>
+                                <!-- Jika Member Premium/Adidaya -->
+                                <template v-if="isPremiumMember">
+                                    <button 
+                                        @click="claimTryout(tryout.id)"
+                                        :disabled="isClaiming === tryout.id"
+                                        class="w-[95%] md:w-[90%] py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-amber-950 rounded-full text-[12px] font-bold transition-all active:scale-95 text-center flex items-center justify-center gap-2 shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
+                                    >
+                                        <svg v-if="isClaiming === tryout.id" class="animate-spin h-3.5 w-3.5 text-amber-950" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                        <span v-else>✨ Klaim Tryout</span>
+                                    </button>
+                                </template>
+
+                                <!-- Jika Member Gratis Biasa -->
+                                <template v-else>
+                                    <Link :href="route('tryout.show', tryout.id)" 
+                                          class="w-[95%] md:w-[90%] py-2 bg-[#007AFF] hover:bg-[#0062CC] text-white rounded-full text-[12px] font-semibold transition-colors active:scale-95 text-center shadow-sm">
+                                        Daftar
+                                    </Link>
+                                </template>
                             </div>
                         </template>
 
@@ -239,7 +265,7 @@ const formatOnlyDate = (dateString) => {
                                             Mulai
                                         </Link>
                                         
-                                        <!-- Tombol Riwayat Khusus Premium Yang Sudah Pernah Dikerjakan (Bersebelahan) -->
+                                        <!-- Tombol Riwayat Khusus Premium Yang Sudah Pernah Dikerjakan -->
                                         <Link v-if="tryout.user_access_type === 'Premium' && getAttemptCount(tryout) > 0" 
                                               :href="route('tryout.history.detail', tryout.id)" 
                                               class="flex-1 py-2 bg-[#F2F2F7] hover:bg-[#E3E3E8] text-slate-700 rounded-full text-[12px] font-semibold transition-colors active:scale-95 text-center">
@@ -259,11 +285,11 @@ const formatOnlyDate = (dateString) => {
                         <img src="/images/logo.png" alt="Logo" class="w-full h-full object-contain" />
                     </div>
                     <h3 class="text-[15px] md:text-[16px] font-semibold text-slate-900 mb-1">
-                        {{ (activeTab === 'catalog' && props.isPremiumMember) ? 'Semua Dimiliki' : 'Tidak Ada Hasil' }}
+                        {{ (activeTab === 'catalog' && props.isPremiumMember) ? 'Semua Berhasil Diklaim' : 'Tidak Ada Hasil' }}
                     </h3>
                     <p class="text-[11px] md:text-[12px] text-slate-500 max-w-sm mx-auto">
                         <template v-if="activeTab === 'catalog' && props.isPremiumMember">
-                            Anda sudah memiliki semua simulasi. Silakan periksa tab Milik Saya.
+                            Anda sudah mengklaim semua simulasi yang tersedia saat ini. Silakan kerjakan di tab Milik Saya.
                         </template>
                         <template v-else>
                             Kami tidak dapat menemukan simulasi yang Anda cari.
@@ -272,7 +298,7 @@ const formatOnlyDate = (dateString) => {
                     <button 
                         v-if="activeTab === 'catalog' && props.isPremiumMember"
                         @click="activeTab = 'my_tryouts'"
-                        class="mt-4 px-5 py-2 bg-[#007AFF] text-white rounded-full text-[11px] md:text-[12px] font-semibold transition-colors active:scale-95"
+                        class="mt-4 px-5 py-2 bg-gradient-to-r from-amber-400 to-amber-500 text-amber-950 rounded-full text-[11px] md:text-[12px] font-bold shadow-sm transition-all active:scale-95"
                     >
                         Lihat Milik Saya
                     </button>
