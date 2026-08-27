@@ -94,18 +94,18 @@ const isExamPage = computed(() => {
 <template>
     <div class="flex min-h-screen bg-[#F5F5F7] font-sans text-[#1D1D1F] relative selection:bg-[#007AFF] selection:text-white">
         
-        <!-- Backdrop Mobile -->
+        <!-- Backdrop Mobile (Z-Index diperbesar ke 100 agar di atas Bottom Tab) -->
         <div 
             v-if="isSidebarOpen" 
             @click="isSidebarOpen = false" 
-            class="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300"
+            class="fixed inset-0 bg-black/30 backdrop-blur-sm z-[100] lg:hidden transition-opacity duration-300"
         ></div>
 
-        <!-- SIDEBAR -->
+        <!-- SIDEBAR (Z-Index diperbesar ke 101 agar paling depan) -->
         <aside 
             :class="[
                 isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
-                'fixed lg:sticky lg:top-0 h-screen inset-y-0 left-0 w-72 bg-white border-r border-black/5 flex flex-col z-50 shadow-[4px_0_24px_rgba(0,0,0,0.02)] shrink-0 transition-transform duration-300 ease-in-out'
+                'fixed lg:sticky lg:top-0 h-screen inset-y-0 left-0 w-72 bg-white border-r border-black/5 flex flex-col z-[101] shadow-[4px_0_24px_rgba(0,0,0,0.02)] shrink-0 transition-transform duration-300 ease-in-out'
             ]"
         >
             <!-- Logo Header dengan Gradasi Berwarna -->
@@ -125,7 +125,7 @@ const isExamPage = computed(() => {
                 </button>
             </div>
 
-            <!-- Widget Status Member (Colorful Apple Gradient Widget) -->
+            <!-- Widget Status Member -->
             <div v-if="isUser && !isAdmin && user" class="px-4 mt-4 shrink-0">
                 <div :class="isUserMember ? 'bg-gradient-to-r from-[#34C759] via-[#007AFF] to-[#5E5CE6] text-white shadow-[0_6px_20px_rgba(0,122,255,0.25)]' : 'bg-gradient-to-r from-[#F5F5F7] to-[#E3E3E8] text-[#1D1D1F] border border-black/5'" 
                      class="rounded-[20px] p-4 transition-all duration-300 relative overflow-hidden">
@@ -287,18 +287,18 @@ const isExamPage = computed(() => {
                 </div>
             </header>
 
-            <!-- Main Body -->
-            <main class="flex-1 p-4 md:p-10 pb-24 lg:pb-12">
+            <!-- Main Body (Padding-bottom diperbesar untuk menghindari tertutup bottom tab) -->
+            <main class="flex-1 p-4 md:p-10 pb-32 lg:pb-12">
                 <div class="max-w-[1400px] mx-auto animate-in fade-in duration-500">
                     <slot />
                 </div>
             </main>
         </div>
 
-        <!-- MOBILE BOTTOM TAB NAVIGATION (Glassmorphism) -->
+        <!-- MOBILE BOTTOM TAB NAVIGATION (Z-Index di bawah Backdrop Sidebar) -->
         <div 
             v-if="!isExamPage && isUser && !isAdmin"
-            class="md:hidden fixed bottom-0 left-0 w-full bg-white/80 backdrop-blur-xl border-t border-black/5 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] z-[999] px-8 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] flex justify-between items-center"
+            class="md:hidden fixed bottom-0 left-0 w-full bg-white/80 backdrop-blur-xl border-t border-black/5 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] z-40 px-8 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] flex justify-between items-center"
         >
             <!-- 1. Home -->
             <Link :href="route('dashboard')" class="flex flex-col items-center gap-1 transition-colors" :class="{ 'text-[#007AFF] font-bold': $page.url === '/dashboard', 'text-[#86868B] hover:text-[#007AFF] font-medium': $page.url !== '/dashboard' }">
