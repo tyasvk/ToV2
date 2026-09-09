@@ -1,6 +1,6 @@
 {
-    "masterProcessId": 1093,
-    "managerProcessId": 1110,
+    "masterProcessId": 4073,
+    "managerProcessId": 4086,
     "state": {
         "appName": "Laravel",
         "host": "127.0.0.1",

@@ -10,7 +10,19 @@ const props = defineProps({
     filters: Object,
 });
 
-const safeRankings = computed(() => props.rankings || []);
+// --- PERBAIKAN WAKTU BOT (80 - 100 Menit) ---
+const safeRankings = computed(() => {
+    return (props.rankings || []).map(u => {
+        let dur = Number(u.duration);
+        // Jika durasi tidak wajar (<= 5 detik) seperti pada Bot
+        if (dur <= 5) {
+            // Kalkulasi acak konsisten: Minimal 4800s (80 menit) s/d 6000s (100 menit)
+            dur = 4800 + (((u.score || 0) * 17 + (u.id || 0)) % 1200);
+        }
+        return { ...u, duration: dur };
+    });
+});
+
 const safeTryout = computed(() => props.tryout || {});
 
 const search = ref('');
@@ -24,13 +36,18 @@ const getAgency = (user) => {
     return user.agency_name || user.instansi || (user.user && user.user.agency_name) || 'Instansi belum diatur';
 };
 
+// --- FORMAT WAKTU INDONESIA ---
 const getDuration = (dur) => {
     if (!dur || dur === 0 || dur === '0') return '-';
     if (!isNaN(dur) && Number(dur) > 0) {
         const val = Number(dur);
         const m = Math.floor(val / 60);
         const s = val % 60;
-        return `${m}m ${s}s`;
+        
+        if (m > 0) {
+            return `${m} menit ${s} detik`;
+        }
+        return `${s} detik`;
     }
     return '-';
 };
@@ -44,39 +61,52 @@ const goBack = () => {
 const baseRanked = computed(() => {
     let sorted = [...safeRankings.value];
     sorted.sort((a, b) => {
-        // 1. Status Passing Grade (Lulus di atas Gagal)
         if (a.is_passed !== b.is_passed) return a.is_passed ? -1 : 1; 
-        
-        // 2. Nilai Total Tertinggi
         if (b.score !== a.score) return b.score - a.score;
-        
-        // 3. Nilai TKP Tertinggi
         if (b.tkp !== a.tkp) return b.tkp - a.tkp;
-        
-        // 4. Nilai TIU Tertinggi
         if (b.tiu !== a.tiu) return b.tiu - a.tiu;
-        
-        // 5. Nilai TWK Tertinggi
         if (b.twk !== a.twk) return b.twk - a.twk;
-        
-        // 6. Waktu Pengerjaan Tercepat (Durasi terkecil di atas)
         return a.duration - b.duration; 
     });
     return sorted;
 });
 
-// Saring Scope (Nasional/Provinsi/Instansi) & Set Rank Number Asli
+// --- PERBAIKAN FILTER PROVINSI & INSTANSI (BOT MENYESUAIKAN OTOMATIS) ---
 const scopeRanked = computed(() => {
-    let list = baseRanked.value;
+    // Clone array agar data aslinya tidak berubah permanen saat pindah tab
+    let list = baseRanked.value.map(u => ({ ...u }));
     
     if (scope.value === 'provinsi' && props.my_rank?.province_code) {
-        list = list.filter(u => u.province_code === props.my_rank.province_code);
+        const myProv = String(props.my_rank.province_code).trim();
+        list = list.filter(u => {
+            if (u.is_me) return true;
+            if (u.province_code != null && String(u.province_code).trim() === myProv) return true;
+            
+            // Paksa ~20% bot agar ber-KTP provinsi yang sama dengan User (Berdasarkan ID genap/ganjil)
+            if (u.id % 5 === 0) {
+                u.province_code = myProv;
+                return true;
+            }
+            return false;
+        });
     } else if (scope.value === 'instansi' && props.my_rank) {
-        const myAgency = getAgency(props.my_rank).toLowerCase();
-        list = list.filter(u => getAgency(u).toLowerCase() === myAgency);
+        const myAgency = getAgency(props.my_rank).trim();
+        const myAgencyLower = myAgency.toLowerCase();
+        list = list.filter(u => {
+            if (u.is_me) return true;
+            if (getAgency(u).toLowerCase().trim() === myAgencyLower) return true;
+            
+            // Paksa ~15% bot agar berseragam instansi yang sama dengan User 
+            if (u.id % 7 === 0) {
+                u.agency_name = myAgency;
+                u.instansi = myAgency;
+                return true;
+            }
+            return false;
+        });
     }
     
-    // Beri nomor urut statis sesuai kategori scope aktif
+    // Beri nomor urut statis baru setelah di-filter
     return list.map((user, index) => ({
         ...user,
         displayRank: index + 1 
@@ -96,7 +126,7 @@ const finalRankings = computed(() => {
     return list;
 });
 
-// Pagination 
+// Pagination Reset jika Filter Berubah
 watch([itemsPerPage, search, scope], () => { currentPage.value = 1; });
 
 const totalPages = computed(() => Math.ceil(finalRankings.value.length / itemsPerPage.value) || 1);
@@ -106,7 +136,7 @@ const paginatedRankings = computed(() => {
     return finalRankings.value.slice(start, start + itemsPerPage.value);
 });
 
-// Sinkronisasi Peringkat Anda secara Realtime (Untuk Floating Bar)
+// Sinkronisasi Peringkat Anda secara Realtime
 const activeMyRank = computed(() => {
     const me = scopeRanked.value.find(u => u.is_me);
     return me || null;
@@ -159,6 +189,26 @@ const activeMyRank = computed(() => {
                         <button @click="scope = 'instansi'" :class="[scope === 'instansi' ? 'bg-white text-[#007AFF] shadow-[0_1px_4px_rgba(0,0,0,0.05)]' : 'text-slate-500 hover:text-slate-700']" class="flex-1 md:w-32 py-2.5 sm:py-2 rounded-[10px] text-[12px] font-bold transition-all">
                             Instansi
                         </button>
+                    </div>
+                </div>
+
+                <!-- ============================================== -->
+                <!-- PAGINATION (DIPINDAHKAN KE ATAS)               -->
+                <!-- ============================================== -->
+                <div v-if="totalPages > 1" class="flex flex-col sm:flex-row items-center justify-between bg-white p-3 sm:p-4 rounded-[20px] shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-slate-100/80 gap-4 relative z-10">
+                    <div class="flex items-center gap-2 text-[11px] sm:text-[12px] text-slate-500 font-semibold">
+                        <span>Tampilkan:</span>
+                        <select v-model="itemsPerPage" class="bg-[#F5F5F7] border-transparent rounded-[8px] text-[11px] sm:text-[12px] py-1.5 pl-3 pr-8 focus:ring-2 focus:ring-[#007AFF]/20 focus:bg-white focus:border-[#007AFF] outline-none cursor-pointer transition-all">
+                            <option :value="20">20 Baris</option>
+                            <option :value="50">50 Baris</option>
+                            <option :value="100">100 Baris</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                        <button @click="currentPage--" :disabled="currentPage === 1" class="px-4 py-2 bg-[#F2F2F7] hover:bg-[#E3E3E8] disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 text-[12px] font-bold rounded-xl transition-colors active:scale-95">Prev</button>
+                        <span class="text-[11px] sm:text-[12px] font-semibold text-slate-500">Hal {{ currentPage }} / {{ totalPages }}</span>
+                        <button @click="currentPage++" :disabled="currentPage === totalPages" class="px-4 py-2 bg-[#F2F2F7] hover:bg-[#E3E3E8] disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 text-[12px] font-bold rounded-xl transition-colors active:scale-95">Next</button>
                     </div>
                 </div>
 
@@ -231,26 +281,6 @@ const activeMyRank = computed(() => {
                             </div>
                         </div>
 
-                    </div>
-                </div>
-
-                <!-- ============================================== -->
-                <!-- PAGINATION                                     -->
-                <!-- ============================================== -->
-                <div v-if="totalPages > 1" class="flex flex-col sm:flex-row items-center justify-between bg-white p-3 sm:p-4 rounded-[20px] shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-slate-100/80 gap-4 relative z-10">
-                    <div class="flex items-center gap-2 text-[11px] sm:text-[12px] text-slate-500 font-semibold">
-                        <span>Tampilkan:</span>
-                        <select v-model="itemsPerPage" class="bg-[#F5F5F7] border-transparent rounded-[8px] text-[11px] sm:text-[12px] py-1.5 pl-3 pr-8 focus:ring-2 focus:ring-[#007AFF]/20 focus:bg-white focus:border-[#007AFF] outline-none cursor-pointer transition-all">
-                            <option :value="20">20 Baris</option>
-                            <option :value="50">50 Baris</option>
-                            <option :value="100">100 Baris</option>
-                        </select>
-                    </div>
-
-                    <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-                        <button @click="currentPage--" :disabled="currentPage === 1" class="px-4 py-2 bg-[#F2F2F7] hover:bg-[#E3E3E8] disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 text-[12px] font-bold rounded-xl transition-colors active:scale-95">Prev</button>
-                        <span class="text-[11px] sm:text-[12px] font-semibold text-slate-500">Hal {{ currentPage }} / {{ totalPages }}</span>
-                        <button @click="currentPage++" :disabled="currentPage === totalPages" class="px-4 py-2 bg-[#F2F2F7] hover:bg-[#E3E3E8] disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 text-[12px] font-bold rounded-xl transition-colors active:scale-95">Next</button>
                     </div>
                 </div>
 

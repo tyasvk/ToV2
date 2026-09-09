@@ -192,19 +192,20 @@ class CheckoutController extends Controller
             ->with('success', 'Berhasil membuat pesanan bundling!');
     }
 
-    public function process(Request $request, Transaction $transaction)
+public function process(Request $request, Transaction $transaction)
     {
         $request->validate(['payment_method' => 'required|in:wallet,midtrans']);
         
         if ($request->payment_method === 'wallet') {
             $user = User::find(auth()->id());
             
-            if ($user->balance < $transaction->amount) {
+            if ($user->balance < $transaction->total_amount) {
                 return back()->withErrors(['message' => 'Saldo tidak cukup.']);
             }
 
             DB::transaction(function () use ($user, $transaction) {
-                $user->decrement('balance', $transaction->amount);
+                // Potong saldo sesuai total_amount yang sudah termasuk fee & diskon
+                $user->decrement('balance', $transaction->total_amount);
                 
                 $transaction->update(['status' => 'paid', 'payment_method' => 'wallet']);
                 
@@ -233,40 +234,101 @@ class CheckoutController extends Controller
                 }
                 // ============================================================
 
+                // ============================================================
+                // LOGIKA KOMISI AFILIASI (DAFTAR & VOUCHER)
+                // ============================================================
                 Log::info("DEBUG KOMISI: Memproses transaksi {$transaction->id} untuk user {$user->id}");
 
+                // Hitung total *pembelian* produk (Tryout/Bundle) yang berstatus sukses/lunas
                 $totalProductPurchases = Transaction::where('user_id', $user->id)
                     ->whereIn('status', ['paid', 'success'])
-                    ->whereNotNull('tryout_id')
+                    ->whereNotNull('tryout_id') // Asumsi Tryout/Paket saja, bukan Topup Wallet
                     ->count();
 
                 Log::info("DEBUG KOMISI: Total Pembelian Produk = {$totalProductPurchases}");
 
+                // 1. KOMISI PENDAFTARAN (PEMBELIAN PERTAMA = Rp 2.500)
+                $komisiPendaftaran = 0;
+                $uplinePendaftaran = null;
+
                 if ($totalProductPurchases === 1 && !empty($user->referred_by)) {
-                    $upline = User::where('id', $user->referred_by)
+                    $uplinePendaftaran = User::where('id', $user->referred_by)
                                   ->orWhere('affiliate_code', $user->referred_by)
                                   ->first();
 
-                    if ($upline) {
-                        $upline->increment('affiliate_balance', 2500);
+                    if ($uplinePendaftaran) {
+                        $komisiPendaftaran = 2500;
+                    }
+                }
+
+                // 2. KOMISI PENGGUNAAN VOUCHER AFILIASI (Setiap Transaksi Valid = Rp 2.000)
+                $komisiVoucher = 0;
+                $uplineVoucher = null;
+
+                // $transaction->referrer_id diisi saat controller Show mengeksekusi potongan harga
+                if ($transaction->referrer_id) {
+                    $uplineVoucher = User::find($transaction->referrer_id);
+                    if ($uplineVoucher) {
+                        $komisiVoucher = 2000;
+                    }
+                }
+
+                // 3. EKSEKUSI PENAMBAHAN SALDO KOMISI KE UPLINE
+                // Skenario: Jika Upline pendaftaran sama dengan Upline Voucher (Bisa dapat 4500 sekaligus)
+                if ($uplinePendaftaran && $uplineVoucher && $uplinePendaftaran->id === $uplineVoucher->id) {
+                    
+                    $totalKomisi = $komisiPendaftaran + $komisiVoucher; // 2500 + 2000 = 4500
+                    $uplinePendaftaran->increment('affiliate_balance', $totalKomisi);
+                    
+                    WalletTransaction::create([
+                        'user_id' => $uplinePendaftaran->id,
+                        'amount' => $totalKomisi,
+                        'type' => 'credit',
+                        'description' => "Komisi ekstra (Daftar & Voucher) dari: {$user->name}",
+                        'status' => 'success'
+                    ]);
+                    Log::info("DEBUG KOMISI: SUKSES transfer Rp{$totalKomisi} (Daftar+Voucher) ke Upline ID {$uplinePendaftaran->id}");
+
+                } else {
+                    // Skenario: Upline Pendaftaran & Voucher Berbeda, ATAU hanya dapat salah satu
+                    
+                    // Eksekusi Komisi Pendaftaran
+                    if ($komisiPendaftaran > 0 && $uplinePendaftaran) {
+                        $uplinePendaftaran->increment('affiliate_balance', $komisiPendaftaran);
                         WalletTransaction::create([
-                            'user_id' => $upline->id,
-                            'amount' => 2500,
+                            'user_id' => $uplinePendaftaran->id,
+                            'amount' => $komisiPendaftaran,
                             'type' => 'credit',
-                            'description' => "Komisi pendaftaran dari: {$user->name}",
+                            'description' => "Komisi pembelian pertama dari referal: {$user->name}",
                             'status' => 'success'
                         ]);
-                        Log::info("DEBUG KOMISI: SUKSES transfer Rp2500 ke Upline ID {$upline->id}");
-                    } else {
-                        Log::warning("DEBUG KOMISI: GAGAL, Upline dengan ID/Kode {$user->referred_by} tidak ditemukan!");
+                        Log::info("DEBUG KOMISI: SUKSES transfer Daftar Rp{$komisiPendaftaran} ke Upline ID {$uplinePendaftaran->id}");
                     }
-                } else {
-                     Log::info("DEBUG KOMISI: Komisi dilewati (Pembelian ke-{$totalProductPurchases})");
+
+                    // Eksekusi Komisi Voucher
+                    if ($komisiVoucher > 0 && $uplineVoucher) {
+                        $uplineVoucher->increment('affiliate_balance', $komisiVoucher);
+                        WalletTransaction::create([
+                            'user_id' => $uplineVoucher->id,
+                            'amount' => $komisiVoucher,
+                            'type' => 'credit',
+                            'description' => "Komisi penggunaan kode voucher dari: {$user->name}",
+                            'status' => 'success'
+                        ]);
+                        Log::info("DEBUG KOMISI: SUKSES transfer Voucher Rp{$komisiVoucher} ke Upline ID {$uplineVoucher->id}");
+                    }
                 }
+                
+                if ($komisiPendaftaran === 0 && $komisiVoucher === 0) {
+                     Log::info("DEBUG KOMISI: Tidak ada komisi yang memenuhi syarat pada transaksi ini.");
+                }
+                // ============================================================
+
             });
             
             return redirect()->route('dashboard')->with('success', 'Pembayaran Berhasil! Akses Anda telah aktif.');
         }
+        
         return back();
     }
 

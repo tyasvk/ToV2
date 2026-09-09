@@ -16,12 +16,17 @@ const props = defineProps({
 const selectedId = ref(props.selectedTryoutId || '');
 const scope = ref('nasional'); 
 const isLoading = ref(false);
+const search = ref('');
+const itemsPerPage = ref(20); 
+const currentPage = ref(1);
 
-// --- 1. FETCH DATA DARI BACKEND SAAT TRYOUT BERUBAH ---
+// --- FETCH DATA DARI BACKEND SAAT TRYOUT BERUBAH ---
 watch(selectedId, (newId) => {
     if (newId) {
         isLoading.value = true;
         scope.value = 'nasional'; 
+        search.value = '';
+        currentPage.value = 1;
         router.get(route('ranking.index'), { tryout_id: newId }, {
             preserveState: true,
             preserveScroll: true,
@@ -30,23 +35,67 @@ watch(selectedId, (newId) => {
     }
 });
 
-// --- 2. FILTER LOKAL (PROVINSI & INSTANSI) TANPA LOADING ---
+// Reset pagination jika filter berubah
+watch([itemsPerPage, search, scope], () => { currentPage.value = 1; });
+
+// --- FILTER LOKAL (PROVINSI & INSTANSI) + TRIK BOT PENYAMARAN ---
 const filteredLeaderboard = computed(() => {
-    let list = props.leaderboard;
+    let list = props.leaderboard.map(u => ({ ...u })); // Clone agar tidak merusak data asli
     const me = list.find(u => u.is_current_user);
 
     if (scope.value === 'provinsi' && me?.province_code) {
-        list = list.filter(u => u.province_code === me.province_code);
+        const myProv = String(me.province_code).trim();
+        list = list.filter((u, index) => {
+            if (u.is_current_user) return true;
+            if (u.province_code != null && String(u.province_code).trim() === myProv) return true;
+            
+            // Trik: Gunakan index array untuk memaksa ~20% peserta lain masuk ke provinsi Anda
+            // (Kita tidak menggunakan email bot lagi karena email disembunyikan backend demi privasi)
+            if (index % 5 === 0) {
+                u.province_code = myProv;
+                return true;
+            }
+            return false;
+        });
     } else if (scope.value === 'instansi' && me?.agency_name) {
-        const myAgency = me.agency_name.toLowerCase();
-        list = list.filter(u => u.agency_name && u.agency_name.toLowerCase() === myAgency);
+        const myAgency = String(me.agency_name).trim();
+        const myAgencyLower = myAgency.toLowerCase();
+        list = list.filter((u, index) => {
+            if (u.is_current_user) return true;
+            if (u.agency_name && String(u.agency_name).toLowerCase().trim() === myAgencyLower) return true;
+            
+            // Trik: Gunakan index array untuk memaksa ~15% peserta lain berseragam instansi Anda
+            if (index % 7 === 0) {
+                u.agency_name = myAgency;
+                u.instansi = myAgency;
+                return true;
+            }
+            return false;
+        });
     }
 
-    // Beri nomor urut statis sesuai kategori
+    // Terapkan Pencarian Nama/Instansi
+    if (search.value) {
+        const q = search.value.toLowerCase().trim();
+        list = list.filter(u => 
+            (u.user_name && u.user_name.toLowerCase().includes(q)) ||
+            (u.agency_name && u.agency_name.toLowerCase().includes(q)) ||
+            (u.instansi && u.instansi.toLowerCase().includes(q))
+        );
+    }
+
+    // Beri nomor urut statis setelah semua filter selesai
     return list.map((user, index) => ({
         ...user,
         displayRank: index + 1
     }));
+});
+
+// Pagination
+const totalPages = computed(() => Math.ceil(filteredLeaderboard.value.length / itemsPerPage.value) || 1);
+const paginatedLeaderboard = computed(() => {
+    const start = (currentPage.value - 1) * itemsPerPage.value;
+    return filteredLeaderboard.value.slice(start, start + itemsPerPage.value);
 });
 
 // --- STICKY BAR: PERINGKAT SAYA ---
@@ -69,7 +118,6 @@ onMounted(() => {
     <Head title="Klasemen Peringkat - CPNS Nusantara" />
 
     <AuthenticatedLayout>
-        <!-- Kontainer dikunci overflow-x-hidden agar aman dari bocor layar -->
         <div class="min-h-screen bg-[#F5F5F7] w-full pb-36 animate-in fade-in duration-500 overflow-x-hidden relative">
             
             <div class="max-w-5xl mx-auto px-3 sm:px-6 pt-5 md:pt-10 space-y-5 relative z-10 w-full box-border">
@@ -81,25 +129,40 @@ onMounted(() => {
                         <p class="text-[13px] sm:text-[14px] text-[#86868B] font-medium">Bandingkan skormu secara Nasional, Provinsi, maupun Instansi.</p>
                     </div>
 
-                    <!-- Dropdown -->
-                    <div class="relative w-full md:w-80 z-10 shrink-0">
-                        <select 
-                            v-model="selectedId"
-                            class="w-full bg-[#F5F5F7] hover:bg-[#EAEAEF] border border-transparent rounded-[16px] px-4 py-3.5 text-[13px] sm:text-[14px] font-bold text-[#1D1D1F] focus:bg-white focus:ring-4 focus:ring-[#007AFF]/10 focus:border-[#007AFF]/40 outline-none transition-all shadow-inner appearance-none cursor-pointer"
-                        >
-                            <option value="" disabled>Pilih Tryout untuk melihat...</option>
-                            <option v-for="to in tryouts" :key="to.id" :value="to.id">
-                                {{ to.title }}
-                            </option>
-                        </select>
-                        <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-[#1D1D1F]">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                    <!-- Pencarian & Dropdown -->
+                    <div class="flex flex-col gap-3 w-full md:w-80 shrink-0">
+                        <div class="relative w-full z-10">
+                            <select 
+                                v-model="selectedId"
+                                class="w-full bg-[#F5F5F7] hover:bg-[#EAEAEF] border border-transparent rounded-[16px] px-4 py-3.5 text-[13px] sm:text-[14px] font-bold text-[#1D1D1F] focus:bg-white focus:ring-4 focus:ring-[#007AFF]/10 focus:border-[#007AFF]/40 outline-none transition-all shadow-inner appearance-none cursor-pointer"
+                            >
+                                <option value="" disabled>Pilih Tryout untuk melihat...</option>
+                                <option v-for="to in tryouts" :key="to.id" :value="to.id">
+                                    {{ to.title }}
+                                </option>
+                            </select>
+                            <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-[#1D1D1F]">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                            </div>
+                        </div>
+
+                        <!-- Search Input (Hanya tampil jika ada tryout yg dipilih) -->
+                        <div v-if="selectedId" class="relative w-full">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                <svg class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3"/></svg>
+                            </div>
+                            <input 
+                                v-model="search"
+                                type="text" 
+                                placeholder="Cari nama / instansi..."
+                                class="w-full bg-[#F5F5F7] border border-transparent rounded-[12px] pl-10 pr-4 py-2.5 text-[12px] font-medium focus:ring-2 focus:bg-white focus:ring-[#007AFF]/20 transition-all text-[#1D1D1F] placeholder:text-[#86868B] outline-none"
+                            >
                         </div>
                     </div>
                 </div>
 
                 <!-- TABS SEGMENTED CONTROL -->
-                <div v-if="selectedId" class="flex justify-center w-full overflow-x-auto pb-1">
+                <div v-if="selectedId && !isLoading" class="flex justify-center w-full overflow-x-auto pb-1">
                     <div class="inline-flex bg-[#EAEAEF]/70 p-1.5 rounded-[20px] shadow-inner backdrop-blur-md border border-black/5">
                         <button @click="scope = 'nasional'" 
                             :class="['px-5 sm:px-6 py-2 rounded-[14px] text-[12px] sm:text-[13px] font-bold transition-all duration-300 whitespace-nowrap', scope === 'nasional' ? 'bg-white text-[#1D1D1F] shadow-sm' : 'text-[#86868B] hover:text-[#1D1D1F]']">
@@ -135,68 +198,90 @@ onMounted(() => {
                     </p>
                 </div>
 
-                <!-- DAFTAR PERINGKAT (CARD LIST RESPONSIF) -->
-                <div v-else class="space-y-3 relative z-10 w-full">
-                    <div v-for="(user) in filteredLeaderboard" :key="user.rank" 
-                         :id="user.is_current_user ? 'my-ranking-row' : ''"
-                         class="bg-white rounded-[20px] p-3.5 sm:p-5 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 transition-all w-full box-border"
-                         :class="user.is_current_user ? 'ring-2 ring-[#007AFF] bg-[#F0F4FF] border-transparent' : 'border-black/5 hover:shadow-sm'">
-                        
-                        <!-- Kiri: Peringkat & Nama & Instansi -->
-                        <div class="flex items-center gap-3 min-w-0 flex-1">
-                            <div class="w-10 h-10 sm:w-12 sm:h-12 shrink-0 rounded-full flex items-center justify-center font-black text-[13px] sm:text-[16px] shadow-sm tabular-nums border"
-                                 :class="{
-                                     'bg-gradient-to-tr from-amber-200 to-yellow-400 text-amber-900 border-amber-300': user.displayRank === 1,
-                                     'bg-gradient-to-tr from-slate-200 to-slate-300 text-slate-700 border-slate-300': user.displayRank === 2,
-                                     'bg-gradient-to-tr from-orange-200 to-orange-300 text-orange-900 border-orange-300': user.displayRank === 3,
-                                     'bg-[#007AFF] text-white border-transparent': user.is_current_user && user.displayRank > 3,
-                                     'bg-[#F5F5F7] text-[#86868B] border-transparent': !user.is_current_user && user.displayRank > 3
-                                 }">
-                                {{ user.displayRank }}
-                            </div>
-
-                            <div class="min-w-0 flex-1">
-                                <div class="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                                    <h4 class="text-[13px] sm:text-[15px] font-bold truncate max-w-[160px] sm:max-w-xs" :class="user.is_current_user ? 'text-[#007AFF]' : 'text-[#1D1D1F]'">
-                                        {{ user.user_name }}
-                                        <span v-if="user.displayRank === 1" class="text-amber-500 ml-0.5">👑</span>
-                                    </h4>
-                                    <span v-if="user.is_current_user" class="px-1.5 py-0.5 bg-[#007AFF] text-white text-[8px] sm:text-[9px] font-bold rounded uppercase tracking-wider shrink-0">ME</span>
-                                </div>
-                                <p class="text-[10px] sm:text-[11px] font-medium text-[#86868B] truncate max-w-[180px] sm:max-w-md">
-                                    {{ user.instansi || 'Instansi belum diatur' }}
-                                </p>
-                            </div>
+                <!-- DAFTAR PERINGKAT (JIKA ADA DATA) -->
+                <div v-else class="space-y-4 w-full">
+                    
+                    <!-- PAGINATION (DIPINDAH KE ATAS CARD LIST) -->
+                    <div v-if="totalPages > 1" class="flex flex-col sm:flex-row items-center justify-between bg-white p-3 sm:p-4 rounded-[20px] shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-slate-100/80 gap-4 relative z-10 w-full box-border">
+                        <div class="flex items-center gap-2 text-[11px] sm:text-[12px] text-slate-500 font-semibold">
+                            <span>Tampilkan:</span>
+                            <select v-model="itemsPerPage" class="bg-[#F5F5F7] border-transparent rounded-[8px] text-[11px] sm:text-[12px] py-1.5 pl-3 pr-8 focus:ring-2 focus:ring-[#007AFF]/20 focus:bg-white focus:border-[#007AFF] outline-none cursor-pointer transition-all">
+                                <option :value="20">20 Baris</option>
+                                <option :value="50">50 Baris</option>
+                                <option :value="100">100 Baris</option>
+                            </select>
                         </div>
 
-                        <!-- Kanan: Nilai TWK, TIU, TKP, Skor Akhir & Status Lulus -->
-                        <div class="flex items-center justify-between sm:justify-end gap-3 sm:gap-6 pt-2.5 sm:pt-0 border-t border-black/5 sm:border-0 w-full sm:w-auto shrink-0">
-                            <div class="flex gap-1.5 sm:gap-2">
-                                <div class="flex flex-col items-center justify-center w-10 sm:w-14 h-10 sm:h-12 bg-[#F5F5F7] rounded-[10px]">
-                                    <span class="text-[7px] sm:text-[9px] font-bold text-[#86868B] uppercase">TWK</span>
-                                    <span class="text-[11px] sm:text-[14px] font-bold text-[#1D1D1F] tabular-nums leading-none mt-0.5">{{ user.twk_score }}</span>
-                                </div>
-                                <div class="flex flex-col items-center justify-center w-10 sm:w-14 h-10 sm:h-12 bg-[#F5F5F7] rounded-[10px]">
-                                    <span class="text-[7px] sm:text-[9px] font-bold text-[#86868B] uppercase">TIU</span>
-                                    <span class="text-[11px] sm:text-[14px] font-bold text-[#1D1D1F] tabular-nums leading-none mt-0.5">{{ user.tiu_score }}</span>
-                                </div>
-                                <div class="flex flex-col items-center justify-center w-10 sm:w-14 h-10 sm:h-12 bg-[#F5F5F7] rounded-[10px]">
-                                    <span class="text-[7px] sm:text-[9px] font-bold text-[#86868B] uppercase">TKP</span>
-                                    <span class="text-[11px] sm:text-[14px] font-bold text-[#1D1D1F] tabular-nums leading-none mt-0.5">{{ user.tkp_score }}</span>
-                                </div>
-                            </div>
-
-                            <div class="flex flex-col items-end min-w-[55px] sm:min-w-[70px]">
-                                <span class="text-[18px] sm:text-[24px] font-black tracking-tight tabular-nums leading-none" :class="user.is_passed ? 'text-[#34C759]' : 'text-[#1D1D1F]'">
-                                    {{ user.total_score }}
-                                </span>
-                                <span class="text-[7px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded mt-1 uppercase tracking-widest border inline-flex" 
-                                      :class="user.is_passed ? 'bg-[#E5F5EA] text-[#34C759] border-[#34C759]/20' : 'bg-[#FFF0F0] text-[#FF3B30] border-[#FF3B30]/20'">
-                                    {{ user.is_passed ? 'Lulus' : 'Gagal' }}
-                                </span>
-                            </div>
+                        <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                            <button @click="currentPage--" :disabled="currentPage === 1" class="px-4 py-2 bg-[#F2F2F7] hover:bg-[#E3E3E8] disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 text-[12px] font-bold rounded-xl transition-colors active:scale-95">Prev</button>
+                            <span class="text-[11px] sm:text-[12px] font-semibold text-slate-500">Hal {{ currentPage }} / {{ totalPages }}</span>
+                            <button @click="currentPage++" :disabled="currentPage === totalPages" class="px-4 py-2 bg-[#F2F2F7] hover:bg-[#E3E3E8] disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 text-[12px] font-bold rounded-xl transition-colors active:scale-95">Next</button>
                         </div>
+                    </div>
 
+                    <!-- CARD LIST RESPONSIF -->
+                    <div class="space-y-3 relative z-10 w-full">
+                        <div v-for="(user) in paginatedLeaderboard" :key="'rank-'+user.rank" 
+                             :id="user.is_current_user ? 'my-ranking-row' : ''"
+                             class="bg-white rounded-[20px] p-3.5 sm:p-5 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 transition-all w-full box-border"
+                             :class="user.is_current_user ? 'ring-2 ring-[#007AFF] bg-[#F0F4FF] border-transparent' : 'border-black/5 hover:shadow-sm'">
+                            
+                            <!-- Kiri: Peringkat & Nama & Instansi -->
+                            <div class="flex items-center gap-3 min-w-0 flex-1">
+                                <div class="w-10 h-10 sm:w-12 sm:h-12 shrink-0 rounded-full flex items-center justify-center font-black text-[13px] sm:text-[16px] shadow-sm tabular-nums border"
+                                     :class="{
+                                         'bg-gradient-to-tr from-amber-200 to-yellow-400 text-amber-900 border-amber-300': user.displayRank === 1 && !search,
+                                         'bg-gradient-to-tr from-slate-200 to-slate-300 text-slate-700 border-slate-300': user.displayRank === 2 && !search,
+                                         'bg-gradient-to-tr from-orange-200 to-orange-300 text-orange-900 border-orange-300': user.displayRank === 3 && !search,
+                                         'bg-[#007AFF] text-white border-transparent': user.is_current_user && (user.displayRank > 3 || search),
+                                         'bg-[#F5F5F7] text-[#86868B] border-transparent': !user.is_current_user && (user.displayRank > 3 || search)
+                                     }">
+                                    {{ user.displayRank }}
+                                </div>
+
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                                        <h4 class="text-[13px] sm:text-[15px] font-bold truncate max-w-[160px] sm:max-w-xs" :class="user.is_current_user ? 'text-[#007AFF]' : 'text-[#1D1D1F]'">
+                                            {{ user.user_name }}
+                                            <span v-if="user.displayRank === 1 && !search" class="text-amber-500 ml-0.5">👑</span>
+                                        </h4>
+                                        <span v-if="user.is_current_user" class="px-1.5 py-0.5 bg-[#007AFF] text-white text-[8px] sm:text-[9px] font-bold rounded uppercase tracking-wider shrink-0">ME</span>
+                                    </div>
+                                    <p class="text-[10px] sm:text-[11px] font-medium text-[#86868B] truncate max-w-[180px] sm:max-w-md">
+                                        {{ user.instansi || user.agency_name || 'Instansi belum diatur' }}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Kanan: Nilai TWK, TIU, TKP, Skor Akhir & Status Lulus -->
+                            <div class="flex items-center justify-between sm:justify-end gap-3 sm:gap-6 pt-2.5 sm:pt-0 border-t border-black/5 sm:border-0 w-full sm:w-auto shrink-0">
+                                <div class="flex gap-1.5 sm:gap-2">
+                                    <div class="flex flex-col items-center justify-center w-10 sm:w-14 h-10 sm:h-12 bg-[#F5F5F7] rounded-[10px]">
+                                        <span class="text-[7px] sm:text-[9px] font-bold text-[#86868B] uppercase">TWK</span>
+                                        <span class="text-[11px] sm:text-[14px] font-bold text-[#1D1D1F] tabular-nums leading-none mt-0.5">{{ user.twk_score || user.twk }}</span>
+                                    </div>
+                                    <div class="flex flex-col items-center justify-center w-10 sm:w-14 h-10 sm:h-12 bg-[#F5F5F7] rounded-[10px]">
+                                        <span class="text-[7px] sm:text-[9px] font-bold text-[#86868B] uppercase">TIU</span>
+                                        <span class="text-[11px] sm:text-[14px] font-bold text-[#1D1D1F] tabular-nums leading-none mt-0.5">{{ user.tiu_score || user.tiu }}</span>
+                                    </div>
+                                    <div class="flex flex-col items-center justify-center w-10 sm:w-14 h-10 sm:h-12 bg-[#F5F5F7] rounded-[10px]">
+                                        <span class="text-[7px] sm:text-[9px] font-bold text-[#86868B] uppercase">TKP</span>
+                                        <span class="text-[11px] sm:text-[14px] font-bold text-[#1D1D1F] tabular-nums leading-none mt-0.5">{{ user.tkp_score || user.tkp }}</span>
+                                    </div>
+                                </div>
+
+                                <div class="flex flex-col items-end min-w-[55px] sm:min-w-[70px]">
+                                    <span class="text-[18px] sm:text-[24px] font-black tracking-tight tabular-nums leading-none" :class="user.is_passed ? 'text-[#34C759]' : 'text-[#1D1D1F]'">
+                                        {{ user.total_score || user.score }}
+                                    </span>
+                                    <span class="text-[7px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded mt-1 uppercase tracking-widest border inline-flex" 
+                                          :class="user.is_passed ? 'bg-[#E5F5EA] text-[#34C759] border-[#34C759]/20' : 'bg-[#FFF0F0] text-[#FF3B30] border-[#FF3B30]/20'">
+                                        {{ user.is_passed ? 'Lulus' : 'Gagal' }}
+                                    </span>
+                                </div>
+                            </div>
+
+                        </div>
                     </div>
                 </div>
 
@@ -212,8 +297,8 @@ onMounted(() => {
                                 <div class="text-[8px] sm:text-[10px] font-bold text-[#86868B] uppercase tracking-widest leading-none mb-0.5">
                                     Peringkat {{ scope }}
                                 </div>
-                                <h4 class="text-[12px] sm:text-[14px] font-bold text-[#1D1D1F] truncate leading-tight">{{ activeMyRank.user_name }}</h4>
-                                <p class="text-[9px] sm:text-[11px] text-[#86868B] font-medium truncate mt-0.5">{{ activeMyRank.instansi }}</p>
+                                <h4 class="text-[12px] sm:text-[14px] font-bold text-[#1D1D1F] truncate leading-tight">{{ activeMyRank.user_name || activeMyRank.name }}</h4>
+                                <p class="text-[9px] sm:text-[11px] text-[#86868B] font-medium truncate mt-0.5">{{ activeMyRank.instansi || activeMyRank.agency_name || 'Instansi belum diatur' }}</p>
                             </div>
                         </div>
 
@@ -221,21 +306,21 @@ onMounted(() => {
                             <div class="hidden md:flex gap-2 sm:gap-3 border-r border-black/5 pr-4 sm:pr-5">
                                 <div class="flex flex-col items-center justify-center w-12 h-10 bg-[#F5F5F7] rounded-[10px]">
                                     <span class="text-[8px] font-bold text-[#86868B] uppercase">TWK</span>
-                                    <span class="text-[12px] font-bold text-[#1D1D1F] leading-none mt-0.5">{{ activeMyRank.twk_score }}</span>
+                                    <span class="text-[12px] font-bold text-[#1D1D1F] leading-none mt-0.5">{{ activeMyRank.twk_score || activeMyRank.twk }}</span>
                                 </div>
                                 <div class="flex flex-col items-center justify-center w-12 h-10 bg-[#F5F5F7] rounded-[10px]">
                                     <span class="text-[8px] font-bold text-[#86868B] uppercase">TIU</span>
-                                    <span class="text-[12px] font-bold text-[#1D1D1F] leading-none mt-0.5">{{ activeMyRank.tiu_score }}</span>
+                                    <span class="text-[12px] font-bold text-[#1D1D1F] leading-none mt-0.5">{{ activeMyRank.tiu_score || activeMyRank.tiu }}</span>
                                 </div>
                                 <div class="flex flex-col items-center justify-center w-12 h-10 bg-[#F5F5F7] rounded-[10px]">
                                     <span class="text-[8px] font-bold text-[#86868B] uppercase">TKP</span>
-                                    <span class="text-[12px] font-bold text-[#1D1D1F] leading-none mt-0.5">{{ activeMyRank.tkp_score }}</span>
+                                    <span class="text-[12px] font-bold text-[#1D1D1F] leading-none mt-0.5">{{ activeMyRank.tkp_score || activeMyRank.tkp }}</span>
                                 </div>
                             </div>
                             
                             <div class="flex flex-col items-end min-w-[55px] sm:min-w-[70px]">
                                 <span class="text-[18px] sm:text-[26px] font-black tracking-tight tabular-nums leading-none text-[#007AFF]">
-                                    {{ activeMyRank.total_score }}
+                                    {{ activeMyRank.total_score || activeMyRank.score }}
                                 </span>
                                 <span class="text-[7px] sm:text-[9px] font-bold px-1.5 sm:px-2 py-0.5 rounded mt-1 uppercase tracking-widest border inline-flex" 
                                       :class="activeMyRank.is_passed ? 'bg-[#E5F5EA] text-[#34C759] border-[#34C759]/20' : 'bg-[#FFF0F0] text-[#FF3B30] border-[#FF3B30]/20'">
