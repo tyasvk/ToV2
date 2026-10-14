@@ -26,7 +26,9 @@ class Tryout extends Model
         'requirements',   
         'ended_at',       
         'duration',       
-        'end_date',     
+        'end_date',
+        'category',     
+        'passing_grade',
         'registration_start_at', // Baru
     'registration_end_at',   // Baru
     'started_at',            // Masa Pengerjaan Mulai

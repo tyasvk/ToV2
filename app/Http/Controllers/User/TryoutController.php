@@ -78,7 +78,7 @@ class TryoutController extends Controller
     /**
      * Gabungan Katalog & Tryout Saya
      */
-public function index(Request $request)
+    public function index(Request $request)
     {
         $user = auth()->user();
         $userId = $user->id; 
@@ -86,9 +86,7 @@ public function index(Request $request)
         $isPremiumMember = $user->membership_expires_at && now()->lt($user->membership_expires_at);
 
         // --- QUERY DASAR UNTUK TO YANG SUDAH JADI "MILIK SAYA" ---
-        // (Berlaku untuk semua user, baik gratis maupun premium)
         $ownedTryoutIdsQuery = function($q) use ($user, $userId, $userEmail) {
-            // 1. Pernah dibeli (transaksi sukses) / Diklaim Premium (Transaksi harga 0 status paid)
             $q->whereHas('transactions', function($tQ) use ($user, $userEmail) {
                 $tQ->whereIn('status', ['paid', 'success'])
                   ->where(function($sq) use ($user, $userEmail) {
@@ -96,11 +94,9 @@ public function index(Request $request)
                          ->orWhereJsonContains('participants_data', $userEmail);
                   });
             })
-            // 2. ATAU pernah dikerjakan (ada di tabel exam_attempts)
             ->orWhereHas('examAttempts', function($eQ) use ($userId) {
                 $eQ->where('user_id', $userId);
             })
-            // 3. ATAU pengajuan gratis disetujui
             ->orWhereIn('id', function($sub) use ($userId) {
                 $sub->select('tryout_id')
                     ->from('tryout_registrations')
@@ -115,7 +111,6 @@ public function index(Request $request)
             ->where(function ($query) {
                 $query->whereNotIn('type', ['akbar', 'adidaya'])->orWhereNull('type');
             })
-            // Kecualikan semua TO yang masuk kategori "Milik Saya"
             ->where(function($q) use ($ownedTryoutIdsQuery) {
                 $q->whereNot(function($subQ) use ($ownedTryoutIdsQuery) {
                     $ownedTryoutIdsQuery($subQ);
@@ -422,7 +417,6 @@ public function index(Request $request)
                       ->orWhereNull('type');
             })
             ->where(function($query) use ($userId, $userEmail, $isPremiumMember) {
-                // Tampilkan yang sudah dibeli
                 $query->whereHas('transactions', function($q) use ($userId, $userEmail) {
                     $q->whereIn('status', ['paid', 'success'])
                       ->where(function($sq) use ($userId, $userEmail) {
@@ -430,11 +424,9 @@ public function index(Request $request)
                              ->orWhereJsonContains('participants_data', $userEmail);
                       });
                 })
-                // ATAU yang pernah dikerjakan secara gratis
                 ->orWhereHas('examAttempts', function($q) use ($userId) {
                     $q->where('user_id', $userId);
                 })
-                // TAMPILKAN di Milik Saya jika pengajuan gratis disetujui admin
                 ->orWhereIn('id', function($sub) use ($userId) {
                     $sub->select('tryout_id')
                         ->from('tryout_registrations')
@@ -457,9 +449,7 @@ public function index(Request $request)
             ->paginate(9)
             ->withQueryString();
 
-        // --- TAMBAHAN LOGIKA: MENENTUKAN TIPE AKSES DAN BATAS SISA KESEMPATAN ---
         $tryouts->getCollection()->transform(function ($tryout) use ($userId, $userEmail, $isPremiumMember) {
-            
             $hasPremium = false;
             if ($isPremiumMember) {
                 $hasPremium = true;
@@ -473,13 +463,11 @@ public function index(Request $request)
                     ->exists();
             }
 
-            // Batas maksimal: 3x untuk Premium, 1x untuk Gratis
             $maxAttempts = $hasPremium ? 3 : 1;
             if ($tryout->type === 'akbar') {
                 $maxAttempts = 1;
             }
 
-            // Menyisipkan data baru ke objek Tryout untuk dibaca Vue
             $tryout->user_access_type = $hasPremium ? 'Premium' : 'Gratis';
             $tryout->max_attempts = $maxAttempts;
             $tryout->remaining_attempts = max(0, $maxAttempts - $tryout->attempts_count);
@@ -498,7 +486,6 @@ public function index(Request $request)
         $user = auth()->user();
         $hasPremium = $this->hasPremiumAccess($tryout);
 
-        // Jika paket berbayar, pastikan user punya akses: (Premium ATAU Gratis Di-Approve ATAU Pernah Mengerjakan)
         if ($tryout->is_paid && $tryout->price > 0) {
             $hasAttempt = ExamAttempt::where('user_id', $user->id)->where('tryout_id', $tryout->id)->exists();
             $isApproved = \App\Models\TryoutRegistration::where('user_id', $user->id)
@@ -522,7 +509,6 @@ public function index(Request $request)
             ->orderBy('created_at', 'desc')
             ->get();
 
-        // Limit Pengerjaan Berdasarkan Tipe Akses
         $maxAttempts = $hasPremium ? 3 : 1;
         if ($tryout->type === 'akbar') {
             $maxAttempts = 1;
@@ -532,7 +518,7 @@ public function index(Request $request)
             'tryout' => $tryout,
             'attempts' => $attempts,
             'hasFullAccess' => $hasPremium,
-            'maxAttempts' => $maxAttempts // KIRIM DATA LIMIT KE VUE
+            'maxAttempts' => $maxAttempts 
         ]);
     }
 
@@ -565,7 +551,6 @@ public function index(Request $request)
             ];
         }
 
-        // --- ATURAN BATAS PENGERJAAN: PREMIUM 3X, GRATIS 1X ---
         $maxAttempts = $hasPremium ? 3 : 1;
         if ($tryout->type === 'akbar') {
             $maxAttempts = 1;
@@ -582,7 +567,6 @@ public function index(Request $request)
             ];
         }
 
-        // Cegah mulai ujian jika gratis tapi belum di-approve admin (dan belum pernah nyoba)
         if (!$hasPremium && $attemptsCount == 0 && $tryout->is_paid && $tryout->price > 0) {
             $isApproved = \App\Models\TryoutRegistration::where('user_id', $user->id)
                 ->where('tryout_id', $tryout->id)
@@ -655,43 +639,32 @@ public function index(Request $request)
         ]);
     }
 
-    /**
-     * Menampilkan halaman form pendaftaran/pembelian Premium
-     */
     public function registerForm(Tryout $tryout)
     {
         $now = now();
 
-        // Validasi pembukaan pendaftaran
         if ($tryout->registration_start_at && $now->lt($tryout->registration_start_at)) {
             return redirect()->route('tryout.show', $tryout->id)
                 ->with('error', 'Pendaftaran untuk tryout ini belum dibuka.');
         }
 
-        // Validasi penutupan pendaftaran
         if ($tryout->registration_end_at && $now->gt($tryout->registration_end_at)) {
             return redirect()->route('tryout.show', $tryout->id)
                 ->with('error', 'Pendaftaran untuk tryout ini telah ditutup.');
         }
 
-        // Validasi masa pengerjaan berakhir
         if ($tryout->end_date && $now->greaterThan($tryout->end_date)) {
             return redirect()->route('tryout.show', $tryout->id)
                 ->with('error', 'Masa pengerjaan tryout ini telah berakhir.');
         }
 
-        // Mengarah ke halaman Vue pembelian/pendaftaran
         return Inertia::render('User/Tryout/Register', [
             'tryout' => $tryout
         ]);
     }
 
-/**
-     * Menampilkan Halaman Peringkat Nasional (Dropdown Tryout & Tab)
-     */
     public function ranking(\Illuminate\Http\Request $request)
     {
-        // 1. Ambil daftar Tryout aktif untuk Dropdown
         $tryouts = \App\Models\Tryout::where('is_active', true)
             ->orderBy('created_at', 'desc')
             ->get(['id', 'title']);
@@ -700,18 +673,17 @@ public function index(Request $request)
         $selectedTryoutId = $request->tryout_id;
 
         if ($selectedTryoutId) {
-            // 2. Ambil SEMUA data peserta untuk tryout ini
             $query = \App\Models\ExamAttempt::with('user')
                 ->where('tryout_id', $selectedTryoutId)
                 ->whereNotNull('completed_at');
 
-            // 3. Eksekusi dan Sorting BKN
             $leaderboard = $query->get()
                 ->groupBy('user_id')
                 ->map(function ($attempts) {
                     return $attempts->sortByDesc('total_score')->first();
                 })
                 ->sortByDesc(function ($attempt) {
+                    // Sorting didasarkan pada total score (Bisa untuk SKD/SKB)
                     return sprintf('%03d%03d%03d%03d', 
                         $attempt->total_score, 
                         $attempt->tkp_score, 
@@ -724,11 +696,11 @@ public function index(Request $request)
                     $namaInstansi = $attempt->user->agency_name ?? 'Instansi belum diatur';
 
                     return [
-                        'rank' => $index + 1, // Peringkat Nasional Asli
+                        'rank' => $index + 1, 
                         'user_name' => $attempt->user->name ?? 'Anonim', 
                         'instansi' => $namaInstansi,
-                        'agency_name' => $namaInstansi, // Dikirim untuk difilter Vue
-                        'province_code' => $attempt->user->province_code ?? null, // Dikirim untuk difilter Vue
+                        'agency_name' => $namaInstansi, 
+                        'province_code' => $attempt->user->province_code ?? null, 
                         'is_current_user' => $attempt->user_id === auth()->id(),
                         'total_score' => $attempt->total_score,
                         'twk_score' => $attempt->twk_score,
@@ -809,6 +781,9 @@ public function index(Request $request)
         return response()->json(['status' => 'ok']);
     }
 
+    /**
+     * Memproses Pengumpulan Jawaban & Penilaian (SKD dan SKB)
+     */
     public function finish(Request $request, Tryout $tryout)
     {
         $user = auth()->user();
@@ -825,29 +800,50 @@ public function index(Request $request)
 
         $answers = $request->answers ?? [];
         $questions = $tryout->questions;
-        $twk = 0; $tiu = 0; $tkp = 0;
 
-        foreach ($questions as $q) {
-            $ans = $answers[$q->id] ?? null;
-            if ($q->type === 'TKP') {
-                $tkpScoreMap = is_string($q->tkp_scores) ? json_decode($q->tkp_scores, true) : $q->tkp_scores;
-                $tkp += (int) ($tkpScoreMap[$ans] ?? 0);
-            } else {
-                if ($ans === $q->correct_answer) {
-                    if ($q->type === 'TWK') $twk += 5;
-                    if ($q->type === 'TIU') $tiu += 5;
+        // Logika Perhitungan Berdasarkan Kategori Tryout
+        if ($tryout->category === 'skb') {
+            $skbScore = 0;
+            foreach ($questions as $q) {
+                $ans = $answers[$q->id] ?? null;
+                if ((string)$ans === (string)$q->correct_answer) {
+                    $skbScore += 5; // SKB Benar = 5, Salah/Kosong = 0
                 }
             }
-        }
 
-        $attempt->update([
-            'answers' => $answers, 
-            'twk_score' => $twk, 
-            'tiu_score' => $tiu, 
-            'tkp_score' => $tkp, 
-            'total_score' => $twk + $tiu + $tkp, 
-            'completed_at' => now() 
-        ]);
+            $attempt->update([
+                'answers' => $answers,
+                'twk_score' => 0,
+                'tiu_score' => 0,
+                'tkp_score' => 0,
+                'total_score' => $skbScore,
+                'completed_at' => now()
+            ]);
+        } else {
+            // Logika SKD
+            $twk = 0; $tiu = 0; $tkp = 0;
+            foreach ($questions as $q) {
+                $ans = $answers[$q->id] ?? null;
+                if ($q->type === 'TKP') {
+                    $tkpScoreMap = is_string($q->tkp_scores) ? json_decode($q->tkp_scores, true) : $q->tkp_scores;
+                    $tkp += (int) ($tkpScoreMap[$ans] ?? 0);
+                } else {
+                    if ((string)$ans === (string)$q->correct_answer) {
+                        if ($q->type === 'TWK') $twk += 5;
+                        if ($q->type === 'TIU') $tiu += 5;
+                    }
+                }
+            }
+
+            $attempt->update([
+                'answers' => $answers, 
+                'twk_score' => $twk, 
+                'tiu_score' => $tiu, 
+                'tkp_score' => $tkp, 
+                'total_score' => $twk + $tiu + $tkp, 
+                'completed_at' => now() 
+            ]);
+        }
         
         return redirect()->route('tryout.result', $attempt->id);
     }
@@ -890,26 +886,22 @@ public function index(Request $request)
         }
 
         $histories = $attempts->map(function ($attempt) use ($pgTwk, $pgTiu, $pgTkp, $firstAttemptsByTryout) {
-            $attempt->is_passed = ($attempt->twk_score >= $pgTwk && $attempt->tiu_score >= $pgTiu && $attempt->tkp_score >= $pgTkp);
+            if ($attempt->tryout && $attempt->tryout->category === 'skb') {
+                $attempt->is_passed = $attempt->total_score >= ($attempt->tryout->passing_grade ?? 0);
+            } else {
+                $attempt->is_passed = ($attempt->twk_score >= $pgTwk && $attempt->tiu_score >= $pgTiu && $attempt->tkp_score >= $pgTkp);
+            }
             
             if ($attempt->attempt_number === 1) {
                 $firstAttempts = $firstAttemptsByTryout[$attempt->tryout_id] ?? collect();
-                
-                $currentPassed = $attempt->is_passed ? 1 : 0;
-                $currentScoreString = sprintf('%d-%03d-%03d-%03d-%03d', $currentPassed, $attempt->total_score, $attempt->tkp_score, $attempt->tiu_score, $attempt->twk_score);
-
                 $rank = 1;
                 foreach ($firstAttempts as $userId => $firstAttempt) {
                     if ($userId === $attempt->user_id) continue;
-
-                    $isPassed = ($firstAttempt->twk_score >= $pgTwk && $firstAttempt->tiu_score >= $pgTiu && $firstAttempt->tkp_score >= $pgTkp) ? 1 : 0;
-                    $compareScoreString = sprintf('%d-%03d-%03d-%03d-%03d', $isPassed, $firstAttempt->total_score, $firstAttempt->tkp_score, $firstAttempt->tiu_score, $firstAttempt->twk_score);
-
-                    if (strcmp($compareScoreString, $currentScoreString) > 0) {
+                    // Simply sort by total score for ranking history
+                    if ($firstAttempt->total_score > $attempt->total_score) {
                         $rank++;
                     }
                 }
-
                 $attempt->rank = $rank;
             } else {
                 $attempt->rank = null;
@@ -930,11 +922,13 @@ public function index(Request $request)
         ]);
     }
 
-public function result(ExamAttempt $attempt)
+    /**
+     * Menampilkan Halaman Hasil Pengerjaan (Support SKD dan SKB)
+     */
+    public function result(ExamAttempt $attempt)
     {
         if ($attempt->user_id !== auth()->id()) abort(403);
         
-        // Memuat tryout beserta soalnya untuk menghitung sub-materi
         $attempt->load(['tryout', 'tryout.questions']);
         $tryout = $attempt->tryout;
 
@@ -942,66 +936,114 @@ public function result(ExamAttempt $attempt)
             ? route('tryout-akbar.wait', $tryout->id) 
             : route('tryout.history.detail', $tryout->id); 
 
-        $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65;
-        $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80;
-        $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
-
-        $firstAttempts = ExamAttempt::where('tryout_id', $tryout->id)
-            ->orderBy('created_at', 'asc')
-            ->get()
-            ->groupBy('user_id')
-            ->map(function ($userAttempts) {
-                return $userAttempts->first(); 
-            });
-
-        $totalParticipants = $firstAttempts->count();
-
-        $currentPassed = ($attempt->twk_score >= $pgTwk && $attempt->tiu_score >= $pgTiu && $attempt->tkp_score >= $pgTkp) ? 1 : 0;
-        $currentScoreString = sprintf('%d-%03d-%03d-%03d-%03d', $currentPassed, $attempt->total_score, $attempt->tkp_score, $attempt->tiu_score, $attempt->twk_score);
-
-        $rank = 1;
-        foreach ($firstAttempts as $userId => $firstAttempt) {
-            if ($userId === $attempt->user_id) continue; 
-
-            $isPassed = ($firstAttempt->twk_score >= $pgTwk && $firstAttempt->tiu_score >= $pgTiu && $firstAttempt->tkp_score >= $pgTkp) ? 1 : 0;
-            $compareScoreString = sprintf('%d-%03d-%03d-%03d-%03d', $isPassed, $firstAttempt->total_score, $firstAttempt->tkp_score, $firstAttempt->tiu_score, $firstAttempt->twk_score);
-
-            if (strcmp($compareScoreString, $currentScoreString) > 0) {
-                $rank++;
-            }
-        }
-
-        $scoreDetails = [
-            ['category' => 'Tes Wawasan Kebangsaan (TWK)', 'score' => $attempt->twk_score, 'passing_grade' => $pgTwk, 'is_passed' => $attempt->twk_score >= $pgTwk],
-            ['category' => 'Tes Intelegensia Umum (TIU)', 'score' => $attempt->tiu_score, 'passing_grade' => $pgTiu, 'is_passed' => $attempt->tiu_score >= $pgTiu],
-            ['category' => 'Tes Karakteristik Pribadi (TKP)', 'score' => $attempt->tkp_score, 'passing_grade' => $pgTkp, 'is_passed' => $attempt->tkp_score >= $pgTkp]
-        ];
-
-        // --- TAMBAHAN: KALKULASI SKOR MATERI / SUB-KATEGORI ---
+        $scoreDetails = [];
         $answers = is_string($attempt->answers) ? json_decode($attempt->answers, true) : ($attempt->answers ?? []);
-        $materialScores = ['TWK' => [], 'TIU' => [], 'TKP' => []];
+        $materialScores = [];
+        $rank = 1;
+        $totalParticipants = 1;
 
-        foreach ($tryout->questions as $q) {
-            $topic = $q->sub_category ?? 'Umum'; 
-            $ans = $answers[$q->id] ?? null;
+        if ($tryout->category === 'skb') {
+            // --- LOGIKA RESULT SKB ---
+            $pgSkb = $tryout->passing_grade ?? 0;
+            $isPassed = $attempt->total_score >= $pgSkb;
             
-            if (!isset($materialScores[$q->type][$topic])) {
-                $materialScores[$q->type][$topic] = ['score' => 0, 'max_score' => 0];
-            }
+            $firstAttempts = ExamAttempt::where('tryout_id', $tryout->id)
+                ->orderBy('created_at', 'asc')
+                ->get()
+                ->groupBy('user_id')
+                ->map(function ($userAttempts) { return $userAttempts->first(); });
 
-            if ($q->type === 'TKP') {
-                $tkpScoreMap = is_string($q->tkp_scores) ? json_decode($q->tkp_scores, true) : $q->tkp_scores;
-                $materialScores[$q->type][$topic]['score'] += (int) ($tkpScoreMap[$ans] ?? 0);
-                $materialScores[$q->type][$topic]['max_score'] += 5; // Nilai max per soal TKP adalah 5
-            } else {
-                $materialScores[$q->type][$topic]['max_score'] += 5;
-                if ((string)$ans === (string)$q->correct_answer) {
-                    $materialScores[$q->type][$topic]['score'] += 5;
+            $totalParticipants = $firstAttempts->count();
+            
+            foreach ($firstAttempts as $userId => $firstAttempt) {
+                if ($userId === $attempt->user_id) continue;
+                if ($firstAttempt->total_score > $attempt->total_score) {
+                    $rank++;
                 }
             }
-        }
 
-        $attempt->status = $attempt->is_passed ? 'lulus' : 'tidak_lulus';
+            $scoreDetails = [
+                ['category' => 'Kompetensi Bidang', 'score' => $attempt->total_score, 'passing_grade' => $pgSkb, 'is_passed' => $isPassed]
+            ];
+            
+            $materialScores['Kompetensi Bidang'] = [];
+            foreach ($tryout->questions as $q) {
+                $topic = $q->sub_category ?? 'Materi Umum'; 
+                $ans = $answers[$q->id] ?? null;
+                
+                if (!isset($materialScores['Kompetensi Bidang'][$topic])) {
+                    $materialScores['Kompetensi Bidang'][$topic] = ['score' => 0, 'max_score' => 0];
+                }
+                
+                $materialScores['Kompetensi Bidang'][$topic]['max_score'] += 5;
+                if ((string)$ans === (string)$q->correct_answer) {
+                    $materialScores['Kompetensi Bidang'][$topic]['score'] += 5;
+                }
+            }
+            $attempt->status = $isPassed ? 'lulus' : 'tidak_lulus';
+            $attempt->is_passed = $isPassed;
+
+        } else {
+            // --- LOGIKA RESULT SKD ---
+            $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65;
+            $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80;
+            $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
+
+            $firstAttempts = ExamAttempt::where('tryout_id', $tryout->id)
+                ->orderBy('created_at', 'asc')
+                ->get()
+                ->groupBy('user_id')
+                ->map(function ($userAttempts) {
+                    return $userAttempts->first(); 
+                });
+
+            $totalParticipants = $firstAttempts->count();
+
+            $currentPassed = ($attempt->twk_score >= $pgTwk && $attempt->tiu_score >= $pgTiu && $attempt->tkp_score >= $pgTkp) ? 1 : 0;
+            $currentScoreString = sprintf('%d-%03d-%03d-%03d-%03d', $currentPassed, $attempt->total_score, $attempt->tkp_score, $attempt->tiu_score, $attempt->twk_score);
+
+            foreach ($firstAttempts as $userId => $firstAttempt) {
+                if ($userId === $attempt->user_id) continue; 
+
+                $isPassed = ($firstAttempt->twk_score >= $pgTwk && $firstAttempt->tiu_score >= $pgTiu && $firstAttempt->tkp_score >= $pgTkp) ? 1 : 0;
+                $compareScoreString = sprintf('%d-%03d-%03d-%03d-%03d', $isPassed, $firstAttempt->total_score, $firstAttempt->tkp_score, $firstAttempt->tiu_score, $firstAttempt->twk_score);
+
+                if (strcmp($compareScoreString, $currentScoreString) > 0) {
+                    $rank++;
+                }
+            }
+
+            $scoreDetails = [
+                ['category' => 'Tes Wawasan Kebangsaan (TWK)', 'score' => $attempt->twk_score, 'passing_grade' => $pgTwk, 'is_passed' => $attempt->twk_score >= $pgTwk],
+                ['category' => 'Tes Intelegensia Umum (TIU)', 'score' => $attempt->tiu_score, 'passing_grade' => $pgTiu, 'is_passed' => $attempt->tiu_score >= $pgTiu],
+                ['category' => 'Tes Karakteristik Pribadi (TKP)', 'score' => $attempt->tkp_score, 'passing_grade' => $pgTkp, 'is_passed' => $attempt->tkp_score >= $pgTkp]
+            ];
+
+            $materialScores = ['TWK' => [], 'TIU' => [], 'TKP' => []];
+
+            foreach ($tryout->questions as $q) {
+                $topic = $q->sub_category ?? 'Umum'; 
+                $ans = $answers[$q->id] ?? null;
+                
+                if (!isset($materialScores[$q->type][$topic])) {
+                    $materialScores[$q->type][$topic] = ['score' => 0, 'max_score' => 0];
+                }
+
+                if ($q->type === 'TKP') {
+                    $tkpScoreMap = is_string($q->tkp_scores) ? json_decode($q->tkp_scores, true) : $q->tkp_scores;
+                    $materialScores[$q->type][$topic]['score'] += (int) ($tkpScoreMap[$ans] ?? 0);
+                    $materialScores[$q->type][$topic]['max_score'] += 5; 
+                } else {
+                    $materialScores[$q->type][$topic]['max_score'] += 5;
+                    if ((string)$ans === (string)$q->correct_answer) {
+                        $materialScores[$q->type][$topic]['score'] += 5;
+                    }
+                }
+            }
+
+            $attempt->is_passed = $currentPassed == 1;
+            $attempt->status = $attempt->is_passed ? 'lulus' : 'tidak_lulus';
+        }
 
         $durationSeconds = 0;
         if ($attempt->created_at && $attempt->completed_at) {
@@ -1029,7 +1071,7 @@ public function result(ExamAttempt $attempt)
             'tryout' => $tryout,
             'totalScore' => $attempt->total_score,
             'scoreDetails' => $scoreDetails,
-            'materialScores' => $materialScores, // --- DATA INI DIKIRIM KE VUE ---
+            'materialScores' => $materialScores, 
             'ranking' => ['rank' => $rank, 'total_participants' => $totalParticipants],
             'timeStats' => $timeStats,
             'backUrl' => $backUrl,
@@ -1047,7 +1089,7 @@ public function result(ExamAttempt $attempt)
                 ->with('error', 'Pembahasan lengkap hanya tersedia untuk pengguna Premium. Silakan beli paket ini terlebih dahulu.');
         }
 
-        $userAnswers = $attempt->answers ?? [];
+        $userAnswers = is_string($attempt->answers) ? json_decode($attempt->answers, true) : ($attempt->answers ?? []);
         $questions = $attempt->tryout->questions()->orderBy('order', 'asc')->get()->map(function ($q) use ($userAnswers) {
             $selected = $userAnswers[$q->id] ?? null;
             $q->user_answer = $selected; 
@@ -1161,7 +1203,6 @@ public function result(ExamAttempt $attempt)
     {
         $user = auth()->user();
         
-        // Ambil semua TO yang sudah selesai dikerjakan, beserta relasi soalnya
         $attempts = \App\Models\ExamAttempt::with('tryout.questions')
             ->where('user_id', $user->id)
             ->whereNotNull('completed_at')
@@ -1175,42 +1216,49 @@ public function result(ExamAttempt $attempt)
         $subtests = [];
 
         foreach ($attempts as $idx => $attempt) {
-            // Label nama TO di grafik (dibatasi 15 huruf agar rapi)
             $title = $attempt->tryout->title ?? ('Tryout ' . ($idx + 1));
             $shortTitle = \Illuminate\Support\Str::limit($title, 15);
             
-            // Hindari nama duplikat di grafik jika user mengulang TO yang sama
             $label = in_array($shortTitle, $categories) ? $shortTitle . ' (V'.($idx+1).')' : $shortTitle;
             $categories[] = $label;
 
-            // Data Grafik Garis (Nilai Utama)
             $seriesMain['total'][] = $attempt->total_score;
-            $seriesMain['twk'][] = $attempt->twk_score;
-            $seriesMain['tiu'][] = $attempt->tiu_score;
-            $seriesMain['tkp'][] = $attempt->tkp_score;
+            
+            if ($attempt->tryout && $attempt->tryout->category === 'skb') {
+                $seriesMain['twk'][] = 0;
+                $seriesMain['tiu'][] = 0;
+                $seriesMain['tkp'][] = 0;
+            } else {
+                $seriesMain['twk'][] = $attempt->twk_score;
+                $seriesMain['tiu'][] = $attempt->tiu_score;
+                $seriesMain['tkp'][] = $attempt->tkp_score;
+            }
 
-            // --- KALKULASI SUBTES (Materi) ---
             $answers = is_string($attempt->answers) ? json_decode($attempt->answers, true) : ($attempt->answers ?? []);
             $tryoutQuestions = $attempt->tryout->questions ?? [];
 
             $subtestScore = ['TWK' => [], 'TIU' => [], 'TKP' => []];
+            
+            if ($attempt->tryout && $attempt->tryout->category === 'skb') {
+                $subtestScore = ['Kompetensi Bidang' => []];
+            }
 
             foreach ($tryoutQuestions as $q) {
-                // CATATAN: Ganti 'sub_category' di bawah ini dengan nama kolom materi/topik di tabel questions Anda.
-                // Jika tidak ada kolomnya, sistem otomatis mengubahnya menjadi 'Umum'.
                 $topic = $q->sub_category ?? $q->materi ?? $q->topic ?? 'Umum'; 
                 $ans = $answers[$q->id] ?? null;
                 
-                if (!isset($subtestScore[$q->type][$topic])) {
-                    $subtestScore[$q->type][$topic] = 0;
+                $catType = ($attempt->tryout && $attempt->tryout->category === 'skb') ? 'Kompetensi Bidang' : $q->type;
+
+                if (!isset($subtestScore[$catType][$topic])) {
+                    $subtestScore[$catType][$topic] = 0;
                 }
 
-                if ($q->type === 'TKP') {
+                if ($q->type === 'TKP' && (!isset($attempt->tryout->category) || $attempt->tryout->category !== 'skb')) {
                     $tkpScoreMap = is_string($q->tkp_scores) ? json_decode($q->tkp_scores, true) : $q->tkp_scores;
-                    $subtestScore[$q->type][$topic] += (int) ($tkpScoreMap[$ans] ?? 0);
+                    $subtestScore[$catType][$topic] += (int) ($tkpScoreMap[$ans] ?? 0);
                 } else {
                     if ((string)$ans === (string)$q->correct_answer) {
-                        $subtestScore[$q->type][$topic] += 5;
+                        $subtestScore[$catType][$topic] += 5;
                     }
                 }
             }
@@ -1227,7 +1275,7 @@ public function result(ExamAttempt $attempt)
         ]);
     }
 
-public function leaderboard(Request $request, Tryout $tryout)
+    public function leaderboard(Request $request, Tryout $tryout)
     {
         if (!$this->hasPremiumAccess($tryout)) {
             return redirect()->route('tryout.history.detail', $tryout->id)
@@ -1240,14 +1288,20 @@ public function leaderboard(Request $request, Tryout $tryout)
 
         $allAttempts = ExamAttempt::with('user')
             ->where('tryout_id', $tryout->id)
+            ->whereNotNull('completed_at')
             ->orderBy('created_at', 'asc')
             ->get();
 
-        // Ambil pengerjaan pertama (atau terbaik) per user
         $firstAttempts = $allAttempts->groupBy('user_id')->map->first()->values();
 
-        $rankings = $firstAttempts->map(function($a) use ($pgTwk, $pgTiu, $pgTkp) {
-            $isPassed = ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp);
+        $rankings = $firstAttempts->map(function($a) use ($pgTwk, $pgTiu, $pgTkp, $tryout) {
+            $isPassed = false;
+            if ($tryout->category === 'skb') {
+                $isPassed = $a->total_score >= ($tryout->passing_grade ?? 0);
+            } else {
+                $isPassed = ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp);
+            }
+            
             return [
                 'id' => $a->id,
                 'user_id' => $a->user_id,
@@ -1265,6 +1319,20 @@ public function leaderboard(Request $request, Tryout $tryout)
                 'is_me' => $a->user_id === auth()->id()
             ];
         });
+        
+        // Sorting untuk leaderboard SKB vs SKD
+        if ($tryout->category === 'skb') {
+            $rankings = $rankings->sortByDesc('score')->values();
+        } else {
+            $rankings = $rankings->sortByDesc(function ($attempt) {
+                return sprintf('%03d%03d%03d%03d', 
+                    $attempt['score'], 
+                    $attempt['tkp'], 
+                    $attempt['tiu'], 
+                    $attempt['twk']
+                );
+            })->values();
+        }
 
         return Inertia::render('User/Tryout/Leaderboard', [
             'tryout' => $tryout, 
@@ -1284,15 +1352,21 @@ public function leaderboard(Request $request, Tryout $tryout)
                 ->with('error', 'Sertifikat hanya tersedia untuk pengguna berbayar (Premium). Silakan beli paket ini terlebih dahulu.');
         }
 
-        $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65; 
-        $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80; 
-        $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
+        $isPassed = false;
         
-        $isPassed = (
-            $attempt->twk_score >= $pgTwk && 
-            $attempt->tiu_score >= $pgTiu && 
-            $attempt->tkp_score >= $pgTkp
-        );
+        if ($attempt->tryout->category === 'skb') {
+            $isPassed = $attempt->total_score >= ($attempt->tryout->passing_grade ?? 0);
+        } else {
+            $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65; 
+            $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80; 
+            $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
+            
+            $isPassed = (
+                $attempt->twk_score >= $pgTwk && 
+                $attempt->tiu_score >= $pgTiu && 
+                $attempt->tkp_score >= $pgTkp
+            );
+        }
 
         return view('pdf.certificate', [
             'attempt' => $attempt, 

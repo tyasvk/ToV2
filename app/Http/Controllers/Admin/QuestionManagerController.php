@@ -14,7 +14,6 @@ class QuestionManagerController extends Controller
 {
     public function index(Tryout $tryout)
     {
-        // Data diambil mentah (termasuk tag HTML gambar) lalu dikirim ke Vue
         $questions = $tryout->questions()->orderBy('order', 'asc')->get();
         
         return Inertia::render('Admin/Question/Index', [
@@ -25,37 +24,51 @@ class QuestionManagerController extends Controller
 
     public function store(Request $request, Tryout $tryout)
     {
-        // Validasi dilonggarkan menjadi nullable agar teks boleh kosong jika diganti gambar
-        $request->validate([
-            'type'            => 'required|in:TWK,TIU,TKP',
+        $rules = [
             'content'         => 'nullable|string',
             'image'           => 'nullable|image|max:2048',
             'options'         => 'required|array',
-            'options.*'       => 'nullable|string', // Izinkan tiap opsi kosong (null/empty)
+            'options.*'       => 'nullable|string',
             'option_images.*' => 'nullable|image|max:2048', 
             'explanation'     => 'nullable|string',
-            'correct_answer'  => 'nullable|string',
-            'tkp_scores'      => 'nullable|array',
-        ]);
+            'sub_category'    => 'nullable|string', // Tambahan Analisis Materi SKB
+        ];
+
+        // Validasi dinamis SKB vs SKD
+        if ($tryout->category === 'skb') {
+            $rules['correct_answer'] = 'required|string';
+        } else {
+            $rules['type'] = 'required|in:TWK,TIU,TKP';
+            if ($request->type === 'TKP') {
+                $rules['tkp_scores'] = 'required|array';
+            } else {
+                $rules['correct_answer'] = 'required|string';
+            }
+        }
+
+        $request->validate($rules);
 
         $data = $request->except(['option_images', 'existing_option_images']);
-        
-        // Mencegah error database jika kolom tidak boleh NULL
         $data['content'] = $request->content ?? '';
 
-        // Pastikan nilai null pada opsi jawaban diubah menjadi string kosong ''
+        // Otomatis assign type SKB jika kategori adalah skb
+        if ($tryout->category === 'skb') {
+            $data['type'] = 'SKB';
+            $data['tkp_scores'] = null;
+        } elseif ($request->type === 'TKP') {
+            $data['correct_answer'] = null;
+        }
+
         $options = $request->options ?? [];
         foreach (['a', 'b', 'c', 'd', 'e'] as $opt) {
             $options[$opt] = isset($options[$opt]) ? $options[$opt] : '';
         }
         $data['options'] = $options;
 
-        // Handle Gambar Soal (Pertanyaan Utama)
         if ($request->hasFile('image')) {
             $data['image'] = $request->file('image')->store('questions', 'public');
         }
 
-        // Handle Gambar Opsi (SEKARANG BERLAKU UNTUK SEMUA TIPE SOAL, TIDAK HANYA TIU)
         if ($request->hasFile('option_images')) {
             $optionImagePaths = [];
             foreach (['a', 'b', 'c', 'd', 'e'] as $key) {
@@ -66,7 +79,6 @@ class QuestionManagerController extends Controller
             $data['option_images'] = $optionImagePaths;
         }
 
-        // Set Order otomatis di akhir
         $maxOrder = $tryout->questions()->max('order') ?? 0;
         $data['order'] = $maxOrder + 1;
 
@@ -77,67 +89,68 @@ class QuestionManagerController extends Controller
 
     public function update(Request $request, Tryout $tryout, Question $question)
     {
-        // Validasi dilonggarkan
-        $request->validate([
-            'type'            => 'required|in:TWK,TIU,TKP',
+        $rules = [
             'content'         => 'nullable|string',
             'image'           => 'nullable|image|max:2048',
             'options'         => 'required|array',
-            'options.*'       => 'nullable|string', // Izinkan tiap opsi kosong
+            'options.*'       => 'nullable|string', 
             'option_images.*' => 'nullable|image|max:2048',
             'explanation'     => 'nullable|string',
-            'correct_answer'  => 'nullable|string',
-            'tkp_scores'      => 'nullable|array',
-        ]);
+            'sub_category'    => 'nullable|string', // Tambahan Analisis Materi SKB
+        ];
+
+        // Validasi dinamis SKB vs SKD
+        if ($tryout->category === 'skb') {
+            $rules['correct_answer'] = 'required|string';
+        } else {
+            $rules['type'] = 'required|in:TWK,TIU,TKP';
+            if ($request->type === 'TKP') {
+                $rules['tkp_scores'] = 'required|array';
+            } else {
+                $rules['correct_answer'] = 'required|string';
+            }
+        }
+
+        $request->validate($rules);
 
         $data = $request->except(['option_images', 'existing_option_images']);
-        
-        // Mencegah error database
         $data['content'] = $request->content ?? '';
 
-        // Mencegah nilai null pada opsi jawaban masuk ke database
+        // Otomatis assign type SKB jika kategori adalah skb
+        if ($tryout->category === 'skb') {
+            $data['type'] = 'SKB';
+            $data['tkp_scores'] = null;
+        } elseif ($request->type === 'TKP') {
+            $data['correct_answer'] = null;
+        }
+
         $options = $request->options ?? [];
         foreach (['a', 'b', 'c', 'd', 'e'] as $opt) {
             $options[$opt] = isset($options[$opt]) ? $options[$opt] : '';
         }
         $data['options'] = $options;
 
-        // ==========================================
-        // HANDLE GAMBAR SOAL UTAMA
-        // ==========================================
         if ($request->hasFile('image')) {
-            // Hapus gambar lama sebelum menyimpan yang baru
             if ($question->image && Storage::disk('public')->exists($question->image)) {
                 Storage::disk('public')->delete($question->image);
             }
             $data['image'] = $request->file('image')->store('questions', 'public');
         } else {
-            // Jika tidak ada gambar baru, hapus 'image' dari array $data
-            // agar Eloquent TIDAK menimpa gambar lama dengan nilai NULL.
             unset($data['image']);
         }
 
-        // ==========================================
-        // HANDLE GAMBAR OPSI (SEKARANG BERLAKU UNTUK SEMUA TIPE)
-        // ==========================================
-        // Ambil data gambar opsi yang sudah ada di database sebelumnya
         $optionImagePaths = is_string($question->option_images) ? json_decode($question->option_images, true) : ($question->option_images ?? []);
 
-        // Langsung cek tanpa membatasi hanya untuk tipe TIU
         foreach (['a', 'b', 'c', 'd', 'e'] as $key) {
             if ($request->hasFile("option_images.{$key}")) {
-                // Hapus gambar opsi lama jika ada
                 if (!empty($optionImagePaths[$key]) && Storage::disk('public')->exists($optionImagePaths[$key])) {
                     Storage::disk('public')->delete($optionImagePaths[$key]);
                 }
-                // Simpan gambar opsi baru
                 $optionImagePaths[$key] = $request->file("option_images.{$key}")->store('option_images', 'public');
             }
         }
-        // Masukkan kembali kombinasi gambar opsi lama & baru ke dalam data untuk di-update
         $data['option_images'] = $optionImagePaths;
 
-        // Update database
         $question->update($data);
 
         return back()->with('message', 'Soal berhasil diperbarui!');
@@ -145,12 +158,10 @@ class QuestionManagerController extends Controller
 
     public function destroy(Tryout $tryout, Question $question)
     {
-        // Hapus file Gambar Soal Utama dari Storage
         if ($question->image && Storage::disk('public')->exists($question->image)) {
             Storage::disk('public')->delete($question->image);
         }
 
-        // Hapus file Gambar Opsi dari Storage
         $optionImages = is_string($question->option_images) ? json_decode($question->option_images, true) : ($question->option_images ?? []);
         if (is_array($optionImages)) {
             foreach ($optionImages as $imgPath) {
@@ -199,6 +210,11 @@ class QuestionManagerController extends Controller
 
                 $type = strtoupper(trim($row[0]));
                 
+                // Jika tryout SKB, paksakan tipe soal menjadi SKB (Abaikan isi CSV)
+                if ($tryout->category === 'skb') {
+                    $type = 'SKB';
+                }
+                
                 $options = [
                     'a' => $row[2] ?? '',
                     'b' => $row[3] ?? '',
@@ -230,6 +246,8 @@ class QuestionManagerController extends Controller
                     'correct_answer' => $correctAnswer,
                     'tkp_scores'     => $tkpScores,
                     'explanation'    => $row[8] ?? '',
+                    // Baris di bawah jika CSV Anda kelak menambahkan kolom ke-9 sebagai Sub Kategori
+                    'sub_category'   => $row[9] ?? null, 
                     'order'          => $maxOrder
                 ]);
                 $count++;

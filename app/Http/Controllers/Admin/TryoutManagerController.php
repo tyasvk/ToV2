@@ -26,12 +26,11 @@ class TryoutManagerController extends Controller
             $query->where('title', 'like', '%' . $request->search . '%');
         }
 
-        // --- UBAH DI SINI: Gunakan get() untuk mengambil SEMUA data tanpa terpotong pagination ---
+        // Gunakan get() untuk mengambil SEMUA data tanpa terpotong pagination
         $tryouts = $query->latest()->get();
 
         return Inertia::render('Admin/Tryout/Index', [
             'tryouts' => $tryouts,
-            // Hapus per_page, sisa parameter pencarian saja
             'filters' => [
                 'search' => $request->search,
             ],
@@ -39,59 +38,68 @@ class TryoutManagerController extends Controller
     }
 
     public function store(Request $request)
-{
-    $validated = $request->validate([
-        'title'                 => 'required|string|max:255',
-        'duration'              => 'required|integer|min:1',
-        'description'           => 'nullable|string',
-        'is_paid'               => 'required|boolean',
-        'price'                 => 'required_if:is_paid,true|numeric|min:0',
-        'is_published'          => 'boolean',
-        'registration_start_at' => 'nullable|date',
-        'registration_end_at'   => 'nullable|date|after_or_equal:registration_start_at',
-        'started_at'            => 'nullable|date', 
-        'end_date'              => 'nullable|date|after_or_equal:started_at',     
-    ]);
+    {
+        $validated = $request->validate([
+            'title'                 => 'required|string|max:255',
+            'duration'              => 'required|integer|min:1',
+            'description'           => 'nullable|string',
+            'is_paid'               => 'required|boolean',
+            'price'                 => 'required_if:is_paid,true|numeric|min:0',
+            'category'              => 'required|in:skd,skb', // Tambahan SKB
+            'passing_grade'         => 'nullable|required_if:category,skb|integer|min:0', // Tambahan SKB
+            'is_published'          => 'boolean',
+            'registration_start_at' => 'nullable|date',
+            'registration_end_at'   => 'nullable|date|after_or_equal:registration_start_at',
+            'started_at'            => 'nullable|date', 
+            'end_date'              => 'nullable|date|after_or_equal:started_at',    
+        ]);
 
-    $validated['type'] = 'general';
-    $validated['is_active'] = $request->is_published; 
-    
-    if ($request->is_published) {
-        $validated['published_at'] = Carbon::now();
+        $validated['type'] = 'general';
+        $validated['is_active'] = $request->is_published; 
+        
+        if ($request->is_published) {
+            $validated['published_at'] = Carbon::now();
+        }
+
+        Tryout::create($validated);
+
+        return back()->with('message', 'Paket Tryout berhasil ditambahkan!');
     }
 
-    Tryout::create($validated);
+    public function update(Request $request, Tryout $tryout)
+    {
+        $validated = $request->validate([
+            'title'                 => 'required|string|max:255',
+            'duration'              => 'required|integer|min:1',
+            'description'           => 'nullable|string',
+            'is_paid'               => 'required|boolean',
+            'price'                 => 'required_if:is_paid,true|numeric|min:0',
+            'category'              => 'required|in:skd,skb', // Tambahan SKB
+            'passing_grade'         => 'nullable|required_if:category,skb|integer|min:0', // Tambahan SKB
+            'is_published'          => 'boolean',
+            'registration_start_at' => 'nullable|date',
+            'registration_end_at'   => 'nullable|date|after_or_equal:registration_start_at',
+            'started_at'            => 'nullable|date', 
+            'end_date'              => 'nullable|date|after_or_equal:started_at',    
+        ]);
+        
+        // Reset passing grade jika admin mengubah dari SKB kembali ke SKD
+        if ($validated['category'] === 'skd') {
+            $validated['passing_grade'] = null;
+        }
 
-    return back()->with('message', 'Paket Tryout berhasil ditambahkan!');
-}
+        $validated['is_active'] = $request->is_published;
+        
+        if ($request->is_published && !$tryout->published_at) {
+            $validated['published_at'] = Carbon::now();
+        } else if (!$request->is_published) {
+            $validated['published_at'] = null;
+        }
 
-public function update(Request $request, Tryout $tryout)
-{
-    $validated = $request->validate([
-        'title'                 => 'required|string|max:255',
-        'duration'              => 'required|integer|min:1',
-        'description'           => 'nullable|string',
-        'is_paid'               => 'required|boolean',
-        'price'                 => 'required_if:is_paid,true|numeric|min:0',
-        'is_published'          => 'boolean',
-        'registration_start_at' => 'nullable|date',
-        'registration_end_at'   => 'nullable|date|after_or_equal:registration_start_at',
-        'started_at'            => 'nullable|date', 
-        'end_date'              => 'nullable|date|after_or_equal:started_at',     
-    ]);
-    
-    $validated['is_active'] = $request->is_published;
-    
-    if ($request->is_published && !$tryout->published_at) {
-        $validated['published_at'] = Carbon::now();
-    } else if (!$request->is_published) {
-        $validated['published_at'] = null;
+        $tryout->update($validated);
+
+        return back()->with('message', 'Paket Tryout berhasil diperbarui!');
     }
-
-    $tryout->update($validated);
-
-    return back()->with('message', 'Paket Tryout berhasil diperbarui!');
-}
 
     public function destroy(Tryout $tryout)
     {
@@ -99,14 +107,11 @@ public function update(Request $request, Tryout $tryout)
         return back()->with('message', 'Paket Tryout berhasil dihapus.');
     }
 
-    /**
-     * Mengambil daftar bot di Tryout ini (Untuk ditampilkan di Vue)
-     */
     public function getDummies($id)
     {
         $dummies = \App\Models\ExamAttempt::where('tryout_id', $id)
             ->whereHas('user', function($q) {
-                $q->where('email', 'like', 'bot_%'); // Memastikan hanya mengambil bot
+                $q->where('email', 'like', 'bot_%'); 
             })
             ->join('users', 'exam_attempts.user_id', '=', 'users.id')
             ->select('exam_attempts.*', 'users.name', 'users.email', 'users.agency_name')
@@ -116,32 +121,19 @@ public function update(Request $request, Tryout $tryout)
         return response()->json($dummies);
     }
 
-    /**
-     * Menghapus seluruh bot di Tryout ini
-     */
     public function clearDummies($id)
     {
-        // Cari ID user bot yang mengerjakan TO ini
         $userIds = \App\Models\ExamAttempt::where('tryout_id', $id)
             ->whereHas('user', function($q) {
                 $q->where('email', 'like', 'bot_%');
             })->pluck('user_id');
 
-        // Hapus riwayat ujian mereka
         \App\Models\ExamAttempt::where('tryout_id', $id)->whereIn('user_id', $userIds)->delete();
-        
-        // Hapus akun bot-nya
         \App\Models\User::whereIn('id', $userIds)->delete();
 
         return back()->with('success', 'Semua peserta bot berhasil dihapus dari Tryout ini!');
     }
 
-    /**
-     * Generate Peserta Dummy / Bot untuk Leaderboard Tryout
-     */
-/**
-     * Generate Peserta Dummy / Bot untuk Leaderboard Tryout
-     */
     public function generateDummies(\Illuminate\Http\Request $request, $id)
     {
         $request->validate([
@@ -150,7 +142,6 @@ public function update(Request $request, Tryout $tryout)
 
         $tryout = \App\Models\Tryout::findOrFail($id);
         $amount = $request->amount;
-        
         $faker = \Faker\Factory::create('id_ID');
 
         $instansiPusat = [
@@ -169,9 +160,6 @@ public function update(Request $request, Tryout $tryout)
         ];
 
         $provinsiList = ['11', '12', '13', '31', '32', '33', '34', '35', '51', '73'];
-
-        // OPTIMASI: Enkripsi password HANYA 1 KALI saja di luar looping!
-        // Ini akan mempercepat proses dari yang tadinya puluhan detik menjadi kurang dari 1 detik.
         $dummyPassword = bcrypt('dummy_bot_password');
 
         \Illuminate\Support\Facades\DB::transaction(function () use ($amount, $faker, $tryout, $instansiPusat, $instansiDaerah, $provinsiList, $dummyPassword) {
@@ -185,16 +173,22 @@ public function update(Request $request, Tryout $tryout)
                 $user = \App\Models\User::create([
                     'name' => $faker->name(),
                     'email' => 'bot_' . \Illuminate\Support\Str::random(8) . '@cpnsnusantara.dummy',
-                    'password' => $dummyPassword, // <-- Gunakan password yang sama agar ringan
+                    'password' => $dummyPassword, 
                     'agency_name' => $assignedInstansi,
                     'province_code' => $faker->randomElement($provinsiList),
                     'email_verified_at' => now(),
                 ]);
 
-                $twk = $faker->numberBetween(50, 135); 
-                $tiu = $faker->numberBetween(60, 155); 
-                $tkp = $faker->numberBetween(130, 210); 
-                $total = $twk + $tiu + $tkp;
+                // Hitung skor berdasarkan kategori (SKB vs SKD)
+                if ($tryout->category === 'skb') {
+                    $twk = 0; $tiu = 0; $tkp = 0;
+                    $total = $faker->numberBetween(150, 450); // Estimasi skor SKB
+                } else {
+                    $twk = $faker->numberBetween(50, 135); 
+                    $tiu = $faker->numberBetween(60, 155); 
+                    $tkp = $faker->numberBetween(130, 210); 
+                    $total = $twk + $tiu + $tkp;
+                }
 
                 \App\Models\ExamAttempt::create([
                     'user_id' => $user->id,
@@ -212,19 +206,10 @@ public function update(Request $request, Tryout $tryout)
         return back()->with('success', "Berhasil menambahkan {$amount} peserta fiktif ke Tryout ini!");
     }
 
-    /**
-     * Menampilkan hasil pengerjaan (leaderboard) untuk suatu tryout dengan Pencarian & Paginasi
-     */
     public function results(Request $request, Tryout $tryout)
     {
-        $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65;
-        $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80;
-        $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
-
         $search = $request->input('search');
 
-        // Subquery untuk mengambil ID attempt TERBAIK dari masing-masing user_id pada tryout ini
-        // Menggunakan logika pengurutan SKOR TERBAIK (Lulus -> Total -> TKP -> TIU -> TWK)
         $bestAttemptIds = ExamAttempt::where('tryout_id', $tryout->id)
             ->whereNotNull('completed_at')
             ->when($search, function ($query) use ($search) {
@@ -235,25 +220,40 @@ public function update(Request $request, Tryout $tryout)
             })
             ->get()
             ->groupBy('user_id')
-            ->map(function ($userAttempts) use ($pgTwk, $pgTiu, $pgTkp) {
-                return $userAttempts->sortByDesc(function ($a) use ($pgTwk, $pgTiu, $pgTkp) {
-                    $isPassed = ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp) ? 1 : 0;
-                    return sprintf('%d-%03d-%03d-%03d-%03d', $isPassed, $a->total_score, $a->tkp_score, $a->tiu_score, $a->twk_score);
+            ->map(function ($userAttempts) use ($tryout) {
+                return $userAttempts->sortByDesc(function ($a) use ($tryout) {
+                    // Sorting berdasarkan Kategori
+                    if ($tryout->category === 'skb') {
+                        $isPassed = $a->total_score >= ($tryout->passing_grade ?? 0) ? 1 : 0;
+                        return sprintf('%d-%05d', $isPassed, $a->total_score);
+                    } else {
+                        $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65;
+                        $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80;
+                        $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
+                        $isPassed = ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp) ? 1 : 0;
+                        return sprintf('%d-%03d-%03d-%03d-%03d', $isPassed, $a->total_score, $a->tkp_score, $a->tiu_score, $a->twk_score);
+                    }
                 })->first()->id;
             })
             ->values();
 
-        // Ambil data attempt murni menggunakan ID terbaik yang sudah didapatkan + Paginasi 10 data per halaman
         $attemptsPaginated = ExamAttempt::with('user')
             ->whereIn('id', $bestAttemptIds)
             ->get()
-            ->sortByDesc(function ($a) use ($pgTwk, $pgTiu, $pgTkp) {
-                $isPassed = ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp) ? 1 : 0;
-                return sprintf('%d-%03d-%03d-%03d-%03d', $isPassed, $a->total_score, $a->tkp_score, $a->tiu_score, $a->twk_score);
+            ->sortByDesc(function ($a) use ($tryout) {
+                if ($tryout->category === 'skb') {
+                    $isPassed = $a->total_score >= ($tryout->passing_grade ?? 0) ? 1 : 0;
+                    return sprintf('%d-%05d', $isPassed, $a->total_score);
+                } else {
+                    $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65;
+                    $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80;
+                    $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
+                    $isPassed = ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp) ? 1 : 0;
+                    return sprintf('%d-%03d-%03d-%03d-%03d', $isPassed, $a->total_score, $a->tkp_score, $a->tiu_score, $a->twk_score);
+                }
             })
             ->values();
 
-        // Buat Paginasi Manual dari Collection agar nomor ranking tetap berurutan dan presisi
         $currentPage = \Illuminate\Pagination\LengthAwarePaginator::resolveCurrentPage();
         $perPage = 10;
         $currentItems = $attemptsPaginated->slice(($currentPage - 1) * $perPage, $perPage)->values();
@@ -266,8 +266,17 @@ public function update(Request $request, Tryout $tryout)
             ['path' => $request->url(), 'query' => $request->query()]
         );
 
-        // Transformasi struktur data ke format bersih untuk Vue
-        $results->getCollection()->transform(function ($a, $key) use ($currentPage, $perPage, $pgTwk, $pgTiu, $pgTkp) {
+        $results->getCollection()->transform(function ($a, $key) use ($currentPage, $perPage, $tryout) {
+            $isPassed = false;
+            if ($tryout->category === 'skb') {
+                $isPassed = $a->total_score >= ($tryout->passing_grade ?? 0);
+            } else {
+                $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65;
+                $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80;
+                $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
+                $isPassed = ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp);
+            }
+
             return [
                 'id' => $a->id,
                 'rank' => (($currentPage - 1) * $perPage) + $key + 1,
@@ -277,7 +286,7 @@ public function update(Request $request, Tryout $tryout)
                 'tiu_score' => $a->tiu_score,
                 'tkp_score' => $a->tkp_score,
                 'total_score' => $a->total_score,
-                'is_passed' => ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp),
+                'is_passed' => $isPassed,
                 'completed_at' => $a->completed_at ? \Carbon\Carbon::parse($a->completed_at)->format('d M Y H:i') : '-',
             ];
         });
@@ -289,25 +298,15 @@ public function update(Request $request, Tryout $tryout)
         ]);
     }
 
-    /**
-     * Fitur Baru: Menghapus data pengerjaan peserta agar bisa mengulang ujian kembali
-     */
     public function destroyAttempt(ExamAttempt $attempt)
     {
-        $tryoutId = $attempt->tryout_id;
-        
-        // Hapus data attempt dari database
         $attempt->delete();
-
         return back()->with('success', 'Data pengerjaan peserta berhasil dihapus. Peserta sekarang dapat mengikuti ujian kembali.');
     }
 
     public function recalculate(Tryout $tryout)
     {
-        // 1. Ambil semua soal dari tryout ini
         $questions = \App\Models\Question::where('tryout_id', $tryout->id)->get()->keyBy('id');
-
-        // 2. Ambil attempt (pengerjaan) yang sudah selesai
         $attempts = \App\Models\ExamAttempt::where('tryout_id', $tryout->id)
                         ->whereNotNull('completed_at')
                         ->get();
@@ -318,8 +317,8 @@ public function update(Request $request, Tryout $tryout)
             $twkScore = 0;
             $tiuScore = 0;
             $tkpScore = 0;
+            $skbScore = 0;
 
-            // Pastikan format JSON terbaca
             $userAnswers = $attempt->answers;
             if (is_string($userAnswers)) {
                 $userAnswers = json_decode($userAnswers, true);
@@ -329,23 +328,26 @@ public function update(Request $request, Tryout $tryout)
                 foreach ($userAnswers as $key => $answerData) {
                     
                     $questionId = (is_array($answerData) && isset($answerData['question_id'])) 
-                                  ? $answerData['question_id'] 
-                                  : $key;
+                                  ? $answerData['question_id'] : $key;
 
                     $userChoiceRaw = (is_array($answerData) && isset($answerData['answer'])) 
-                                  ? $answerData['answer'] 
-                                  : (is_string($answerData) ? $answerData : null);
+                                  ? $answerData['answer'] : (is_string($answerData) ? $answerData : null);
                     
                     $userChoice = $userChoiceRaw !== null ? strtoupper(trim($userChoiceRaw)) : null;
 
                     if (isset($questions[$questionId]) && $userChoice !== null) {
                         $question = $questions[$questionId];
-                        
-                        // Menangkap berbagai kemungkinan nama kolom kategori (category/type/kategori)
                         $category = strtoupper(trim($question->category ?? $question->type ?? $question->kategori ?? '')); 
                         
+                        // -- LOGIKA SKB --
+                        if ($tryout->category === 'skb') {
+                            $correctAnswer = strtoupper(trim($question->correct_answer));
+                            if ($userChoice === $correctAnswer) {
+                                $skbScore += 5;
+                            }
+                        } 
                         // -- LOGIKA SKOR TWK & TIU --
-                        if ($category === 'TWK' || $category === 'TIU') {
+                        else if ($category === 'TWK' || $category === 'TIU') {
                             $correctAnswer = strtoupper(trim($question->correct_answer));
                             if ($userChoice === $correctAnswer) {
                                 if ($category === 'TWK') $twkScore += 5;
@@ -356,7 +358,6 @@ public function update(Request $request, Tryout $tryout)
                         elseif ($category === 'TKP') {
                             $foundScore = false;
 
-                            // 1. Cek dari kolom `tkp_scores`
                             if (!empty($question->tkp_scores)) {
                                 $tkpScoresMap = is_string($question->tkp_scores) ? json_decode($question->tkp_scores, true) : $question->tkp_scores;
                                 if (is_array($tkpScoresMap)) {
@@ -370,7 +371,6 @@ public function update(Request $request, Tryout $tryout)
                                 }
                             }
 
-                            // 2. Fallback: Cek properti `points`
                             if (!$foundScore && !empty($question->points)) {
                                 $pointsMap = is_string($question->points) ? json_decode($question->points, true) : $question->points;
                                 if (is_array($pointsMap)) {
@@ -384,7 +384,6 @@ public function update(Request $request, Tryout $tryout)
                                 }
                             }
                             
-                            // 3. Fallback: Mengecek penamaan kolom nilai terpisah di database (point_a, dll)
                             if (!$foundScore) {
                                 $possibleColumns = [
                                     'point_' . strtolower($userChoice),
@@ -406,16 +405,22 @@ public function update(Request $request, Tryout $tryout)
                 }
             }
 
-            // 3. BYPASS $FILLABLE DENGAN DIRECT ASSIGNMENT
-            $attempt->twk_score   = $twkScore;
-            $attempt->tiu_score   = $tiuScore;
-            $attempt->tkp_score   = $tkpScore;
-            $attempt->total_score = $twkScore + $tiuScore + $tkpScore;
-            $attempt->is_passed   = ($twkScore >= 65 && $tiuScore >= 80 && $tkpScore >= 166);
+            // Simpan hasil sesuai kategori TO
+            if ($tryout->category === 'skb') {
+                $attempt->twk_score   = 0;
+                $attempt->tiu_score   = 0;
+                $attempt->tkp_score   = 0;
+                $attempt->total_score = $skbScore;
+                $attempt->is_passed   = $skbScore >= ($tryout->passing_grade ?? 0);
+            } else {
+                $attempt->twk_score   = $twkScore;
+                $attempt->tiu_score   = $tiuScore;
+                $attempt->tkp_score   = $tkpScore;
+                $attempt->total_score = $twkScore + $tiuScore + $tkpScore;
+                $attempt->is_passed   = ($twkScore >= 65 && $tiuScore >= 80 && $tkpScore >= 166);
+            }
             
-            // Simpan paksa ke database
             $attempt->save();
-
             $updatedCount++;
         }
 

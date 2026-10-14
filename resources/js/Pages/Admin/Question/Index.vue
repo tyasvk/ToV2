@@ -3,7 +3,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, useForm, Link, router } from '@inertiajs/vue3';
 import { ref, watch, computed } from 'vue';
 import draggable from 'vuedraggable';
-import axios from 'axios'; // <-- IMPORT AXIOS DITAMBAHKAN
+import axios from 'axios';
 
 import { QuillEditor } from '@vueup/vue-quill';
 import '@vueup/vue-quill/dist/vue-quill.snow.css';
@@ -13,7 +13,10 @@ const props = defineProps({
     questions: Array
 });
 
-// --- DAFTAR MATERI SUBTES BKN ---
+// Deteksi Kategori Tryout
+const isSKB = computed(() => props.tryout?.category === 'skb');
+
+// --- DAFTAR MATERI SUBTES SKD BKN ---
 const materiOptions = {
     TWK: ['Pilar Negara', 'Nasionalisme', 'Bela Negara', 'Integritas', 'Bahasa Indonesia'],
     TIU: ['Analogi', 'Silogisme', 'Analitis', 'Berhitung', 'Deret Angka', 'Perbandingan Kuantitatif', 'Soal Cerita', 'Analogi Gambar', 'Ketidaksamaan Gambar', 'Serial Gambar'],
@@ -52,7 +55,7 @@ const dummyForm = useForm({
 });
 
 const submitDummies = () => {
-    const requestedAmount = dummyForm.amount; // SIMPAN NILAI SEBELUM RESET
+    const requestedAmount = dummyForm.amount; 
     
     dummyForm.post(route('tryouts.dummies', props.tryout.id), {
         onSuccess: () => {
@@ -67,7 +70,6 @@ const openManageDummies = async () => {
     isManageDummyModalOpen.value = true;
     isFetchingDummies.value = true;
     try {
-        // Sesuaikan dengan URL admin Anda
         const res = await axios.get(`/admin/tryouts/${props.tryout.id}/dummies`);
         dummyList.value = res.data;
     } catch (error) {
@@ -144,21 +146,21 @@ const handleDragEnd = () => {
 
 const form = useForm({
     id: null,
-    type: 'TWK',
-    sub_category: 'Pilar Negara',
+    type: isSKB.value ? 'SKB' : 'TWK',
+    sub_category: isSKB.value ? '' : 'Pilar Negara',
     content: '',
     image: null,
     options: { a: '', b: '', c: '', d: '', e: '' },
     option_images: { a: null, b: null, c: null, d: null, e: null },
-    correct_answer: '',
+    correct_answer: 'A',
     tkp_scores: { a: '', b: '', c: '', d: '', e: '' },
     explanation: ''
 });
 
-const currentMateriList = computed(() => materiOptions[form.type] || []);
+const currentMateriList = computed(() => !isSKB.value && materiOptions[form.type] ? materiOptions[form.type] : []);
 
 watch(() => form.type, (newType) => {
-    if (newType && materiOptions[newType] && !materiOptions[newType].includes(form.sub_category)) {
+    if (!isSKB.value && newType && materiOptions[newType] && !materiOptions[newType].includes(form.sub_category)) {
         form.sub_category = materiOptions[newType][0];
     }
 });
@@ -181,13 +183,13 @@ const openCreateModal = () => {
     if (form.clearErrors) form.clearErrors(); 
     
     form.id = null;
-    form.type = 'TWK';
-    form.sub_category = 'Pilar Negara';
+    form.type = isSKB.value ? 'SKB' : 'TWK';
+    form.sub_category = isSKB.value ? '' : 'Pilar Negara';
     form.content = '';
     form.image = null;
     form.options = { a: '', b: '', c: '', d: '', e: '' };
     form.option_images = { a: null, b: null, c: null, d: null, e: null };
-    form.correct_answer = '';
+    form.correct_answer = 'A';
     form.tkp_scores = { a: '', b: '', c: '', d: '', e: '' };
     form.explanation = '';
     
@@ -201,13 +203,13 @@ const openEditModal = (q) => {
     if (form.clearErrors) form.clearErrors(); 
     
     form.id = q.id;
-    form.type = q.type || 'TWK';
-    form.sub_category = q.sub_category || q.materi || materiOptions[form.type][0];
+    form.type = isSKB.value ? 'SKB' : (q.type || 'TWK');
+    form.sub_category = q.sub_category || q.materi || (isSKB.value ? '' : materiOptions[form.type][0]);
     form.content = q.content || '';
     form.image = null; 
     form.options = { ...q.options };
     form.option_images = { a: null, b: null, c: null, d: null, e: null }; 
-    form.correct_answer = q.correct_answer || '';
+    form.correct_answer = q.correct_answer || 'A';
     form.tkp_scores = { ...q.tkp_scores };
     form.explanation = q.explanation || '';
 
@@ -254,7 +256,13 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                 <div class="relative z-10">
                     <Link :href="backUrl" class="text-xs font-semibold text-slate-500 hover:text-indigo-600 mb-2 block">&larr; Kembali ke List</Link>
                     <h1 class="text-2xl md:text-3xl font-medium text-slate-900 tracking-tight">{{ tryout.title }}</h1>
-                    <p class="text-sm text-slate-500 font-medium mt-1">Mengelola {{ questions.length }} butir soal</p>
+                    
+                    <div class="flex items-center gap-3 mt-2">
+                        <span class="px-2 py-0.5 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-md">
+                            {{ isSKB ? 'KATEGORI: SKB' : 'KATEGORI: SKD' }}
+                        </span>
+                        <p class="text-sm text-slate-500 font-medium">Mengelola {{ questions.length }} butir soal</p>
+                    </div>
                 </div>
 
                 <div class="relative z-10 flex flex-wrap gap-3">
@@ -318,7 +326,7 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                             
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <div v-for="(val, key) in (q.options || {})" :key="key" 
-                                    :class="[q.correct_answer === key ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-white border-slate-200']" 
+                                    :class="[q.correct_answer === key.toUpperCase() ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-white border-slate-200']" 
                                     class="p-3 rounded-xl border text-xs flex justify-between min-w-0">
                                     <div class="flex flex-col min-w-0">
                                         <div class="font-medium flex items-start">
@@ -352,20 +360,37 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                     <form @submit.prevent="submit" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar">
                         
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            
+                            <!-- Tipe Soal -->
                             <div class="col-span-1">
-                                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Tipe</label>
-                                <select v-model="form.type" class="w-full border-slate-200 rounded-xl bg-slate-50 text-sm focus:ring-indigo-500">
-                                    <option>TWK</option><option>TIU</option><option>TKP</option>
-                                </select>
+                                <div v-if="!isSKB">
+                                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Tipe</label>
+                                    <select v-model="form.type" class="w-full border-slate-200 rounded-xl bg-slate-50 text-sm focus:ring-indigo-500">
+                                        <option value="TWK">TWK</option>
+                                        <option value="TIU">TIU</option>
+                                        <option value="TKP">TKP</option>
+                                    </select>
+                                </div>
+                                <div v-else>
+                                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Tipe</label>
+                                    <input type="text" disabled value="SKB" class="w-full px-4 py-2 border border-slate-200 bg-slate-100 rounded-xl text-sm font-bold text-slate-500">
+                                </div>
                             </div>
                             
+                            <!-- Materi Soal Dinamis -->
                             <div class="col-span-1">
                                 <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Materi Soal</label>
-                                <select v-model="form.sub_category" class="w-full border-slate-200 rounded-xl bg-slate-50 text-sm focus:ring-indigo-500">
+                                
+                                <!-- Select untuk SKD -->
+                                <select v-if="!isSKB" v-model="form.sub_category" class="w-full border-slate-200 rounded-xl bg-slate-50 text-sm focus:ring-indigo-500">
                                     <option v-for="materi in currentMateriList" :key="materi" :value="materi">{{ materi }}</option>
                                 </select>
+                                
+                                <!-- Input Teks Bebas untuk SKB -->
+                                <input v-else v-model="form.sub_category" type="text" placeholder="Misal: Hukum, Medis..." class="w-full border-slate-200 rounded-xl bg-slate-50 text-sm focus:ring-indigo-500">
                             </div>
 
+                            <!-- Gambar Soal -->
                             <div class="col-span-1 md:col-span-2">
                                 <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Gambar Soal (Opsional)</label>
                                 
@@ -376,7 +401,7 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                                     <img :src="`/storage/${existingImages.question}`" class="h-20 rounded-lg border border-slate-200 object-contain shadow-sm bg-white" />
                                 </div>
 
-                                <input type="file" @change="e => handleImagePreview(e, 'question')" accept="image/*" class="w-full text-xs text-slate-500 file:mr-4 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-colors" />
+                                <input type="file" @change="e => handleImagePreview(e, 'question')" accept="image/*" class="w-full text-xs text-slate-500 file:mr-4 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 transition-colors" />
                             </div>
                         </div>
 
@@ -428,14 +453,18 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                                 </div>
 
                                 <div class="w-full lg:w-48 shrink-0 flex flex-col gap-3 justify-start pt-3 lg:pt-0 border-t lg:border-t-0 lg:border-l border-slate-200 lg:pl-5 mt-2 lg:mt-0">
-                                    <div v-if="form.type === 'TKP'">
+                                    
+                                    <!-- Logika Tampilnya Input Poin TKP -->
+                                    <div v-if="!isSKB && form.type === 'TKP'">
                                         <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Poin TKP</label>
                                         <input v-model="form.tkp_scores[opt]" type="number" placeholder="1 - 5" class="w-full border-slate-200 rounded-lg text-sm text-center focus:ring-indigo-500" />
                                     </div>
-                                    <div v-else>
+                                    
+                                    <!-- Logika Tampilnya Radio Kunci Jawaban Benar -->
+                                    <div v-if="isSKB || form.type !== 'TKP'">
                                         <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Kunci Jawaban?</label>
                                         <label class="flex items-center gap-2 cursor-pointer bg-white border border-slate-200 px-3 py-2 rounded-lg hover:bg-indigo-50 transition w-full shadow-sm">
-                                            <input type="radio" :value="opt" v-model="form.correct_answer" class="text-indigo-600 focus:ring-indigo-500 shrink-0" required />
+                                            <input type="radio" :value="opt.toUpperCase()" v-model="form.correct_answer" class="text-indigo-600 focus:ring-indigo-500 shrink-0" required />
                                             <span class="text-xs font-semibold text-slate-600">Jawaban Benar</span>
                                         </label>
                                     </div>
@@ -458,7 +487,7 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                         </div>
 
                         <div>
-                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Pembahasan</label>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Pembahasan Lengkap</label>
                             <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                                 <QuillEditor 
                                     theme="snow" 
@@ -501,12 +530,10 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                         </button>
                     </div>
 
-                    <!-- Loading State -->
                     <div v-if="isFetchingDummies" class="flex-1 flex justify-center items-center py-10">
                         <span class="animate-spin w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full"></span>
                     </div>
 
-                    <!-- Tabel Data Bot -->
                     <div v-else class="flex-1 overflow-y-auto custom-scrollbar border border-slate-200 rounded-xl">
                         <table class="w-full text-left border-collapse">
                             <thead class="bg-slate-50 sticky top-0 z-10">
