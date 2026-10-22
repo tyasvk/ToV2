@@ -90,6 +90,9 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     Route::get('/tryouts', [UserTryoutController::class, 'index'])->name('tryout.index');
     Route::get('/tryout/{tryout}', [UserTryoutController::class, 'show'])->name('tryout.show');
 
+    // Route Tryout SKB (BARU - Halaman Terpisah)
+    Route::get('/tryout-skb', [TryoutController::class, 'indexSkb'])->name('tryout.skb.index');
+
     // --- API & MEMBERSHIP ---
     Route::post('/check-email-availability', [UserTryoutController::class, 'checkEmail'])->name('api.check.email');
     Route::get('/membership', [MembershipController::class, 'index'])->name('membership.index');

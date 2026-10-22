@@ -76,14 +76,25 @@ class TryoutController extends Controller
     }
 
     /**
-     * Gabungan Katalog & Tryout Saya
+     * Helper Query Katalog & Tryout Saya berdasarkan Kategori ('skd' atau 'skb')
      */
-    public function index(Request $request)
+    private function getTryoutCatalogAndOwned(Request $request, string $category = 'skd')
     {
         $user = auth()->user();
         $userId = $user->id; 
         $userEmail = $user->email; 
         $isPremiumMember = $user->membership_expires_at && now()->lt($user->membership_expires_at);
+
+        // Filter Kategori: jika 'skd', ambil yang 'skd' atau NULL (data lama)
+        $categoryFilter = function($query) use ($category) {
+            if ($category === 'skb') {
+                $query->where('category', 'skb');
+            } else {
+                $query->where(function($q) {
+                    $q->where('category', 'skd')->orWhereNull('category');
+                });
+            }
+        };
 
         // --- QUERY DASAR UNTUK TO YANG SUDAH JADI "MILIK SAYA" ---
         $ownedTryoutIdsQuery = function($q) use ($user, $userId, $userEmail) {
@@ -108,6 +119,7 @@ class TryoutController extends Controller
         // --- 1. DATA KATALOG (TO Tersedia yang BELUM dimiliki) ---
         $catalogTryouts = Tryout::query()
             ->where('is_published', true)
+            ->where($categoryFilter)
             ->where(function ($query) {
                 $query->whereNotIn('type', ['akbar', 'adidaya'])->orWhereNull('type');
             })
@@ -116,6 +128,7 @@ class TryoutController extends Controller
                     $ownedTryoutIdsQuery($subQ);
                 });
             })
+            ->withCount('questions')
             ->when($request->search, fn($q, $s) => $q->where('title', 'like', "%{$s}%"))
             ->latest()
             ->get();
@@ -123,12 +136,14 @@ class TryoutController extends Controller
         // --- 2. DATA TRYOUT SAYA ---
         $myTryouts = Tryout::query()
             ->where('is_published', true)
+            ->where($categoryFilter)
             ->where(function ($query) {
                 $query->whereNotIn('type', ['akbar', 'adidaya'])->orWhereNull('type');
             })
             ->where(function($q) use ($ownedTryoutIdsQuery) {
                 $ownedTryoutIdsQuery($q);
             })
+            ->withCount('questions')
             ->withCount(['examAttempts as attempts_count' => function($q) use ($userId) {
                 $q->where('user_id', $userId);
             }])
@@ -161,12 +176,31 @@ class TryoutController extends Controller
             return $tryout;
         });
 
-        return Inertia::render('User/Tryout/Index', [
+        return [
             'catalogTryouts' => $catalogTryouts,
             'myTryouts' => $myTryouts,
             'filters' => $request->only(['search']),
-            'isPremiumMember' => $isPremiumMember
-        ]);
+            'isPremiumMember' => $isPremiumMember,
+            'category' => $category
+        ];
+    }
+
+    /**
+     * Halaman Gabungan Katalog & Tryout Saya (KHUSUS SKD)
+     */
+    public function index(Request $request)
+    {
+        $data = $this->getTryoutCatalogAndOwned($request, 'skd');
+        return Inertia::render('User/Tryout/Index', $data);
+    }
+
+    /**
+     * Halaman Gabungan Katalog & Tryout Saya (KHUSUS SKB - Beda Halaman, Fitur Sama Persis)
+     */
+    public function indexSkb(Request $request)
+    {
+        $data = $this->getTryoutCatalogAndOwned($request, 'skb');
+        return Inertia::render('User/Tryout/IndexSkb', $data);
     }
 
     public function show(Tryout $tryout)
@@ -202,7 +236,7 @@ class TryoutController extends Controller
         ];
 
         return Inertia::render('User/Tryout/Show', [
-            'tryout' => $tryout,
+            'tryout' => $tryout->loadCount('questions'),
             'is_registration_closed' => $isClosed,
             'packages' => $packages,
             'registrationStatus' => $registration ? $registration->status : null, 
@@ -262,7 +296,7 @@ class TryoutController extends Controller
             ->firstOrFail();
 
         return Inertia::render('User/Tryout/StatusSyarat', [
-            'tryout' => $tryout->only(['id', 'title']),
+            'tryout' => $tryout->only(['id', 'title', 'category']),
             'status' => $registration->status,
         ]);
     }
@@ -366,7 +400,8 @@ class TryoutController extends Controller
                 }
             });
 
-            return redirect()->route('tryout.index')->with('success', 'Pembelian berhasil!');
+            $redirectRoute = $tryout->category === 'skb' ? 'tryout.skb.index' : 'tryout.index';
+            return redirect()->route($redirectRoute)->with('success', 'Pembelian berhasil!');
         }
 
         $transaction = Transaction::create([
@@ -621,7 +656,8 @@ class TryoutController extends Controller
             ]);
         }
 
-        $durationSeconds = ($tryout->duration ?? 100) * 60;
+        $durationMinutes = $tryout->duration ?? $tryout->duration_minutes ?? 100;
+        $durationSeconds = $durationMinutes * 60;
         $elapsedSeconds = now()->diffInSeconds($attempt->created_at, true); 
         $serverTimeLeft = (int) ($durationSeconds - $elapsedSeconds);
 
@@ -667,7 +703,7 @@ class TryoutController extends Controller
     {
         $tryouts = \App\Models\Tryout::where('is_active', true)
             ->orderBy('created_at', 'desc')
-            ->get(['id', 'title']);
+            ->get(['id', 'title', 'category']);
 
         $leaderboard = collect([]);
         $selectedTryoutId = $request->tryout_id;
@@ -683,7 +719,6 @@ class TryoutController extends Controller
                     return $attempts->sortByDesc('total_score')->first();
                 })
                 ->sortByDesc(function ($attempt) {
-                    // Sorting didasarkan pada total score (Bisa untuk SKD/SKB)
                     return sprintf('%03d%03d%03d%03d', 
                         $attempt->total_score, 
                         $attempt->tkp_score, 
@@ -744,7 +779,8 @@ class TryoutController extends Controller
             ]);
         }
 
-        $durationSeconds = ($tryout->duration ?? 100) * 60;
+        $durationMinutes = $tryout->duration ?? $tryout->duration_minutes ?? 100;
+        $durationSeconds = $durationMinutes * 60;
         $elapsedSeconds = now()->diffInSeconds($attempt->created_at, true);
         $serverTimeLeft = (int) ($durationSeconds - $elapsedSeconds);
 
@@ -806,10 +842,13 @@ class TryoutController extends Controller
             $skbScore = 0;
             foreach ($questions as $q) {
                 $ans = $answers[$q->id] ?? null;
-                if ((string)$ans === (string)$q->correct_answer) {
+                if ($ans !== null && strtoupper(trim((string)$ans)) === strtoupper(trim((string)$q->correct_answer))) {
                     $skbScore += 5; // SKB Benar = 5, Salah/Kosong = 0
                 }
             }
+
+            $pgSkb = $tryout->passing_grade ?? 0;
+            $isPassed = $skbScore >= $pgSkb;
 
             $attempt->update([
                 'answers' => $answers,
@@ -817,6 +856,7 @@ class TryoutController extends Controller
                 'tiu_score' => 0,
                 'tkp_score' => 0,
                 'total_score' => $skbScore,
+                'is_passed' => $isPassed,
                 'completed_at' => now()
             ]);
         } else {
@@ -828,12 +868,17 @@ class TryoutController extends Controller
                     $tkpScoreMap = is_string($q->tkp_scores) ? json_decode($q->tkp_scores, true) : $q->tkp_scores;
                     $tkp += (int) ($tkpScoreMap[$ans] ?? 0);
                 } else {
-                    if ((string)$ans === (string)$q->correct_answer) {
+                    if ($ans !== null && strtoupper(trim((string)$ans)) === strtoupper(trim((string)$q->correct_answer))) {
                         if ($q->type === 'TWK') $twk += 5;
                         if ($q->type === 'TIU') $tiu += 5;
                     }
                 }
             }
+
+            $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65; 
+            $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80; 
+            $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
+            $isPassed = ($twk >= $pgTwk && $tiu >= $pgTiu && $tkp >= $pgTkp);
 
             $attempt->update([
                 'answers' => $answers, 
@@ -841,6 +886,7 @@ class TryoutController extends Controller
                 'tiu_score' => $tiu, 
                 'tkp_score' => $tkp, 
                 'total_score' => $twk + $tiu + $tkp, 
+                'is_passed' => $isPassed,
                 'completed_at' => now() 
             ]);
         }
@@ -897,7 +943,6 @@ class TryoutController extends Controller
                 $rank = 1;
                 foreach ($firstAttempts as $userId => $firstAttempt) {
                     if ($userId === $attempt->user_id) continue;
-                    // Simply sort by total score for ranking history
                     if ($firstAttempt->total_score > $attempt->total_score) {
                         $rank++;
                     }
@@ -963,7 +1008,7 @@ class TryoutController extends Controller
             }
 
             $scoreDetails = [
-                ['category' => 'Kompetensi Bidang', 'score' => $attempt->total_score, 'passing_grade' => $pgSkb, 'is_passed' => $isPassed]
+                ['category' => 'Kompetensi Bidang (SKB)', 'score' => $attempt->total_score, 'passing_grade' => $pgSkb, 'is_passed' => $isPassed]
             ];
             
             $materialScores['Kompetensi Bidang'] = [];
@@ -976,7 +1021,7 @@ class TryoutController extends Controller
                 }
                 
                 $materialScores['Kompetensi Bidang'][$topic]['max_score'] += 5;
-                if ((string)$ans === (string)$q->correct_answer) {
+                if ($ans !== null && strtoupper(trim((string)$ans)) === strtoupper(trim((string)$q->correct_answer))) {
                     $materialScores['Kompetensi Bidang'][$topic]['score'] += 5;
                 }
             }
@@ -1035,7 +1080,7 @@ class TryoutController extends Controller
                     $materialScores[$q->type][$topic]['max_score'] += 5; 
                 } else {
                     $materialScores[$q->type][$topic]['max_score'] += 5;
-                    if ((string)$ans === (string)$q->correct_answer) {
+                    if ($ans !== null && strtoupper(trim((string)$ans)) === strtoupper(trim((string)$q->correct_answer))) {
                         $materialScores[$q->type][$topic]['score'] += 5;
                     }
                 }
@@ -1093,7 +1138,7 @@ class TryoutController extends Controller
         $questions = $attempt->tryout->questions()->orderBy('order', 'asc')->get()->map(function ($q) use ($userAnswers) {
             $selected = $userAnswers[$q->id] ?? null;
             $q->user_answer = $selected; 
-            $q->is_correct_user = (string)$selected === (string)$q->correct_answer;
+            $q->is_correct_user = $selected !== null && strtoupper(trim((string)$selected)) === strtoupper(trim((string)$q->correct_answer));
             return $q;
         });
         return Inertia::render('User/Tryout/Review', ['attempt' => $attempt, 'questions' => $questions, 'tryout' => $attempt->tryout]);
@@ -1116,7 +1161,7 @@ class TryoutController extends Controller
                                ->orWhereJsonContains('participants_data', $user->email);
                   });
             })
-            ->select('id', 'title', 'price', 'end_date', 'created_at')
+            ->select('id', 'title', 'price', 'end_date', 'created_at', 'category')
             ->orderBy('created_at', 'desc') 
             ->get();
 
@@ -1257,7 +1302,7 @@ class TryoutController extends Controller
                     $tkpScoreMap = is_string($q->tkp_scores) ? json_decode($q->tkp_scores, true) : $q->tkp_scores;
                     $subtestScore[$catType][$topic] += (int) ($tkpScoreMap[$ans] ?? 0);
                 } else {
-                    if ((string)$ans === (string)$q->correct_answer) {
+                    if ($ans !== null && strtoupper(trim((string)$ans)) === strtoupper(trim((string)$q->correct_answer))) {
                         $subtestScore[$catType][$topic] += 5;
                     }
                 }
@@ -1320,7 +1365,6 @@ class TryoutController extends Controller
             ];
         });
         
-        // Sorting untuk leaderboard SKB vs SKD
         if ($tryout->category === 'skb') {
             $rankings = $rankings->sortByDesc('score')->values();
         } else {

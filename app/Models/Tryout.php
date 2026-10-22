@@ -21,34 +21,32 @@ class Tryout extends Model
         'is_paid',      
         'price',         
         'published_at', 
-        'started_at',
-        'type',           
+        'started_at',            // Masa Pengerjaan Mulai
+        'type',          
         'requirements',   
-        'ended_at',       
-        'duration',       
-        'end_date',
-        'category',     
-        'passing_grade',
-        'registration_start_at', // Baru
-    'registration_end_at',   // Baru
-    'started_at',            // Masa Pengerjaan Mulai
-    'end_date',              // Masa Pengerjaan Selesai  
+        'ended_at',      
+        'duration',      
+        'end_date',              // Masa Pengerjaan Selesai
+        'category',              // 'skd' atau 'skb'
+        'passing_grade',         // Nilai ambang batas total untuk SKB
+        'registration_start_at', 
+        'registration_end_at',   
+        'instagram_post_url',
     ];
 
     protected $casts = [
-        // FORMAT KUNCI: Laravel dipaksa mengeluarkan output murni (Contoh: "2026-05-28 08:00:00")
-        // Tidak akan ada lagi huruf 'T', 'Z', atau konversi zona waktu yang mengacaukan browser.
-        'published_at' => 'datetime:Y-m-d H:i:s',
-        'ended_at'     => 'datetime:Y-m-d H:i:s', 
-        'end_date'     => 'datetime:Y-m-d H:i:s', 
+        'published_at'          => 'datetime:Y-m-d H:i:s',
+        'ended_at'              => 'datetime:Y-m-d H:i:s', 
+        'end_date'              => 'datetime:Y-m-d H:i:s', 
         'registration_start_at' => 'datetime:Y-m-d H:i:s',
         'registration_end_at'   => 'datetime:Y-m-d H:i:s',
         'started_at'            => 'datetime:Y-m-d H:i:s',
         
-        'is_active'    => 'boolean',
-        'is_published' => 'boolean',
-        'is_paid'      => 'boolean',   
-        'price'        => 'decimal:2',    
+        'is_active'             => 'boolean',
+        'is_published'          => 'boolean',
+        'is_paid'               => 'boolean',   
+        'price'                 => 'decimal:2',    
+        'passing_grade'         => 'integer',
     ];
 
     public function transactions(): HasMany
@@ -58,11 +56,16 @@ class Tryout extends Model
 
     public function questions(): HasMany
     {
-        return $this->hasMany(Question::class);
+        return $this->hasMany(Question::class)->orderBy('order', 'asc');
     }
 
     public function examAttempts(): HasMany
     {
         return $this->hasMany(ExamAttempt::class);
+    }
+
+    public function registrations(): HasMany
+    {
+        return $this->hasMany(TryoutRegistration::class);
     }
 }

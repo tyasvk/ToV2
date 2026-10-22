@@ -4,10 +4,15 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Tryout;
-use Illuminate\Http\Request;
-use Inertia\Inertia;
-use Illuminate\Support\Carbon; 
 use App\Models\ExamAttempt;
+use App\Models\Question;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Inertia\Inertia;
 
 class TryoutManagerController extends Controller
 {
@@ -21,18 +26,36 @@ class TryoutManagerController extends Controller
               ->orWhereNull('type');
         });
 
+        // Filter berdasarkan kategori (opsional: skd / skb)
+        if ($request->filled('category') && in_array($request->category, ['skd', 'skb'])) {
+            if ($request->category === 'skd') {
+                $query->where(function ($q) {
+                    $q->where('category', 'skd')->orWhereNull('category');
+                });
+            } else {
+                $query->where('category', 'skb');
+            }
+        }
+
         // Tangkap parameter pencarian
-        if ($request->search) {
+        if ($request->filled('search')) {
             $query->where('title', 'like', '%' . $request->search . '%');
         }
 
         // Gunakan get() untuk mengambil SEMUA data tanpa terpotong pagination
-        $tryouts = $query->latest()->get();
+        $tryouts = $query->latest()->get()->map(function ($tryout) {
+            // Pastikan data lama yang category-nya masih null terbaca sebagai 'skd' di Frontend Vue
+            if (empty($tryout->category)) {
+                $tryout->category = 'skd';
+            }
+            return $tryout;
+        });
 
         return Inertia::render('Admin/Tryout/Index', [
             'tryouts' => $tryouts,
             'filters' => [
-                'search' => $request->search,
+                'search'   => $request->search,
+                'category' => $request->category,
             ],
         ]);
     }
@@ -44,20 +67,29 @@ class TryoutManagerController extends Controller
             'duration'              => 'required|integer|min:1',
             'description'           => 'nullable|string',
             'is_paid'               => 'required|boolean',
-            'price'                 => 'required_if:is_paid,true|numeric|min:0',
-            'category'              => 'required|in:skd,skb', // Tambahan SKB
-            'passing_grade'         => 'nullable|required_if:category,skb|integer|min:0', // Tambahan SKB
+            'price'                 => 'nullable|required_if:is_paid,true|numeric|min:0',
+            'category'              => 'required|in:skd,skb',
+            'passing_grade'         => 'nullable|required_if:category,skb|integer|min:0',
             'is_published'          => 'boolean',
             'registration_start_at' => 'nullable|date',
             'registration_end_at'   => 'nullable|date|after_or_equal:registration_start_at',
-            'started_at'            => 'nullable|date', 
-            'end_date'              => 'nullable|date|after_or_equal:started_at',    
+            'started_at'            => 'nullable|date',
+            'end_date'              => 'nullable|date|after_or_equal:started_at',
         ]);
 
-        $validated['type'] = 'general';
-        $validated['is_active'] = $request->is_published; 
-        
-        if ($request->is_published) {
+        $validated['type']             = 'general';
+        $validated['duration_minutes'] = $validated['duration']; // Sinkronisasi kolom durasi
+        $validated['price']            = $request->boolean('is_paid') ? ($validated['price'] ?? 0) : 0;
+        $validated['is_published']     = $request->boolean('is_published');
+        $validated['is_active']        = $validated['is_published'];
+
+        if ($validated['category'] === 'skd') {
+            $validated['passing_grade'] = null;
+        } else {
+            $validated['passing_grade'] = $validated['passing_grade'] ?? 0;
+        }
+
+        if ($validated['is_published']) {
             $validated['published_at'] = Carbon::now();
         }
 
@@ -73,26 +105,31 @@ class TryoutManagerController extends Controller
             'duration'              => 'required|integer|min:1',
             'description'           => 'nullable|string',
             'is_paid'               => 'required|boolean',
-            'price'                 => 'required_if:is_paid,true|numeric|min:0',
-            'category'              => 'required|in:skd,skb', // Tambahan SKB
-            'passing_grade'         => 'nullable|required_if:category,skb|integer|min:0', // Tambahan SKB
+            'price'                 => 'nullable|required_if:is_paid,true|numeric|min:0',
+            'category'              => 'required|in:skd,skb',
+            'passing_grade'         => 'nullable|required_if:category,skb|integer|min:0',
             'is_published'          => 'boolean',
             'registration_start_at' => 'nullable|date',
             'registration_end_at'   => 'nullable|date|after_or_equal:registration_start_at',
-            'started_at'            => 'nullable|date', 
-            'end_date'              => 'nullable|date|after_or_equal:started_at',    
+            'started_at'            => 'nullable|date',
+            'end_date'              => 'nullable|date|after_or_equal:started_at',
         ]);
-        
+
+        $validated['duration_minutes'] = $validated['duration']; // Sinkronisasi kolom durasi
+        $validated['price']            = $request->boolean('is_paid') ? ($validated['price'] ?? 0) : 0;
+        $validated['is_published']     = $request->boolean('is_published');
+        $validated['is_active']        = $validated['is_published'];
+
         // Reset passing grade jika admin mengubah dari SKB kembali ke SKD
         if ($validated['category'] === 'skd') {
             $validated['passing_grade'] = null;
+        } else {
+            $validated['passing_grade'] = $validated['passing_grade'] ?? 0;
         }
 
-        $validated['is_active'] = $request->is_published;
-        
-        if ($request->is_published && !$tryout->published_at) {
+        if ($validated['is_published'] && !$tryout->published_at) {
             $validated['published_at'] = Carbon::now();
-        } else if (!$request->is_published) {
+        } elseif (!$validated['is_published']) {
             $validated['published_at'] = null;
         }
 
@@ -109,9 +146,9 @@ class TryoutManagerController extends Controller
 
     public function getDummies($id)
     {
-        $dummies = \App\Models\ExamAttempt::where('tryout_id', $id)
-            ->whereHas('user', function($q) {
-                $q->where('email', 'like', 'bot_%'); 
+        $dummies = ExamAttempt::where('tryout_id', $id)
+            ->whereHas('user', function ($q) {
+                $q->where('email', 'like', 'bot_%');
             })
             ->join('users', 'exam_attempts.user_id', '=', 'users.id')
             ->select('exam_attempts.*', 'users.name', 'users.email', 'users.agency_name')
@@ -123,82 +160,100 @@ class TryoutManagerController extends Controller
 
     public function clearDummies($id)
     {
-        $userIds = \App\Models\ExamAttempt::where('tryout_id', $id)
-            ->whereHas('user', function($q) {
+        $userIds = ExamAttempt::where('tryout_id', $id)
+            ->whereHas('user', function ($q) {
                 $q->where('email', 'like', 'bot_%');
             })->pluck('user_id');
 
-        \App\Models\ExamAttempt::where('tryout_id', $id)->whereIn('user_id', $userIds)->delete();
-        \App\Models\User::whereIn('id', $userIds)->delete();
+        ExamAttempt::where('tryout_id', $id)->whereIn('user_id', $userIds)->delete();
+        User::whereIn('id', $userIds)->delete();
 
         return back()->with('success', 'Semua peserta bot berhasil dihapus dari Tryout ini!');
     }
 
-    public function generateDummies(\Illuminate\Http\Request $request, $id)
+    public function generateDummies(Request $request, $id)
     {
         $request->validate([
-            'amount' => 'required|integer|min:1|max:500' 
+            'amount' => 'required|integer|min:1|max:500'
         ]);
 
-        $tryout = \App\Models\Tryout::findOrFail($id);
+        $tryout = Tryout::withCount('questions')->findOrFail($id);
         $amount = $request->amount;
-        $faker = \Faker\Factory::create('id_ID');
+        $faker  = \Faker\Factory::create('id_ID');
 
         $instansiPusat = [
-            'Kementerian Hukum dan Hak Asasi Manusia', 'Kementerian Keuangan', 
-            'Kementerian Pendidikan, Kebudayaan, Riset, dan Teknologi', 'Kejaksaan Agung RI', 
+            'Kementerian Hukum dan Hak Asasi Manusia', 'Kementerian Keuangan',
+            'Kementerian Pendidikan, Kebudayaan, Riset, dan Teknologi', 'Kejaksaan Agung RI',
             'Badan Intelijen Negara', 'Kementerian Kesehatan', 'Kementerian Agama',
             'Kementerian Pertahanan', 'Kementerian Perhubungan', 'Badan Pusat Statistik',
-            'Badan Kepegawaian Negara', 'Kementerian Luar Negeri', 'Kementerian ATR/BPN'
+            'Badan Kepegawaian Negara', 'Kementerian Luar Negeri', 'Kementerian ATR/BPN',
+            'Kementerian Imigrasi dan Pemasyarakatan'
         ];
 
         $instansiDaerah = [
-            'Pemerintah Provinsi Jawa Barat', 'Pemerintah Provinsi Jawa Tengah', 
+            'Pemerintah Provinsi Jawa Barat', 'Pemerintah Provinsi Jawa Tengah',
             'Pemerintah Provinsi Jawa Timur', 'Pemerintah Provinsi DKI Jakarta',
             'Pemerintah Kota Surabaya', 'Pemerintah Kabupaten Bogor', 'Pemerintah Kota Medan',
-            'Pemerintah Provinsi Banten', 'Pemerintah Provinsi Bali'
+            'Pemerintah Provinsi Banten', 'Pemerintah Provinsi Bali', 'Pemerintah Provinsi Sumatera Selatan'
         ];
 
-        $provinsiList = ['11', '12', '13', '31', '32', '33', '34', '35', '51', '73'];
+        $provinsiList  = ['11', '12', '13', '16', '31', '32', '33', '34', '35', '51', '73'];
         $dummyPassword = bcrypt('dummy_bot_password');
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($amount, $faker, $tryout, $instansiPusat, $instansiDaerah, $provinsiList, $dummyPassword) {
+        $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65;
+        $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80;
+        $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
+
+        DB::transaction(function () use ($amount, $faker, $tryout, $instansiPusat, $instansiDaerah, $provinsiList, $dummyPassword, $pgTwk, $pgTiu, $pgTkp) {
+            $maxQuestions = $tryout->questions_count > 0 ? $tryout->questions_count : 100;
+
             for ($i = 0; $i < $amount; $i++) {
-                
-                $isPusat = rand(1, 100) <= 75; 
-                $assignedInstansi = $isPusat 
-                    ? $faker->randomElement($instansiPusat) 
+                $isPusat = rand(1, 100) <= 75;
+                $assignedInstansi = $isPusat
+                    ? $faker->randomElement($instansiPusat)
                     : $faker->randomElement($instansiDaerah);
 
-                $user = \App\Models\User::create([
-                    'name' => $faker->name(),
-                    'email' => 'bot_' . \Illuminate\Support\Str::random(8) . '@cpnsnusantara.dummy',
-                    'password' => $dummyPassword, 
-                    'agency_name' => $assignedInstansi,
-                    'province_code' => $faker->randomElement($provinsiList),
+                $user = User::create([
+                    'name'              => $faker->name(),
+                    'email'             => 'bot_' . Str::random(8) . '@cpnsnusantara.dummy',
+                    'password'          => $dummyPassword,
+                    'agency_name'       => $assignedInstansi,
+                    'province_code'     => $faker->randomElement($provinsiList),
                     'email_verified_at' => now(),
                 ]);
 
                 // Hitung skor berdasarkan kategori (SKB vs SKD)
                 if ($tryout->category === 'skb') {
-                    $twk = 0; $tiu = 0; $tkp = 0;
-                    $total = $faker->numberBetween(150, 450); // Estimasi skor SKB
+                    $twk = 0;
+                    $tiu = 0;
+                    $tkp = 0;
+
+                    // Karena tiap soal SKB berbobot 5 poin, skor harus kelipatan 5 murni
+                    $minCorrect = max(10, (int) floor($maxQuestions * 0.30));
+                    $maxCorrect = max($minCorrect + 5, (int) floor($maxQuestions * 0.90));
+                    $correctCount = $faker->numberBetween($minCorrect, $maxCorrect);
+
+                    $total    = $correctCount * 5;
+                    $isPassed = $total >= ($tryout->passing_grade ?? 0);
                 } else {
-                    $twk = $faker->numberBetween(50, 135); 
-                    $tiu = $faker->numberBetween(60, 155); 
-                    $tkp = $faker->numberBetween(130, 210); 
-                    $total = $twk + $tiu + $tkp;
+                    // Skor TWK & TIU kelipatan 5
+                    $twk      = $faker->numberBetween(10, 27) * 5; // 50 - 135
+                    $tiu      = $faker->numberBetween(12, 31) * 5; // 60 - 155
+                    $tkp      = $faker->numberBetween(130, 210);
+                    $total    = $twk + $tiu + $tkp;
+                    $isPassed = ($twk >= $pgTwk && $tiu >= $pgTiu && $tkp >= $pgTkp);
                 }
 
-                \App\Models\ExamAttempt::create([
-                    'user_id' => $user->id,
-                    'tryout_id' => $tryout->id,
-                    'twk_score' => $twk,
-                    'tiu_score' => $tiu,
-                    'tkp_score' => $tkp,
-                    'total_score' => $total,
-                    'answers' => [], 
-                    'completed_at' => now()->subMinutes(rand(1, 10000)), 
+                ExamAttempt::create([
+                    'user_id'      => $user->id,
+                    'tryout_id'    => $tryout->id,
+                    'twk_score'    => $twk,
+                    'tiu_score'    => $tiu,
+                    'tkp_score'    => $tkp,
+                    'total_score'  => $total,
+                    'is_passed'    => $isPassed,
+                    'answers'      => [],
+                    'completed_at' => now()->subMinutes(rand(1, 10000)),
                 ]);
             }
         });
@@ -210,6 +265,10 @@ class TryoutManagerController extends Controller
     {
         $search = $request->input('search');
 
+        $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65;
+        $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80;
+        $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
+
         $bestAttemptIds = ExamAttempt::where('tryout_id', $tryout->id)
             ->whereNotNull('completed_at')
             ->when($search, function ($query) use ($search) {
@@ -220,16 +279,12 @@ class TryoutManagerController extends Controller
             })
             ->get()
             ->groupBy('user_id')
-            ->map(function ($userAttempts) use ($tryout) {
-                return $userAttempts->sortByDesc(function ($a) use ($tryout) {
-                    // Sorting berdasarkan Kategori
+            ->map(function ($userAttempts) use ($tryout, $pgTwk, $pgTiu, $pgTkp) {
+                return $userAttempts->sortByDesc(function ($a) use ($tryout, $pgTwk, $pgTiu, $pgTkp) {
                     if ($tryout->category === 'skb') {
                         $isPassed = $a->total_score >= ($tryout->passing_grade ?? 0) ? 1 : 0;
                         return sprintf('%d-%05d', $isPassed, $a->total_score);
                     } else {
-                        $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65;
-                        $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80;
-                        $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
                         $isPassed = ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp) ? 1 : 0;
                         return sprintf('%d-%03d-%03d-%03d-%03d', $isPassed, $a->total_score, $a->tkp_score, $a->tiu_score, $a->twk_score);
                     }
@@ -240,25 +295,22 @@ class TryoutManagerController extends Controller
         $attemptsPaginated = ExamAttempt::with('user')
             ->whereIn('id', $bestAttemptIds)
             ->get()
-            ->sortByDesc(function ($a) use ($tryout) {
+            ->sortByDesc(function ($a) use ($tryout, $pgTwk, $pgTiu, $pgTkp) {
                 if ($tryout->category === 'skb') {
                     $isPassed = $a->total_score >= ($tryout->passing_grade ?? 0) ? 1 : 0;
                     return sprintf('%d-%05d', $isPassed, $a->total_score);
                 } else {
-                    $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65;
-                    $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80;
-                    $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
                     $isPassed = ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp) ? 1 : 0;
                     return sprintf('%d-%03d-%03d-%03d-%03d', $isPassed, $a->total_score, $a->tkp_score, $a->tiu_score, $a->twk_score);
                 }
             })
             ->values();
 
-        $currentPage = \Illuminate\Pagination\LengthAwarePaginator::resolveCurrentPage();
-        $perPage = 10;
+        $currentPage  = LengthAwarePaginator::resolveCurrentPage();
+        $perPage      = 10;
         $currentItems = $attemptsPaginated->slice(($currentPage - 1) * $perPage, $perPage)->values();
-        
-        $results = new \Illuminate\Pagination\LengthAwarePaginator(
+
+        $results = new LengthAwarePaginator(
             $currentItems,
             $attemptsPaginated->count(),
             $perPage,
@@ -266,33 +318,29 @@ class TryoutManagerController extends Controller
             ['path' => $request->url(), 'query' => $request->query()]
         );
 
-        $results->getCollection()->transform(function ($a, $key) use ($currentPage, $perPage, $tryout) {
-            $isPassed = false;
+        $results->getCollection()->transform(function ($a, $key) use ($currentPage, $perPage, $tryout, $pgTwk, $pgTiu, $pgTkp) {
             if ($tryout->category === 'skb') {
                 $isPassed = $a->total_score >= ($tryout->passing_grade ?? 0);
             } else {
-                $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65;
-                $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80;
-                $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
                 $isPassed = ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp);
             }
 
             return [
-                'id' => $a->id,
-                'rank' => (($currentPage - 1) * $perPage) + $key + 1,
-                'user_name' => $a->user->name ?? 'User Telah Dihapus',
-                'user_email' => $a->user->email ?? '-',
-                'twk_score' => $a->twk_score,
-                'tiu_score' => $a->tiu_score,
-                'tkp_score' => $a->tkp_score,
-                'total_score' => $a->total_score,
-                'is_passed' => $isPassed,
-                'completed_at' => $a->completed_at ? \Carbon\Carbon::parse($a->completed_at)->format('d M Y H:i') : '-',
+                'id'           => $a->id,
+                'rank'         => (($currentPage - 1) * $perPage) + $key + 1,
+                'user_name'    => $a->user->name ?? 'User Telah Dihapus',
+                'user_email'   => $a->user->email ?? '-',
+                'twk_score'    => $a->twk_score,
+                'tiu_score'    => $a->tiu_score,
+                'tkp_score'    => $a->tkp_score,
+                'total_score'  => $a->total_score,
+                'is_passed'    => $isPassed,
+                'completed_at' => $a->completed_at ? Carbon::parse($a->completed_at)->format('d M Y H:i') : '-',
             ];
         });
 
-        return inertia('Admin/Tryout/Results', [
-            'tryout' => $tryout,
+        return Inertia::render('Admin/Tryout/Results', [
+            'tryout'  => $tryout,
             'results' => $results,
             'filters' => $request->only(['search'])
         ]);
@@ -306,12 +354,16 @@ class TryoutManagerController extends Controller
 
     public function recalculate(Tryout $tryout)
     {
-        $questions = \App\Models\Question::where('tryout_id', $tryout->id)->get()->keyBy('id');
-        $attempts = \App\Models\ExamAttempt::where('tryout_id', $tryout->id)
+        $questions = Question::where('tryout_id', $tryout->id)->get()->keyBy('id');
+        $attempts  = ExamAttempt::where('tryout_id', $tryout->id)
                         ->whereNotNull('completed_at')
                         ->get();
 
         $updatedCount = 0;
+
+        $pgTwk = ExamAttempt::PASSING_GRADE_TWK ?? 65;
+        $pgTiu = ExamAttempt::PASSING_GRADE_TIU ?? 80;
+        $pgTkp = ExamAttempt::PASSING_GRADE_TKP ?? 166;
 
         foreach ($attempts as $attempt) {
             $twkScore = 0;
@@ -326,35 +378,36 @@ class TryoutManagerController extends Controller
 
             if (is_array($userAnswers) || is_object($userAnswers)) {
                 foreach ($userAnswers as $key => $answerData) {
-                    
-                    $questionId = (is_array($answerData) && isset($answerData['question_id'])) 
-                                  ? $answerData['question_id'] : $key;
+                    $questionId = (is_array($answerData) && isset($answerData['question_id']))
+                        ? $answerData['question_id']
+                        : $key;
 
-                    $userChoiceRaw = (is_array($answerData) && isset($answerData['answer'])) 
-                                  ? $answerData['answer'] : (is_string($answerData) ? $answerData : null);
-                    
+                    $userChoiceRaw = (is_array($answerData) && isset($answerData['answer']))
+                        ? $answerData['answer']
+                        : (is_scalar($answerData) ? (string) $answerData : null);
+
                     $userChoice = $userChoiceRaw !== null ? strtoupper(trim($userChoiceRaw)) : null;
 
-                    if (isset($questions[$questionId]) && $userChoice !== null) {
+                    if (isset($questions[$questionId]) && $userChoice !== null && $userChoice !== '') {
                         $question = $questions[$questionId];
-                        $category = strtoupper(trim($question->category ?? $question->type ?? $question->kategori ?? '')); 
-                        
-                        // -- LOGIKA SKB --
+                        $category = strtoupper(trim($question->category ?? $question->type ?? $question->kategori ?? ''));
+
+                        // -- 1. LOGIKA SKB (Setiap Soal Benar = 5 Poin) --
                         if ($tryout->category === 'skb') {
-                            $correctAnswer = strtoupper(trim($question->correct_answer));
+                            $correctAnswer = strtoupper(trim((string) $question->correct_answer));
                             if ($userChoice === $correctAnswer) {
                                 $skbScore += 5;
                             }
-                        } 
-                        // -- LOGIKA SKOR TWK & TIU --
-                        else if ($category === 'TWK' || $category === 'TIU') {
-                            $correctAnswer = strtoupper(trim($question->correct_answer));
+                        }
+                        // -- 2. LOGIKA SKD: TWK & TIU --
+                        elseif ($category === 'TWK' || $category === 'TIU') {
+                            $correctAnswer = strtoupper(trim((string) $question->correct_answer));
                             if ($userChoice === $correctAnswer) {
                                 if ($category === 'TWK') $twkScore += 5;
                                 if ($category === 'TIU') $tiuScore += 5;
                             }
-                        } 
-                        // -- LOGIKA SKOR TKP --
+                        }
+                        // -- 3. LOGIKA SKD: TKP --
                         elseif ($category === 'TKP') {
                             $foundScore = false;
 
@@ -383,20 +436,20 @@ class TryoutManagerController extends Controller
                                     }
                                 }
                             }
-                            
+
                             if (!$foundScore) {
                                 $possibleColumns = [
                                     'point_' . strtolower($userChoice),
-                                    'poin_' . strtolower($userChoice), 
-                                    'score_' . strtolower($userChoice), 
-                                    'skor_' . strtolower($userChoice),  
-                                    strtolower($userChoice),            
+                                    'poin_' . strtolower($userChoice),
+                                    'score_' . strtolower($userChoice),
+                                    'skor_' . strtolower($userChoice),
+                                    strtolower($userChoice),
                                 ];
 
                                 foreach ($possibleColumns as $col) {
                                     if (isset($question->$col)) {
                                         $tkpScore += (int) $question->$col;
-                                        break; 
+                                        break;
                                     }
                                 }
                             }
@@ -417,13 +470,13 @@ class TryoutManagerController extends Controller
                 $attempt->tiu_score   = $tiuScore;
                 $attempt->tkp_score   = $tkpScore;
                 $attempt->total_score = $twkScore + $tiuScore + $tkpScore;
-                $attempt->is_passed   = ($twkScore >= 65 && $tiuScore >= 80 && $tkpScore >= 166);
+                $attempt->is_passed   = ($twkScore >= $pgTwk && $tiuScore >= $pgTiu && $tkpScore >= $pgTkp);
             }
-            
+
             $attempt->save();
             $updatedCount++;
         }
 
-        return back()->with('success', "Kalkulasi berhasil! $updatedCount data peserta telah diperbarui.");
+        return back()->with('success', "Kalkulasi berhasil! {$updatedCount} data peserta telah diperbarui.");
     }
 }
