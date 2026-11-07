@@ -242,29 +242,6 @@ onUnmounted(() => {
                             </div>
                         </Link>
 
-                        <div class="h-px bg-black/5 ml-[68px]"></div>
-
-                        <!-- Menu SKB (AKTIF) -->
-                        <Link :href="route('tryout.skb.index')" class="flex items-center justify-between p-4 sm:p-5 active:bg-[#F5F5F7] sm:hover:bg-[#F5F5F7] transition-colors group">
-                            <div class="flex items-center gap-4 min-w-0">
-                                <div class="w-10 h-10 bg-[#F0F4FF] text-[#007AFF] rounded-[10px] flex items-center justify-center text-lg shrink-0">
-                                    💼
-                                </div>
-                                <div class="min-w-0">
-                                    <div class="flex items-center gap-2">
-                                        <h3 class="text-[16px] font-semibold text-[#1D1D1F] truncate">Tryout SKB CPNS</h3>
-                                        <span class="inline-block px-1.5 py-0.5 bg-[#E5F5EA] text-[#34C759] text-[10px] font-bold uppercase tracking-wider rounded">
-                                            5 Poin / Soal
-                                        </span>
-                                    </div>
-                                    <p class="text-[13px] text-[#86868B] font-medium mt-0.5 truncate">Simulasi Seleksi Kompetensi Bidang Teknis</p>
-                                </div>
-                            </div>
-                            <div class="text-[#C7C7CC] group-hover:text-[#1D1D1F] transition-colors shrink-0 ml-3">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
-                            </div>
-                        </Link>
-
                     </div>
                 </div>
 

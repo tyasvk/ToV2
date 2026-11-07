@@ -60,6 +60,37 @@ class TryoutManagerController extends Controller
         ]);
     }
 
+    public function indexSkb(Request $request)
+    {
+        $query = Tryout::query()->withCount('questions');
+
+        // Filter tipe (bukan adidaya/akbar)
+        $query->where(function ($q) {
+            $q->whereNotIn('type', ['adidaya', 'akbar'])
+              ->orWhereNull('type');
+        });
+
+        // Wajib filter kategori skb
+        $query->where('category', 'skb');
+
+        // Tangkap parameter pencarian
+        if ($request->filled('search')) {
+            $query->where('title', 'like', '%' . $request->search . '%');
+        }
+
+        $tryouts = $query->latest()->get();
+
+        // Catatan: Pastikan file Vue-nya ada di direktori: resources/js/Pages/Admin/TryoutSkb/Index.vue
+        // Jika Anda menggunakan file Vue yang sama dengan SKD, Anda bisa ganti render path-nya menjadi 'Admin/Tryout/Index'
+        return Inertia::render('Admin/TryoutSkb/Index', [
+            'tryouts' => $tryouts,
+            'filters' => [
+                'search'   => $request->search,
+                'category' => 'skb',
+            ],
+        ]);
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([
