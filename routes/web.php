@@ -125,15 +125,10 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     Route::post('/bundling/checkout', [TryoutController::class, 'processBundlingCheckout'])->name('user.bundling.checkout');
 
     // --- HASIL, RIWAYAT & RANKING ---
-    Route::get('/ranking', [UserTryoutController::class, 'ranking'])->name('ranking.index'); // <-- TAMBAHKAN BARIS INI
+    Route::get('/ranking', [UserTryoutController::class, 'ranking'])->name('ranking.index'); 
 
-    // --- HASIL, RIWAYAT, RANKING & GRAFIK ---
-    Route::get('/ranking', [UserTryoutController::class, 'ranking'])->name('ranking.index');
-    
     // =========== TAMBAHKAN BARIS INI ===========
     Route::get('/progress', [UserTryoutController::class, 'progress'])->name('tryout.progress');
-
-    // =========== TAMBAHKAN BARIS INI ===========
     Route::post('/tryouts/{tryout}/claim', [UserTryoutController::class, 'claimTryout'])->name('tryout.claim');
 
     // --- HASIL & RIWAYAT ---
@@ -144,7 +139,6 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     Route::get('/history/{tryout}', [UserTryoutController::class, 'historyDetail'])->name('tryout.history.detail');
     Route::get('/certificate/{attempt}', [UserTryoutController::class, 'certificate'])->name('tryout.certificate');
     Route::post('/tryouts/report-question', [\App\Http\Controllers\User\TryoutController::class, 'reportQuestion'])->name('tryout.report-question');
-
     Route::post('/tryouts/{tryout}/penalty', [\App\Http\Controllers\User\TryoutController::class, 'incrementPenalty'])->name('tryout.penalty');
 
     // --- TRYOUT AKBAR ---
@@ -188,8 +182,14 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::get('/tryouts/{tryout}/results', [\App\Http\Controllers\Admin\TryoutManagerController::class, 'results'])->name('tryouts.results');
     Route::delete('/tryouts/attempts/{attempt}', [\App\Http\Controllers\Admin\TryoutManagerController::class, 'destroyAttempt'])->name('tryouts.attempts.destroy');
     Route::post('tryouts/{tryout}/recalculate', [TryoutManagerController::class, 'recalculate'])->name('tryouts.recalculate');
+
+    // ==========================================
+    // --- ROUTE ADMIN TRYOUT SKB (BARU DITAMBAHKAN) ---
+    // ==========================================
+    // Nama route ini akan menjadi "admin.tryout-skb.index" karena ada prefix dan name('admin.') pada group
+    Route::get('/tryout-skb', [TryoutManagerController::class, 'indexSkb'])->name('tryout-skb.index');
     
-    // --- VERIFIKASI SYARAT --- (Perhatikan prefix dan name disesuaikan agar tidak dobel admin)
+    // --- VERIFIKASI SYARAT ---
     Route::get('/tryouts-verifikasi', [TryoutRegistrationController::class, 'index'])->name('tryouts.verifikasi.index');
     Route::post('/tryouts-verifikasi/{registration}', [TryoutRegistrationController::class, 'update'])->name('tryouts.verifikasi.update');
 
@@ -216,10 +216,7 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     // Transaction Management
     Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
     Route::post('/transactions/{transaction}/approve', [TransactionController::class, 'approve'])->name('transactions.approve');
-
-    // =========== TAMBAHKAN BARIS INI ===========
     Route::post('/transactions/{transaction}/reject', [TransactionController::class, 'reject'])->name('transactions.reject');
-    // ===========================================
 
     // --- ROUTE BOT PESERTA FIKTIF ---
     Route::post('/tryouts/{tryout}/generate-dummies', [TryoutManagerController::class, 'generateDummies'])->name('admin.tryouts.dummies');

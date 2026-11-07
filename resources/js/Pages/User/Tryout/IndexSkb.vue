@@ -111,9 +111,6 @@ const claimTryout = (tryoutId) => {
                     <div>
                         <div class="flex items-center gap-2">
                             <h1 class="text-2xl md:text-3xl font-semibold text-slate-900 tracking-tight">Tryout SKB</h1>
-                            <span class="px-2.5 py-0.5 bg-blue-50 text-[#007AFF] rounded-full text-[11px] font-bold tracking-wide border border-blue-100">
-                                5 Poin / Soal
-                            </span>
                         </div>
                         <p class="text-[12px] md:text-[13px] text-slate-500 font-medium mt-0.5">
                             Simulasi Seleksi Kompetensi Bidang (SKB) CPNS Nusantara
@@ -135,7 +132,7 @@ const claimTryout = (tryoutId) => {
                     </div>
                 </div>
 
-                <!-- CONTROL BAR (Tabs & Switcher SKD/SKB) -->
+                <!-- CONTROL BAR (Tabs) -->
                 <div class="bg-white rounded-[16px] p-1.5 flex flex-col sm:flex-row items-center justify-between gap-2 shadow-[0_2px_8px_rgba(0,0,0,0.02)] border border-slate-100">
                     
                     <!-- Segmented Control: Tersedia vs Milik Saya -->
@@ -154,22 +151,6 @@ const claimTryout = (tryoutId) => {
                         >
                             Milik Saya
                         </button>
-                    </div>
-
-                    <!-- Switcher Halaman: SKD vs SKB -->
-                    <div class="flex bg-[#F2F2F7] p-0.5 rounded-[12px] w-full sm:w-auto">
-                        <Link 
-                            :href="route('tryout.index')"
-                            class="flex-1 sm:w-32 py-1.5 rounded-[10px] text-[12px] font-semibold text-center text-slate-500 hover:text-slate-700 transition-all"
-                        >
-                            Halaman SKD
-                        </Link>
-                        <Link 
-                            :href="route('tryout.skb.index')"
-                            class="flex-1 sm:w-32 py-1.5 rounded-[10px] text-[12px] font-semibold text-center bg-white text-[#007AFF] shadow-sm transition-all"
-                        >
-                            Halaman SKB
-                        </Link>
                     </div>
                 </div>
 
