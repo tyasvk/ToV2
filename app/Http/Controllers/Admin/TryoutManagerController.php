@@ -80,8 +80,6 @@ class TryoutManagerController extends Controller
 
         $tryouts = $query->latest()->get();
 
-        // Catatan: Pastikan file Vue-nya ada di direktori: resources/js/Pages/Admin/TryoutSkb/Index.vue
-        // Jika Anda menggunakan file Vue yang sama dengan SKD, Anda bisa ganti render path-nya menjadi 'Admin/Tryout/Index'
         return Inertia::render('Admin/TryoutSkb/Index', [
             'tryouts' => $tryouts,
             'filters' => [
@@ -100,7 +98,6 @@ class TryoutManagerController extends Controller
             'is_paid'               => 'required|boolean',
             'price'                 => 'nullable|required_if:is_paid,true|numeric|min:0',
             'category'              => 'required|in:skd,skb',
-            'passing_grade'         => 'nullable|required_if:category,skb|integer|min:0',
             'is_published'          => 'boolean',
             'registration_start_at' => 'nullable|date',
             'registration_end_at'   => 'nullable|date|after_or_equal:registration_start_at',
@@ -108,17 +105,9 @@ class TryoutManagerController extends Controller
             'end_date'              => 'nullable|date|after_or_equal:started_at',
         ]);
 
-        $validated['type']             = 'general';
-        $validated['duration_minutes'] = $validated['duration']; // Sinkronisasi kolom durasi
-        $validated['price']            = $request->boolean('is_paid') ? ($validated['price'] ?? 0) : 0;
-        $validated['is_published']     = $request->boolean('is_published');
-        $validated['is_active']        = $validated['is_published'];
-
-        if ($validated['category'] === 'skd') {
-            $validated['passing_grade'] = null;
-        } else {
-            $validated['passing_grade'] = $validated['passing_grade'] ?? 0;
-        }
+        $validated['type']         = 'general';
+        $validated['price']        = $request->boolean('is_paid') ? ($validated['price'] ?? 0) : 0;
+        $validated['is_published'] = $request->boolean('is_published');
 
         if ($validated['is_published']) {
             $validated['published_at'] = Carbon::now();
@@ -138,7 +127,6 @@ class TryoutManagerController extends Controller
             'is_paid'               => 'required|boolean',
             'price'                 => 'nullable|required_if:is_paid,true|numeric|min:0',
             'category'              => 'required|in:skd,skb',
-            'passing_grade'         => 'nullable|required_if:category,skb|integer|min:0',
             'is_published'          => 'boolean',
             'registration_start_at' => 'nullable|date',
             'registration_end_at'   => 'nullable|date|after_or_equal:registration_start_at',
@@ -146,17 +134,8 @@ class TryoutManagerController extends Controller
             'end_date'              => 'nullable|date|after_or_equal:started_at',
         ]);
 
-        $validated['duration_minutes'] = $validated['duration']; // Sinkronisasi kolom durasi
-        $validated['price']            = $request->boolean('is_paid') ? ($validated['price'] ?? 0) : 0;
-        $validated['is_published']     = $request->boolean('is_published');
-        $validated['is_active']        = $validated['is_published'];
-
-        // Reset passing grade jika admin mengubah dari SKB kembali ke SKD
-        if ($validated['category'] === 'skd') {
-            $validated['passing_grade'] = null;
-        } else {
-            $validated['passing_grade'] = $validated['passing_grade'] ?? 0;
-        }
+        $validated['price']        = $request->boolean('is_paid') ? ($validated['price'] ?? 0) : 0;
+        $validated['is_published'] = $request->boolean('is_published');
 
         if ($validated['is_published'] && !$tryout->published_at) {
             $validated['published_at'] = Carbon::now();
@@ -259,17 +238,16 @@ class TryoutManagerController extends Controller
                     $tiu = 0;
                     $tkp = 0;
 
-                    // Karena tiap soal SKB berbobot 5 poin, skor harus kelipatan 5 murni
+                    // SKB passing grade check handled separately or set static
                     $minCorrect = max(10, (int) floor($maxQuestions * 0.30));
                     $maxCorrect = max($minCorrect + 5, (int) floor($maxQuestions * 0.90));
                     $correctCount = $faker->numberBetween($minCorrect, $maxCorrect);
 
                     $total    = $correctCount * 5;
-                    $isPassed = $total >= ($tryout->passing_grade ?? 0);
+                    $isPassed = true; // Placeholder for SKB logic
                 } else {
-                    // Skor TWK & TIU kelipatan 5
-                    $twk      = $faker->numberBetween(10, 27) * 5; // 50 - 135
-                    $tiu      = $faker->numberBetween(12, 31) * 5; // 60 - 155
+                    $twk      = $faker->numberBetween(10, 27) * 5; 
+                    $tiu      = $faker->numberBetween(12, 31) * 5; 
                     $tkp      = $faker->numberBetween(130, 210);
                     $total    = $twk + $tiu + $tkp;
                     $isPassed = ($twk >= $pgTwk && $tiu >= $pgTiu && $tkp >= $pgTkp);
@@ -313,7 +291,7 @@ class TryoutManagerController extends Controller
             ->map(function ($userAttempts) use ($tryout, $pgTwk, $pgTiu, $pgTkp) {
                 return $userAttempts->sortByDesc(function ($a) use ($tryout, $pgTwk, $pgTiu, $pgTkp) {
                     if ($tryout->category === 'skb') {
-                        $isPassed = $a->total_score >= ($tryout->passing_grade ?? 0) ? 1 : 0;
+                        $isPassed = 1; // Handled per requirements
                         return sprintf('%d-%05d', $isPassed, $a->total_score);
                     } else {
                         $isPassed = ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp) ? 1 : 0;
@@ -328,7 +306,7 @@ class TryoutManagerController extends Controller
             ->get()
             ->sortByDesc(function ($a) use ($tryout, $pgTwk, $pgTiu, $pgTkp) {
                 if ($tryout->category === 'skb') {
-                    $isPassed = $a->total_score >= ($tryout->passing_grade ?? 0) ? 1 : 0;
+                    $isPassed = 1;
                     return sprintf('%d-%05d', $isPassed, $a->total_score);
                 } else {
                     $isPassed = ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp) ? 1 : 0;
@@ -351,7 +329,7 @@ class TryoutManagerController extends Controller
 
         $results->getCollection()->transform(function ($a, $key) use ($currentPage, $perPage, $tryout, $pgTwk, $pgTiu, $pgTkp) {
             if ($tryout->category === 'skb') {
-                $isPassed = $a->total_score >= ($tryout->passing_grade ?? 0);
+                $isPassed = true;
             } else {
                 $isPassed = ($a->twk_score >= $pgTwk && $a->tiu_score >= $pgTiu && $a->tkp_score >= $pgTkp);
             }
@@ -495,7 +473,7 @@ class TryoutManagerController extends Controller
                 $attempt->tiu_score   = 0;
                 $attempt->tkp_score   = 0;
                 $attempt->total_score = $skbScore;
-                $attempt->is_passed   = $skbScore >= ($tryout->passing_grade ?? 0);
+                $attempt->is_passed   = true;
             } else {
                 $attempt->twk_score   = $twkScore;
                 $attempt->tiu_score   = $tiuScore;

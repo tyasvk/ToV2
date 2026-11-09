@@ -10,25 +10,21 @@ class Tryout extends Model
 {
     use HasFactory;
 
-    protected $guarded = [];
-
+    // WAJIB: Definisikan hanya kolom yang ada di database
     protected $fillable = [
         'title', 
         'description', 
-        'duration_minutes', 
-        'is_active', 
+        'duration',      // HANYA gunakan 'duration'
         'is_published', 
         'is_paid',      
         'price',         
         'published_at', 
-        'started_at',            // Masa Pengerjaan Mulai
+        'started_at',            
         'type',          
         'requirements',   
         'ended_at',      
-        'duration',      
-        'end_date',              // Masa Pengerjaan Selesai
-        'category',              // 'skd' atau 'skb'
-        'passing_grade',         // Nilai ambang batas total untuk SKB
+        'end_date',              
+        'category',              
         'registration_start_at', 
         'registration_end_at',   
         'instagram_post_url',
@@ -42,11 +38,9 @@ class Tryout extends Model
         'registration_end_at'   => 'datetime:Y-m-d H:i:s',
         'started_at'            => 'datetime:Y-m-d H:i:s',
         
-        'is_active'             => 'boolean',
         'is_published'          => 'boolean',
         'is_paid'               => 'boolean',   
         'price'                 => 'decimal:2',    
-        'passing_grade'         => 'integer',
     ];
 
     public function transactions(): HasMany
