@@ -42,7 +42,6 @@ const editingId = ref(null);
 const form = useForm({
     title: '',
     duration: 100, // SKD biasanya 100 menit
-    passing_grade: 0, // Jika SKD butuh TWK, TIU, TKP terpisah, field ini bisa disesuaikan nanti
     description: '',
     is_published: false,
     published_at: '',
@@ -51,7 +50,7 @@ const form = useForm({
     started_at: '',            
     is_paid: false,
     price: 0,
-    category: 'skd', // Diubah menjadi SKD
+    category: 'skd',
     type: 'general'
 });
 
@@ -68,7 +67,6 @@ const openEditModal = (tryout) => {
     editingId.value = tryout.id;
     form.title = tryout.title;
     form.duration = tryout.duration; 
-    form.passing_grade = tryout.passing_grade || 0;
     form.description = tryout.description;
     form.is_published = !!tryout.is_published;
     form.published_at = tryout.published_at ? tryout.published_at.substring(0, 16) : '';
@@ -77,7 +75,7 @@ const openEditModal = (tryout) => {
     form.started_at = tryout.started_at ? tryout.started_at.substring(0, 16) : '';
     form.is_paid = !!tryout.is_paid;
     form.price = tryout.price;
-    form.category = 'skd'; // Diubah menjadi SKD
+    form.category = 'skd';
     showModal.value = true;
 };
 
@@ -163,13 +161,11 @@ const formatCurrency = (price) => {
 
                         <!-- TOMBOL VERIFIKASI & BUAT PAKET -->
                         <div class="flex w-full sm:w-auto gap-2">
-                            <!-- Tombol Verifikasi -->
                             <Link :href="route('admin.tryouts.verifikasi.index')" class="flex-1 sm:flex-none px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-[10px] font-semibold text-[12px] md:text-[13px] transition-colors flex items-center justify-center gap-1.5 active:scale-95 shadow-sm">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                 Verifikasi
                             </Link>
 
-                            <!-- Tombol Buat Paket -->
                             <button @click="openCreateModal" class="flex-1 sm:flex-none px-4 py-2 bg-[#007AFF] hover:bg-[#0056b3] text-white rounded-[10px] font-semibold text-[12px] md:text-[13px] transition-colors flex items-center justify-center gap-1.5 active:scale-95 shrink-0">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -208,8 +204,6 @@ const formatCurrency = (price) => {
                                                 <span>{{ tryout.duration }} Menit</span>
                                                 <span class="text-slate-300">•</span>
                                                 <span>{{ tryout.questions_count || 0 }} Soal</span>
-                                                <span class="text-slate-300">•</span>
-                                                <span class="text-[#007AFF]">PG: {{ tryout.passing_grade || 0 }}</span>
                                             </div>
                                         </div>
                                     </td>
@@ -314,6 +308,7 @@ const formatCurrency = (price) => {
                             <input v-model="form.title" type="text" class="w-full bg-[#F5F5F7] border-transparent rounded-[10px] px-3 py-2 text-[13px] font-medium focus:bg-white focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 outline-none transition-all text-slate-900" placeholder="Contoh: Tryout SKD CPNS 2026" required />
                         </div>
 
+                        <!-- Menggabungkan Durasi dan Publikasi sejajar agar rapi setelah passing grade dihapus -->
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-[12px] font-semibold text-slate-700 mb-1.5">Durasi (Mnt) <span class="text-rose-500">*</span></label>
@@ -321,16 +316,11 @@ const formatCurrency = (price) => {
                             </div>
                             
                             <div>
-                                <label class="block text-[12px] font-semibold text-slate-700 mb-1.5">Passing Grade <span class="text-rose-500">*</span></label>
-                                <input v-model="form.passing_grade" type="number" class="w-full bg-[#F5F5F7] border-transparent rounded-[10px] px-3 py-2 text-[13px] font-medium focus:bg-white focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 outline-none transition-all text-slate-900" placeholder="Misal: 311" required />
-                            </div>
-                        </div>
-                        
-                        <div>
-                            <label class="block text-[12px] font-semibold text-slate-700 mb-1.5">Publikasi</label>
-                            <div class="flex bg-[#F2F2F7] p-1 rounded-[10px]">
-                                <button type="button" @click="form.is_published = false" :class="[!form.is_published ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500']" class="flex-1 py-1 rounded-[8px] text-[11px] font-semibold transition-all">Draft</button>
-                                <button type="button" @click="form.is_published = true" :class="[form.is_published ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500']" class="flex-1 py-1 rounded-[8px] text-[11px] font-semibold transition-all">Live</button>
+                                <label class="block text-[12px] font-semibold text-slate-700 mb-1.5">Publikasi</label>
+                                <div class="flex bg-[#F2F2F7] p-1 rounded-[10px] h-[37px]"> <!-- h-[37px] agar sejajar dengan input di sebelahnya -->
+                                    <button type="button" @click="form.is_published = false" :class="[!form.is_published ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500']" class="flex-1 rounded-[8px] text-[11px] font-semibold transition-all">Draft</button>
+                                    <button type="button" @click="form.is_published = true" :class="[form.is_published ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500']" class="flex-1 rounded-[8px] text-[11px] font-semibold transition-all">Live</button>
+                                </div>
                             </div>
                         </div>
 
