@@ -218,10 +218,10 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::post('/transactions/{transaction}/approve', [TransactionController::class, 'approve'])->name('transactions.approve');
     Route::post('/transactions/{transaction}/reject', [TransactionController::class, 'reject'])->name('transactions.reject');
 
-    // --- ROUTE BOT PESERTA FIKTIF ---
-    Route::post('/tryouts/{tryout}/generate-dummies', [TryoutManagerController::class, 'generateDummies'])->name('admin.tryouts.dummies');
-    Route::get('/tryouts/{tryout}/dummies', [TryoutManagerController::class, 'getDummies'])->name('admin.tryouts.dummies.list');
-    Route::delete('/tryouts/{tryout}/dummies', [TryoutManagerController::class, 'clearDummies'])->name('admin.tryouts.dummies.clear');
+    // --- ROUTE BOT PESERTA FIKTIF (DIPERBAIKI) ---
+    Route::get('/tryouts/{id}/dummies', [TryoutManagerController::class, 'getDummies'])->name('tryouts.dummies.get');
+    Route::post('/tryouts/{id}/dummies', [TryoutManagerController::class, 'generateDummies'])->name('tryouts.dummies');
+    Route::delete('/tryouts/{id}/dummies', [TryoutManagerController::class, 'clearDummies'])->name('tryouts.dummies.clear');
 
     // Membership Settings
     Route::get('/membership-setting', [MembershipSettingController::class, 'index'])->name('membership-setting.index');

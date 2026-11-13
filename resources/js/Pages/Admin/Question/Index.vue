@@ -57,7 +57,7 @@ const dummyForm = useForm({
 const submitDummies = () => {
     const requestedAmount = dummyForm.amount; 
     
-    dummyForm.post(route('tryouts.dummies', props.tryout.id), {
+    dummyForm.post(route('admin.tryouts.dummies', props.tryout.id), {
         onSuccess: () => {
             isDummyModalOpen.value = false;
             dummyForm.reset();
