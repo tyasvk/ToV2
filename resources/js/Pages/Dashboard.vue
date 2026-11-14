@@ -6,7 +6,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 const props = defineProps({
     announcement: String,
     balance: {
-        type: Number,
+        type: [Number, String],
         default: 0
     },
     stats: Object,
@@ -235,6 +235,25 @@ onUnmounted(() => {
                                 <div class="min-w-0">
                                     <h3 class="text-[16px] font-semibold text-[#1D1D1F] truncate">Tryout SKD CPNS</h3>
                                     <p class="text-[13px] text-[#86868B] font-medium mt-0.5 truncate">Akses katalog simulasi SKD terbaru</p>
+                                </div>
+                            </div>
+                            <div class="text-[#C7C7CC] group-hover:text-[#1D1D1F] transition-colors shrink-0 ml-3">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+                            </div>
+                        </Link>
+
+                        <!-- Garis Pemisah -->
+                        <div class="h-px bg-black/5 ml-[68px]"></div>
+
+                        <!-- Menu SKB -->
+                        <Link :href="route('tryout.skb.index')" class="flex items-center justify-between p-4 sm:p-5 active:bg-[#F5F5F7] sm:hover:bg-[#F5F5F7] transition-colors group">
+                            <div class="flex items-center gap-4 min-w-0">
+                                <div class="w-10 h-10 bg-[#F5E6FF] text-[#AF52DE] rounded-[10px] flex items-center justify-center text-lg shrink-0">
+                                    💼
+                                </div>
+                                <div class="min-w-0">
+                                    <h3 class="text-[16px] font-semibold text-[#1D1D1F] truncate">Tryout SKB CPNS</h3>
+                                    <p class="text-[13px] text-[#86868B] font-medium mt-0.5 truncate">Simulasi Seleksi Kompetensi Bidang</p>
                                 </div>
                             </div>
                             <div class="text-[#C7C7CC] group-hover:text-[#1D1D1F] transition-colors shrink-0 ml-3">

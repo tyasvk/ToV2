@@ -13,6 +13,7 @@ class Tryout extends Model
     // WAJIB: Definisikan hanya kolom yang ada di database
     protected $fillable = [
         'title', 
+        'skb_category_id',
         'description', 
         'duration',      // HANYA gunakan 'duration'
         'is_published', 
@@ -47,6 +48,12 @@ class Tryout extends Model
     {
         return $this->hasMany(Transaction::class);
     }
+
+    // Tambahkan method relasi:
+public function skbCategory()
+{
+    return $this->belongsTo(SkbCategory::class, 'skb_category_id');
+}
 
     public function questions(): HasMany
     {

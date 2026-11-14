@@ -73,6 +73,10 @@ const activeTryoutType = computed(() => {
     return page.props.tryout?.type || page.props.attempt?.tryout?.type || null;
 });
 
+const activeTryoutCategory = computed(() => {
+    return page.props.tryout?.category || page.props.attempt?.tryout?.category || null;
+});
+
 const isInsideTryoutScope = computed(() => {
     return route().current('tryout.show') || 
            route().current('tryout.wait') || 
@@ -157,9 +161,15 @@ const isExamPage = computed(() => {
                         <span class="text-[13px]">Kelola User</span>
                     </Link>
 
-                    <Link :href="route('admin.tryouts.index')" :class="[(route().current('admin.tryouts.*') && !route().current('admin.tryouts.questions.*')) || (route().current('admin.tryouts.questions.*') && activeTryoutType !== 'adidaya' && activeTryoutType !== 'akbar') ? 'bg-[#F3E8FF] text-[#AF52DE] active-link font-bold' : 'text-[#1D1D1F] hover:bg-[#F5F5F7] font-medium', 'flex items-center gap-3 py-2.5 px-3 rounded-[12px] transition-all']">
+                    <Link :href="route('admin.tryouts.index')" :class="[(route().current('admin.tryouts.*') && !route().current('admin.tryouts.questions.*')) || (route().current('admin.tryouts.questions.*') && activeTryoutType !== 'adidaya' && activeTryoutType !== 'akbar' && activeTryoutCategory !== 'skb') ? 'bg-[#F3E8FF] text-[#AF52DE] active-link font-bold' : 'text-[#1D1D1F] hover:bg-[#F5F5F7] font-medium', 'flex items-center gap-3 py-2.5 px-3 rounded-[12px] transition-all']">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 shrink-0 text-[#AF52DE]"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18s4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18c-2.305 0-4.408.867-6 2.292m0-14.25v14.25" /></svg>
                         <span class="text-[13px]">Kelola Tryout</span>
+                    </Link>
+
+                    <!-- BARU: KELOLA SKB (ADMIN) -->
+                    <Link :href="route('admin.tryout.skb.index')" :class="[route().current('admin.tryout.skb.*') || (route().current('admin.tryouts.questions.*') && activeTryoutCategory === 'skb') ? 'bg-[#EEF2FF] text-[#5E5CE6] active-link font-bold' : 'text-[#1D1D1F] hover:bg-[#F5F5F7] font-medium', 'flex items-center gap-3 py-2.5 px-3 rounded-[12px] transition-all']">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 shrink-0 text-[#5E5CE6]"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0 1 12 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 0 1-.673-.38m0 0A2.18 2.18 0 0 1 3 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 0 1 3.413-.387m7.5 0V5.25A2.25 2.25 0 0 0 13.5 3h-3a2.25 2.25 0 0 0-2.25 2.25v.894m7.5 0a48.667 48.667 0 0 0-7.5 0M12 12.75h.008v.008H12v-.008Z" /></svg>
+                        <span class="text-[13px]">Kelola SKB</span>
                     </Link>
 
                     <Link :href="route('admin.adidaya.index')" :class="[route().current('admin.adidaya.*') || (route().current('admin.tryouts.questions.*') && activeTryoutType === 'adidaya') ? 'bg-[#F3E8FF] text-[#AF52DE] active-link font-bold' : 'text-[#1D1D1F] hover:bg-[#F5F5F7] font-medium', 'flex items-center gap-3 py-2.5 px-3 rounded-[12px] transition-all']">
@@ -212,9 +222,18 @@ const isExamPage = computed(() => {
                         <span class="text-[13px]">Dashboard</span>
                     </Link>
 
-                    <Link :href="route('tryout.index')" :class="[(route().current('tryout.index') || route().current('tryout.my') || route().current('tryout.register') || (isInsideTryoutScope && activeTryoutType === 'general')) ? 'bg-[#F3E8FF] text-[#AF52DE] active-link font-bold' : 'text-[#1D1D1F] hover:bg-[#F5F5F7] font-medium', 'flex items-center gap-3 py-2.5 px-3 rounded-[12px] transition-all']">
+                    <Link :href="route('tryout.index')" :class="[(route().current('tryout.index') || route().current('tryout.my') || route().current('tryout.register') || (isInsideTryoutScope && activeTryoutType === 'general' && activeTryoutCategory !== 'skb')) ? 'bg-[#F3E8FF] text-[#AF52DE] active-link font-bold' : 'text-[#1D1D1F] hover:bg-[#F5F5F7] font-medium', 'flex items-center gap-3 py-2.5 px-3 rounded-[12px] transition-all']">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 shrink-0 text-[#AF52DE]"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
                         <span class="text-[13px]">Katalog Tryout</span>
+                    </Link>
+
+                    <!-- BARU: TRYOUT SKB (USER) -->
+                    <Link :href="route('tryout.skb.index')" :class="[(route().current('tryout.skb.*') || (isInsideTryoutScope && activeTryoutCategory === 'skb')) ? 'bg-[#EEF2FF] text-[#5E5CE6] active-link font-bold' : 'text-[#1D1D1F] hover:bg-[#F5F5F7] font-medium', 'flex items-center justify-between py-2.5 px-3 rounded-[12px] transition-all']">
+                        <div class="flex items-center gap-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 shrink-0 text-[#5E5CE6]"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0 1 12 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 0 1-.673-.38m0 0A2.18 2.18 0 0 1 3 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 0 1 3.413-.387m7.5 0V5.25A2.25 2.25 0 0 0 13.5 3h-3a2.25 2.25 0 0 0-2.25 2.25v.894m7.5 0a48.667 48.667 0 0 0-7.5 0M12 12.75h.008v.008H12v-.008Z" /></svg>
+                            <span class="text-[13px]">Tryout SKB</span>
+                        </div>
+                        <span class="text-[9px] bg-[#EEF2FF] text-[#5E5CE6] px-2 py-0.5 rounded-full font-bold">NEW</span>
                     </Link>
 
                     <Link :href="route('tryout-akbar.index')" :class="[(route().current('tryout-akbar.*') || (isInsideTryoutScope && activeTryoutType === 'akbar')) ? 'bg-[#FFF0F0] text-[#FF3B30] active-link font-bold' : 'text-[#1D1D1F] hover:bg-[#F5F5F7] font-medium', 'flex items-center gap-3 py-2.5 px-3 rounded-[12px] transition-all']">

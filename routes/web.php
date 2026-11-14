@@ -78,7 +78,6 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     Route::post('/check-voucher-validity', [TryoutController::class, 'checkVoucher'])->name('voucher.check');
     
     // === FITUR BARU: UPLOAD PERSYARATAN GRATIS ===
-    // (Perhatikan route ini saya namakan tryout.store-register untuk disesuaikan dgn form Vue)
     Route::get('/tryout/{tryout}/upload-syarat', [UserTryoutController::class, 'uploadSyarat'])->name('tryout.upload-syarat');
     Route::post('/tryout/{tryout}/upload-syarat', [UserTryoutController::class, 'storeSyarat'])->name('tryout.store-register');
     Route::get('/tryout/{tryout}/status-syarat', [UserTryoutController::class, 'statusSyarat'])->name('tryout.status-syarat');
@@ -90,8 +89,11 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
     Route::get('/tryouts', [UserTryoutController::class, 'index'])->name('tryout.index');
     Route::get('/tryout/{tryout}', [UserTryoutController::class, 'show'])->name('tryout.show');
 
-    // Route Tryout SKB (BARU - Halaman Terpisah)
+    // ==========================================
+    // --- ROUTE TRYOUT SKB USER ---
+    // ==========================================
     Route::get('/tryout-skb', [TryoutController::class, 'indexSkb'])->name('tryout.skb.index');
+    Route::get('/tryout-skb/{slug}', [TryoutController::class, 'showSkb'])->name('tryout.skb.show');
 
     // --- API & MEMBERSHIP ---
     Route::post('/check-email-availability', [UserTryoutController::class, 'checkEmail'])->name('api.check.email');
@@ -126,8 +128,6 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
 
     // --- HASIL, RIWAYAT & RANKING ---
     Route::get('/ranking', [UserTryoutController::class, 'ranking'])->name('ranking.index'); 
-
-    // =========== TAMBAHKAN BARIS INI ===========
     Route::get('/progress', [UserTryoutController::class, 'progress'])->name('tryout.progress');
     Route::post('/tryouts/{tryout}/claim', [UserTryoutController::class, 'claimTryout'])->name('tryout.claim');
 
@@ -184,10 +184,21 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::post('tryouts/{tryout}/recalculate', [TryoutManagerController::class, 'recalculate'])->name('tryouts.recalculate');
 
     // ==========================================
-    // --- ROUTE ADMIN TRYOUT SKB (BARU DITAMBAHKAN) ---
+    // --- ROUTE ADMIN TRYOUT SKB (DIPERBARUI) --
     // ==========================================
-    // Nama route ini akan menjadi "admin.tryout-skb.index" karena ada prefix dan name('admin.') pada group
-    Route::get('/tryout-skb', [TryoutManagerController::class, 'indexSkb'])->name('tryout-skb.index');
+    Route::prefix('tryout-skb')->name('tryout.skb.')->group(function () {
+        // 1. Kelola Daftar Formasi (Master)
+        Route::get('/', [TryoutManagerController::class, 'indexSkb'])->name('index');
+        Route::post('/', [TryoutManagerController::class, 'storeSkbCategory'])->name('store');
+        Route::put('/{id}', [TryoutManagerController::class, 'updateSkbCategory'])->name('update');
+        Route::delete('/{id}', [TryoutManagerController::class, 'destroySkbCategory'])->name('destroy');
+
+        // 2. Kelola Paket Tryout per Formasi (Detail)
+        Route::get('/{slug}/packages', [TryoutManagerController::class, 'manageSkbPackages'])->name('packages');
+        Route::post('/{slug}/packages', [TryoutManagerController::class, 'storeSkbPackage'])->name('packages.store');
+        Route::put('/packages/{packageId}', [TryoutManagerController::class, 'updateSkbPackage'])->name('packages.update');
+        Route::delete('/packages/{packageId}', [TryoutManagerController::class, 'destroySkbPackage'])->name('packages.destroy');
+    });
     
     // --- VERIFIKASI SYARAT ---
     Route::get('/tryouts-verifikasi', [TryoutRegistrationController::class, 'index'])->name('tryouts.verifikasi.index');
@@ -218,7 +229,7 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::post('/transactions/{transaction}/approve', [TransactionController::class, 'approve'])->name('transactions.approve');
     Route::post('/transactions/{transaction}/reject', [TransactionController::class, 'reject'])->name('transactions.reject');
 
-    // --- ROUTE BOT PESERTA FIKTIF (DIPERBAIKI) ---
+    // --- ROUTE BOT PESERTA FIKTIF ---
     Route::get('/tryouts/{id}/dummies', [TryoutManagerController::class, 'getDummies'])->name('tryouts.dummies.get');
     Route::post('/tryouts/{id}/dummies', [TryoutManagerController::class, 'generateDummies'])->name('tryouts.dummies');
     Route::delete('/tryouts/{id}/dummies', [TryoutManagerController::class, 'clearDummies'])->name('tryouts.dummies.clear');

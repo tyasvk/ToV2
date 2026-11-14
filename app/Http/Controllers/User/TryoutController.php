@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Models\SkbCategory;
 
 class TryoutController extends Controller
 {
@@ -116,10 +117,14 @@ class TryoutController extends Controller
             });
         };
 
-        // --- 1. DATA KATALOG (TO Tersedia yang BELUM dimiliki) ---
+       // --- 1. DATA KATALOG (TO Tersedia yang BELUM dimiliki) ---
         $catalogTryouts = Tryout::query()
+            ->with('skbCategory')
             ->where('is_published', true)
             ->where($categoryFilter)
+            ->when($request->filled('skb_category'), function ($q) use ($request) {
+                $q->whereHas('skbCategory', fn($sq) => $sq->where('slug', $request->skb_category));
+            })
             ->where(function ($query) {
                 $query->whereNotIn('type', ['akbar', 'adidaya'])->orWhereNull('type');
             })
@@ -135,8 +140,12 @@ class TryoutController extends Controller
 
         // --- 2. DATA TRYOUT SAYA ---
         $myTryouts = Tryout::query()
+            ->with('skbCategory')
             ->where('is_published', true)
             ->where($categoryFilter)
+            ->when($request->filled('skb_category'), function ($q) use ($request) {
+                $q->whereHas('skbCategory', fn($sq) => $sq->where('slug', $request->skb_category));
+            })
             ->where(function ($query) {
                 $query->whereNotIn('type', ['akbar', 'adidaya'])->orWhereNull('type');
             })
@@ -197,9 +206,20 @@ class TryoutController extends Controller
     /**
      * Halaman Gabungan Katalog & Tryout Saya (KHUSUS SKB - Beda Halaman, Fitur Sama Persis)
      */
-    public function indexSkb(Request $request)
+public function indexSkb(Request $request)
     {
         $data = $this->getTryoutCatalogAndOwned($request, 'skb');
+
+        $data['categories'] = SkbCategory::where('is_active', true)
+            ->withCount(['tryouts' => function ($q) {
+                $q->where('category', 'skb')
+                  ->where('is_published', true);
+            }])
+            ->latest()
+            ->get();
+
+        $data['filters']['skb_category'] = $request->skb_category;
+
         return Inertia::render('User/Tryout/IndexSkb', $data);
     }
 
@@ -1497,6 +1517,54 @@ class TryoutController extends Controller
         }
 
         return response()->json(['valid' => true, 'message' => 'Kode valid.']);
+    }
+
+public function showSkb($slug)
+    {
+        $user = auth()->user();
+        $isPremiumMember = $user->membership_expires_at && now()->lt($user->membership_expires_at);
+
+        $category = SkbCategory::where('slug', $slug)
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        $tryouts = Tryout::withCount('questions')
+            ->where('category', 'skb')
+            ->where('skb_category_id', $category->id)
+            ->where('is_published', true)
+            ->latest()
+            ->get()
+            ->map(function ($tryout) use ($user, $isPremiumMember) {
+                $hasPurchased = $isPremiumMember || Transaction::where('tryout_id', $tryout->id)
+                    ->whereIn('status', ['paid', 'success'])
+                    ->where(function ($query) use ($user) {
+                        $query->where('user_id', $user->id)
+                              ->orWhereJsonContains('participants_data', $user->email);
+                    })
+                    ->exists();
+
+                $isApproved = TryoutRegistration::where('user_id', $user->id)
+                    ->where('tryout_id', $tryout->id)
+                    ->where('status', 'approved')
+                    ->exists();
+
+                return [
+                    'id'              => $tryout->id,
+                    'title'           => $tryout->title,
+                    'description'     => $tryout->description,
+                    'duration'        => $tryout->duration,
+                    'total_questions' => $tryout->questions_count,
+                    'questions_count' => $tryout->questions_count,
+                    'price'           => (float) $tryout->price,
+                    'is_paid'         => (bool) $tryout->is_paid,
+                    'is_purchased'    => $hasPurchased || $isApproved || !$tryout->is_paid || $tryout->price <= 0,
+                ];
+            });
+
+        return Inertia::render('User/Tryout/ShowSkb', [
+            'category' => $category,
+            'tryouts'  => $tryouts,
+        ]);
     }
 
     public function reportQuestion(\Illuminate\Http\Request $request)

@@ -7,6 +7,8 @@ use App\Models\Tryout;
 use App\Models\ExamAttempt;
 use App\Models\Question;
 use App\Models\User;
+// Pastikan Anda sudah membuat Model SkbCategory atau sesuaikan nama modelnya
+use App\Models\SkbCategory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -60,35 +62,184 @@ class TryoutManagerController extends Controller
         ]);
     }
 
+// ==================================================================
+    // 1. KELOLA FORMASI SKB (MASTER - UNTUK HALAMAN INDEX USER)
+    // ==================================================================
     public function indexSkb(Request $request)
     {
-        $query = Tryout::query()->withCount('questions');
+        $categories = SkbCategory::withCount(['tryouts' => function ($q) {
+            $q->where('category', 'skb');
+        }])->latest()->get();
 
-        // Filter tipe (bukan adidaya/akbar)
-        $query->where(function ($q) {
-            $q->whereNotIn('type', ['adidaya', 'akbar'])
-              ->orWhereNull('type');
-        });
-
-        // Wajib filter kategori skb
-        $query->where('category', 'skb');
-
-        // Tangkap parameter pencarian
-        if ($request->filled('search')) {
-            $query->where('title', 'like', '%' . $request->search . '%');
-        }
-
-        $tryouts = $query->latest()->get();
-
-        return Inertia::render('Admin/TryoutSkb/Index', [
-            'tryouts' => $tryouts,
-            'filters' => [
-                'search'   => $request->search,
-                'category' => 'skb',
-            ],
+        return Inertia::render('Admin/Tryout/IndexSkb', [
+            'categories' => $categories,
         ]);
     }
 
+    public function storeSkbCategory(Request $request)
+    {
+        $validated = $request->validate([
+            'name'        => 'required|string|max:255',
+            'icon'        => 'required|string|max:20',
+            'description' => 'nullable|string|max:500',
+            'is_active'   => 'boolean',
+        ]);
+
+        $slug = Str::slug($validated['name']);
+        $originalSlug = $slug;
+        $counter = 1;
+        while (SkbCategory::where('slug', $slug)->exists()) {
+            $slug = $originalSlug . '-' . $counter++;
+        }
+
+        SkbCategory::create([
+            'name'        => $validated['name'],
+            'slug'        => $slug,
+            'icon'        => $validated['icon'],
+            'description' => $validated['description'] ?? null,
+            'is_active'   => $request->boolean('is_active', true),
+        ]);
+
+        return back()->with('success', 'Formasi SKB berhasil ditambahkan!');
+    }
+
+    public function updateSkbCategory(Request $request, $id)
+    {
+        $category = SkbCategory::findOrFail($id);
+
+        $validated = $request->validate([
+            'name'        => 'required|string|max:255',
+            'icon'        => 'required|string|max:20',
+            'description' => 'nullable|string|max:500',
+            'is_active'   => 'boolean',
+        ]);
+
+        $slug = Str::slug($validated['name']);
+        $originalSlug = $slug;
+        $counter = 1;
+        while (SkbCategory::where('slug', $slug)->where('id', '!=', $id)->exists()) {
+            $slug = $originalSlug . '-' . $counter++;
+        }
+
+        $category->update([
+            'name'        => $validated['name'],
+            'slug'        => $slug,
+            'icon'        => $validated['icon'],
+            'description' => $validated['description'] ?? null,
+            'is_active'   => $request->boolean('is_active'),
+        ]);
+
+        return back()->with('success', 'Formasi SKB berhasil diperbarui!');
+    }
+
+    public function destroySkbCategory($id)
+    {
+        $category = SkbCategory::findOrFail($id);
+        $category->delete();
+
+        return back()->with('success', 'Formasi SKB berhasil dihapus.');
+    }
+
+    // ==================================================================
+    // 2. KELOLA PAKET TRYOUT PER FORMASI SKB (DETAIL - UNTUK SHOW USER)
+    // ==================================================================
+    public function manageSkbPackages($slug)
+    {
+        $category = SkbCategory::where('slug', $slug)->firstOrFail();
+
+        $packages = Tryout::withCount('questions')
+            ->where('category', 'skb')
+            ->where('skb_category_id', $category->id)
+            ->latest()
+            ->get()
+            ->map(function ($pkg) {
+                return [
+                    'id'              => $pkg->id,
+                    'title'           => $pkg->title,
+                    'duration'        => $pkg->duration,
+                    'price'           => $pkg->price,
+                    'questions_count' => $pkg->questions_count,
+                    'is_active'       => (bool) $pkg->is_published,
+                ];
+            });
+
+        return Inertia::render('Admin/Tryout/ShowSkb', [
+            'category' => $category,
+            'packages' => $packages,
+        ]);
+    }
+
+    public function storeSkbPackage(Request $request, $slug)
+    {
+        $category = SkbCategory::where('slug', $slug)->firstOrFail();
+
+        $validated = $request->validate([
+            'title'     => 'required|string|max:255',
+            'duration'  => 'required|integer|min:1',
+            'price'     => 'required|numeric|min:0',
+            'is_active' => 'boolean',
+        ]);
+
+        $isPublished = $request->boolean('is_active');
+
+        Tryout::create([
+            'skb_category_id' => $category->id,
+            'title'           => $validated['title'],
+            'duration'        => $validated['duration'],
+            'price'           => $validated['price'],
+            'is_paid'         => $validated['price'] > 0,
+            'category'        => 'skb',
+            'type'            => 'general',
+            'is_published'    => $isPublished,
+            'published_at'    => $isPublished ? Carbon::now() : null,
+        ]);
+
+        return back()->with('success', 'Paket Tryout SKB berhasil ditambahkan!');
+    }
+
+    public function updateSkbPackage(Request $request, $packageId)
+    {
+        $tryout = Tryout::findOrFail($packageId);
+
+        $validated = $request->validate([
+            'title'     => 'required|string|max:255',
+            'duration'  => 'required|integer|min:1',
+            'price'     => 'required|numeric|min:0',
+            'is_active' => 'boolean',
+        ]);
+
+        $isPublished = $request->boolean('is_active');
+        $publishedAt = $tryout->published_at;
+
+        if ($isPublished && !$publishedAt) {
+            $publishedAt = Carbon::now();
+        } elseif (!$isPublished) {
+            $publishedAt = null;
+        }
+
+        $tryout->update([
+            'title'        => $validated['title'],
+            'duration'     => $validated['duration'],
+            'price'        => $validated['price'],
+            'is_paid'      => $validated['price'] > 0,
+            'is_published' => $isPublished,
+            'published_at' => $publishedAt,
+        ]);
+
+        return back()->with('success', 'Paket Tryout SKB berhasil diperbarui!');
+    }
+
+    public function destroySkbPackage($packageId)
+    {
+        $tryout = Tryout::findOrFail($packageId);
+        $tryout->delete();
+
+        return back()->with('success', 'Paket Tryout SKB berhasil dihapus.');
+    }
+
+    // ==================================================================
+    // CRUD TRYOUT UMUM (SKD & SKB)
+    // ==================================================================
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -154,6 +305,9 @@ class TryoutManagerController extends Controller
         return back()->with('message', 'Paket Tryout berhasil dihapus.');
     }
 
+    // ==================================================================
+    // BOT PESERTA FIKTIF, HASIL & KALKULASI ULANG
+    // ==================================================================
     public function getDummies($id)
     {
         $dummies = ExamAttempt::where('tryout_id', $id)
