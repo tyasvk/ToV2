@@ -1,17 +1,17 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, useForm, Link, router } from '@inertiajs/vue3';
-import { ref, watch, computed, onMounted } from 'vue';
+import { ref, watch, computed } from 'vue';
 import draggable from 'vuedraggable';
 import axios from 'axios';
 
-import { QuillEditor, loadQuill } from '@vueup/vue-quill';
+import { QuillEditor } from '@vueup/vue-quill';
 import '@vueup/vue-quill/dist/vue-quill.snow.css';
 
-// Daftarkan ekstensi gambar ala Word setelah Quill dimuat di browser
+// Daftarkan ekstensi gambar ala Word menggunakan quill.constructor dari event @ready
 let isQuillBlotRegistered = false;
 const registerWordLikeImage = (QuillClass) => {
-    if (!QuillClass || isQuillBlotRegistered) return;
+    if (!QuillClass || isQuillBlotRegistered) return false;
     try {
         const BaseImage = QuillClass.import('formats/image');
         class WordLikeImage extends BaseImage {
@@ -39,19 +39,12 @@ const registerWordLikeImage = (QuillClass) => {
         }
         QuillClass.register(WordLikeImage, true);
         isQuillBlotRegistered = true;
+        return true;
     } catch (e) {
         console.warn('Gagal mendaftarkan WordLikeImage:', e);
+        return false;
     }
 };
-
-onMounted(async () => {
-    try {
-        const QuillClass = await loadQuill();
-        registerWordLikeImage(QuillClass);
-    } catch (e) {
-        console.warn('Gagal memuat Quill:', e);
-    }
-});
 
 const props = defineProps({
     tryout: Object,
@@ -116,7 +109,6 @@ const uploadAndInsertInlineImage = async (file) => {
             quill.insertEmbed(range.index, 'image', res.data.url, 'user');
             quill.setSelection(range.index + 1, 0);
 
-            // Terapkan style default ala Microsoft Word pada gambar yang baru disisipkan
             setTimeout(() => {
                 const imgs = quill.root.querySelectorAll(`img[src="${res.data.url}"]`);
                 const insertedImg = imgs[imgs.length - 1];
@@ -149,7 +141,12 @@ const handleInlineImageFileChange = async (event) => {
 
 const onQuestionEditorReady = (quill) => {
     quillInstance.value = quill;
-    registerWordLikeImage(quill.constructor);
+    const justRegistered = registerWordLikeImage(quill.constructor);
+
+    // Jika sedang mode Edit dan blot baru terdaftar saat modal pertama kali dibuka, muat ulang HTML agar style gambar terbaca
+    if (justRegistered && form.content) {
+        quill.clipboard.dangerouslyPasteHTML(form.content);
+    }
 
     // 1. Override tombol 'image' pada toolbar Quill agar upload ke server
     const toolbar = quill.getModule('toolbar');
