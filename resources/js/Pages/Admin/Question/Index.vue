@@ -81,6 +81,7 @@ const localQuestions = ref(formatQuestions(props.questions));
 const expandedId = ref(null);
 const isModalOpen = ref(false);
 const fileInput = ref(null);
+const questionImageInput = ref(null);
 
 // --- STATE EDITOR PERTANYAAN ALA WORD (INLINE IMAGE) ---
 const quillInstance = ref(null);
@@ -408,6 +409,7 @@ const form = useForm({
     sub_category: isSKB.value ? '' : 'Pilar Negara',
     content: '',
     image: null,
+    remove_image: false,
     options: { a: '', b: '', c: '', d: '', e: '' },
     option_images: { a: null, b: null, c: null, d: null, e: null },
     correct_answer: 'A',
@@ -427,12 +429,31 @@ const handleImagePreview = (event, type, opt = null) => {
     const file = event.target.files[0];
     if (type === 'question') {
         form.image = file || null;
+        if (file) {
+            form.remove_image = false;
+        }
         if (imagePreviews.value.question) URL.revokeObjectURL(imagePreviews.value.question);
         imagePreviews.value.question = file ? URL.createObjectURL(file) : null;
     } else if (type === 'option') {
         form.option_images[opt] = file || null;
         if (imagePreviews.value.options[opt]) URL.revokeObjectURL(imagePreviews.value.options[opt]);
         imagePreviews.value.options[opt] = file ? URL.createObjectURL(file) : null;
+    }
+};
+
+// Hapus Gambar Header Soal (baik preview file baru maupun gambar tersimpan)
+const removeQuestionHeaderImage = () => {
+    form.image = null;
+    if (imagePreviews.value.question) {
+        URL.revokeObjectURL(imagePreviews.value.question);
+        imagePreviews.value.question = null;
+    }
+    if (existingImages.value.question) {
+        existingImages.value.question = null;
+        form.remove_image = true;
+    }
+    if (questionImageInput.value) {
+        questionImageInput.value.value = '';
     }
 };
 
@@ -453,6 +474,7 @@ const openCreateModal = () => {
     form.sub_category = isSKB.value ? '' : 'Pilar Negara';
     form.content = '';
     form.image = null;
+    form.remove_image = false;
     form.options = { a: '', b: '', c: '', d: '', e: '' };
     form.option_images = { a: null, b: null, c: null, d: null, e: null };
     form.correct_answer = 'A';
@@ -461,6 +483,7 @@ const openCreateModal = () => {
     
     existingImages.value = { question: null, options: { a: null, b: null, c: null, d: null, e: null } };
     imagePreviews.value = { question: null, options: { a: null, b: null, c: null, d: null, e: null } };
+    if (questionImageInput.value) questionImageInput.value.value = '';
     
     isModalOpen.value = true;
 };
@@ -475,6 +498,7 @@ const openEditModal = (q) => {
     form.sub_category = q.sub_category || q.materi || (isSKB.value ? '' : materiOptions[form.type][0]);
     form.content = q.content || '';
     form.image = null; 
+    form.remove_image = false;
     form.options = { ...q.options };
     form.option_images = { a: null, b: null, c: null, d: null, e: null }; 
     form.correct_answer = q.correct_answer || 'A';
@@ -483,6 +507,7 @@ const openEditModal = (q) => {
 
     existingImages.value = { question: q.image || null, options: { ...q.option_images } };
     imagePreviews.value = { question: null, options: { a: null, b: null, c: null, d: null, e: null } };
+    if (questionImageInput.value) questionImageInput.value.value = '';
     
     isModalOpen.value = true;
 };
@@ -660,16 +685,51 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
 
                             <!-- Gambar Utama Soal (Opsional) -->
                             <div class="col-span-1 md:col-span-2">
-                                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Gambar Header Soal (Opsional)</label>
-                                
-                                <div v-if="imagePreviews.question" class="mb-3">
-                                    <img :src="imagePreviews.question" class="h-20 rounded-lg border border-indigo-200 object-contain shadow-sm bg-indigo-50" />
+                                <div class="flex items-center justify-between mb-2">
+                                    <label class="block text-xs font-bold text-slate-500 uppercase">Gambar Header Soal (Opsional)</label>
+                                    <button
+                                        v-if="imagePreviews.question || (form.id && existingImages.question)"
+                                        type="button"
+                                        @click="removeQuestionHeaderImage"
+                                        class="inline-flex items-center gap-1 px-2.5 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-md text-[11px] font-semibold transition"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                        Hapus Gambar
+                                    </button>
                                 </div>
-                                <div v-else-if="form.id && existingImages.question" class="mb-3">
+                                
+                                <div v-if="imagePreviews.question" class="mb-3 relative inline-block group">
+                                    <img :src="imagePreviews.question" class="h-20 rounded-lg border border-indigo-200 object-contain shadow-sm bg-indigo-50" />
+                                    <button
+                                        type="button"
+                                        @click="removeQuestionHeaderImage"
+                                        title="Hapus gambar"
+                                        class="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center text-xs font-bold shadow hover:bg-rose-700 transition"
+                                    >
+                                        &times;
+                                    </button>
+                                </div>
+                                <div v-else-if="form.id && existingImages.question" class="mb-3 relative inline-block group">
                                     <img :src="`/storage/${existingImages.question}`" class="h-20 rounded-lg border border-slate-200 object-contain shadow-sm bg-white" />
+                                    <button
+                                        type="button"
+                                        @click="removeQuestionHeaderImage"
+                                        title="Hapus gambar"
+                                        class="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center text-xs font-bold shadow hover:bg-rose-700 transition"
+                                    >
+                                        &times;
+                                    </button>
                                 </div>
 
-                                <input type="file" @change="e => handleImagePreview(e, 'question')" accept="image/*" class="w-full text-xs text-slate-500 file:mr-4 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 transition-colors" />
+                                <input
+                                    ref="questionImageInput"
+                                    type="file"
+                                    @change="e => handleImagePreview(e, 'question')"
+                                    accept="image/*"
+                                    class="w-full text-xs text-slate-500 file:mr-4 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 transition-colors"
+                                />
                             </div>
                         </div>
 

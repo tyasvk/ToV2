@@ -115,6 +115,18 @@ public function uploadImage(Request $request)
             'sub_category'    => 'nullable|string', // Tambahan Analisis Materi SKB
         ];
 
+        if ($request->hasFile('image')) {
+    if ($question->image) {
+        Storage::disk('public')->delete($question->image);
+    }
+    $data['image'] = $request->file('image')->store('questions', 'public');
+} elseif ($request->boolean('remove_image')) {
+    if ($question->image) {
+        Storage::disk('public')->delete($question->image);
+    }
+    $data['image'] = null;
+}
+
         // Validasi dinamis SKB vs SKD
         if ($tryout->category === 'skb') {
             $rules['correct_answer'] = 'required|string';
