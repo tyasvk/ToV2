@@ -83,15 +83,32 @@ const isModalOpen = ref(false);
 const fileInput = ref(null);
 const questionImageInput = ref(null);
 
-// --- STATE EDITOR PERTANYAAN ALA WORD (NON-REACTIVE AGAR TIDAK TERBUNGKUS PROXY VUE) ---
-let quillInstance = null;
-let selectedInlineImg = null;
+// --- STATE EDITOR PERTANYAAN & PEMBAHASAN ALA WORD (NON-REACTIVE AGAR TIDAK TERBUNGKUS PROXY VUE) ---
+const editors = {
+    question: null,
+    explanation: null,
+};
+const selectedImgs = {
+    question: null,
+    explanation: null,
+};
+const lastSelectionIndices = {
+    question: null,
+    explanation: null,
+};
 
-const inlineImageInput = ref(null);
-const isUploadingInlineImage = ref(false);
-const hasSelectedInlineImg = ref(false);
-const selectedImgWidth = ref('');
-const lastSelectionIndex = ref(null);
+const questionInlineImageInput = ref(null);
+const explanationInlineImageInput = ref(null);
+
+const uploadingInline = ref({
+    question: false,
+    explanation: false,
+});
+
+const selectedImgState = ref({
+    question: { active: false, width: '' },
+    explanation: { active: false, width: '' },
+});
 
 // Optimasi & kompresi otomatis di browser agar lolos limit upload_max_filesize PHP & tetap tajam
 const optimizeImageFile = (file) => {
@@ -128,7 +145,7 @@ const optimizeImageFile = (file) => {
             canvas.toBlob(
                 (blob) => {
                     if (blob && blob.size < file.size) {
-                        resolve(new File([blob], 'question-image.webp', { type: 'image/webp' }));
+                        resolve(new File([blob], 'inline-image.webp', { type: 'image/webp' }));
                     } else {
                         resolve(file);
                     }
@@ -147,11 +164,22 @@ const optimizeImageFile = (file) => {
     });
 };
 
-const uploadAndInsertInlineImage = async (rawFile) => {
-    if (!rawFile || !rawFile.type.startsWith('image/')) return;
-    if (!quillInstance) return;
+const syncEditorContent = (target) => {
+    const quill = editors[target];
+    if (!quill) return;
+    if (target === 'question') {
+        form.content = quill.root.innerHTML;
+    } else {
+        form.explanation = quill.root.innerHTML;
+    }
+};
 
-    isUploadingInlineImage.value = true;
+const uploadAndInsertInlineImage = async (target, rawFile) => {
+    const quill = editors[target];
+    if (!rawFile || !rawFile.type.startsWith('image/')) return;
+    if (!quill) return;
+
+    uploadingInline.value[target] = true;
 
     try {
         const processedFile = await optimizeImageFile(rawFile);
@@ -166,17 +194,19 @@ const uploadAndInsertInlineImage = async (rawFile) => {
         });
 
         if (res.data?.url) {
-            const maxIndex = Math.max(0, quillInstance.getLength() - 1);
-            const currentRange = quillInstance.getSelection();
-            const rawIndex = currentRange ? currentRange.index : (lastSelectionIndex.value !== null ? lastSelectionIndex.value : maxIndex);
+            const maxIndex = Math.max(0, quill.getLength() - 1);
+            const currentRange = quill.getSelection();
+            const savedIndex = lastSelectionIndices[target];
+            const rawIndex = currentRange ? currentRange.index : (savedIndex !== null ? savedIndex : maxIndex);
             const insertIndex = Math.min(Math.max(0, rawIndex), maxIndex);
 
-            quillInstance.insertEmbed(insertIndex, 'image', res.data.url, 'user');
-            lastSelectionIndex.value = insertIndex + 1;
+            quill.insertEmbed(insertIndex, 'image', res.data.url, 'user');
+            lastSelectionIndices[target] = insertIndex + 1;
 
             setTimeout(() => {
-                if (!quillInstance) return;
-                const imgs = quillInstance.root.querySelectorAll(`img[src="${res.data.url}"]`);
+                const activeQuill = editors[target];
+                if (!activeQuill) return;
+                const imgs = activeQuill.root.querySelectorAll(`img[src="${res.data.url}"]`);
                 const insertedImg = imgs[imgs.length - 1];
                 if (insertedImg) {
                     insertedImg.style.display = 'block';
@@ -186,11 +216,13 @@ const uploadAndInsertInlineImage = async (rawFile) => {
                     insertedImg.style.margin = '10px auto';
                     insertedImg.style.borderRadius = '8px';
 
-                    selectedInlineImg = insertedImg;
-                    hasSelectedInlineImg.value = true;
-                    selectedImgWidth.value = '60%';
+                    selectedImgs[target] = insertedImg;
+                    selectedImgState.value[target] = {
+                        active: true,
+                        width: '60%',
+                    };
                 }
-                form.content = quillInstance.root.innerHTML;
+                syncEditorContent(target);
             }, 30);
         }
     } catch (error) {
@@ -200,30 +232,31 @@ const uploadAndInsertInlineImage = async (rawFile) => {
             (error.response?.status ? `HTTP Error ${error.response.status}` : error.message);
         alert(`Gagal mengunggah gambar: ${serverMsg}`);
     } finally {
-        isUploadingInlineImage.value = false;
+        uploadingInline.value[target] = false;
     }
 };
 
-const handleInlineImageFileChange = async (event) => {
+const handleInlineImageFileChange = async (target, event) => {
     const file = event.target.files?.[0];
     if (file) {
-        await uploadAndInsertInlineImage(file);
+        await uploadAndInsertInlineImage(target, file);
     }
     event.target.value = '';
 };
 
-const onQuestionEditorReady = (quill) => {
-    quillInstance = quill;
+const setupWordLikeEditor = (target, quill) => {
+    editors[target] = quill;
     const justRegistered = registerWordLikeImage(quill.constructor);
+    const initialHtml = target === 'question' ? form.content : form.explanation;
 
-    if (justRegistered && form.content) {
-        quill.clipboard.dangerouslyPasteHTML(form.content);
+    if (justRegistered && initialHtml) {
+        quill.clipboard.dangerouslyPasteHTML(initialHtml);
     }
 
     // Simpan posisi kursor terakhir sebelum editor kehilangan fokus
     quill.on('selection-change', (range) => {
         if (range) {
-            lastSelectionIndex.value = range.index;
+            lastSelectionIndices[target] = range.index;
         }
     });
 
@@ -231,7 +264,11 @@ const onQuestionEditorReady = (quill) => {
     const toolbar = quill.getModule('toolbar');
     if (toolbar) {
         toolbar.addHandler('image', () => {
-            inlineImageInput.value?.click();
+            if (target === 'question') {
+                questionInlineImageInput.value?.click();
+            } else {
+                explanationInlineImageInput.value?.click();
+            }
         });
     }
 
@@ -246,12 +283,12 @@ const onQuestionEditorReady = (quill) => {
             e.stopPropagation();
             const file = imageItem.getAsFile();
             if (file) {
-                await uploadAndInsertInlineImage(file);
+                await uploadAndInsertInlineImage(target, file);
             }
         }
     }, true);
 
-    // 3. Tangkap Drag & Drop gambar dari komputer ke area soal
+    // 3. Tangkap Drag & Drop gambar dari komputer ke area editor
     quill.root.addEventListener('drop', async (e) => {
         const files = e.dataTransfer?.files;
         if (!files || files.length === 0) return;
@@ -260,59 +297,68 @@ const onQuestionEditorReady = (quill) => {
         if (imageFile) {
             e.preventDefault();
             e.stopPropagation();
-            await uploadAndInsertInlineImage(imageFile);
+            await uploadAndInsertInlineImage(target, imageFile);
         }
     }, true);
 
     // 4. Deteksi klik pada gambar di dalam editor untuk memunculkan pengaturan ukuran & posisi
     quill.root.addEventListener('click', (e) => {
         if (e.target && e.target.tagName === 'IMG') {
-            selectedInlineImg = e.target;
-            hasSelectedInlineImg.value = true;
-            selectedImgWidth.value = e.target.style.width || '';
+            selectedImgs[target] = e.target;
+            selectedImgState.value[target] = {
+                active: true,
+                width: e.target.style.width || '',
+            };
         } else {
-            selectedInlineImg = null;
-            hasSelectedInlineImg.value = false;
-            selectedImgWidth.value = '';
+            selectedImgs[target] = null;
+            selectedImgState.value[target] = {
+                active: false,
+                width: '',
+            };
         }
     });
 };
 
-const setSelectedImgWidth = (width) => {
-    if (!selectedInlineImg || !quillInstance) return;
-    selectedInlineImg.style.width = width;
-    selectedInlineImg.style.maxWidth = '100%';
-    selectedInlineImg.style.height = 'auto';
-    selectedImgWidth.value = width;
-    form.content = quillInstance.root.innerHTML;
+const onQuestionEditorReady = (quill) => setupWordLikeEditor('question', quill);
+const onExplanationEditorReady = (quill) => setupWordLikeEditor('explanation', quill);
+
+const setSelectedImgWidth = (target, width) => {
+    const img = selectedImgs[target];
+    if (!img || !editors[target]) return;
+    img.style.width = width;
+    img.style.maxWidth = '100%';
+    img.style.height = 'auto';
+    selectedImgState.value[target].width = width;
+    syncEditorContent(target);
 };
 
-const setSelectedImgAlign = (align) => {
-    if (!selectedInlineImg || !quillInstance) return;
-    selectedInlineImg.style.display = 'block';
-    selectedInlineImg.style.marginTop = '10px';
-    selectedInlineImg.style.marginBottom = '10px';
+const setSelectedImgAlign = (target, align) => {
+    const img = selectedImgs[target];
+    if (!img || !editors[target]) return;
+    img.style.display = 'block';
+    img.style.marginTop = '10px';
+    img.style.marginBottom = '10px';
 
     if (align === 'center') {
-        selectedInlineImg.style.marginLeft = 'auto';
-        selectedInlineImg.style.marginRight = 'auto';
+        img.style.marginLeft = 'auto';
+        img.style.marginRight = 'auto';
     } else if (align === 'right') {
-        selectedInlineImg.style.marginLeft = 'auto';
-        selectedInlineImg.style.marginRight = '0';
+        img.style.marginLeft = 'auto';
+        img.style.marginRight = '0';
     } else {
-        selectedInlineImg.style.marginLeft = '0';
-        selectedInlineImg.style.marginRight = 'auto';
+        img.style.marginLeft = '0';
+        img.style.marginRight = 'auto';
     }
-    form.content = quillInstance.root.innerHTML;
+    syncEditorContent(target);
 };
 
-const removeSelectedImg = () => {
-    if (!selectedInlineImg || !quillInstance) return;
-    selectedInlineImg.remove();
-    selectedInlineImg = null;
-    hasSelectedInlineImg.value = false;
-    selectedImgWidth.value = '';
-    form.content = quillInstance.root.innerHTML;
+const removeSelectedImg = (target) => {
+    const img = selectedImgs[target];
+    if (!img || !editors[target]) return;
+    img.remove();
+    selectedImgs[target] = null;
+    selectedImgState.value[target] = { active: false, width: '' };
+    syncEditorContent(target);
 };
 
 // --- STATE UNTUK GENERATOR & KELOLA BOT ---
@@ -470,15 +516,20 @@ const removeQuestionHeaderImage = () => {
 };
 
 const resetEditorInlineState = () => {
-    selectedInlineImg = null;
-    hasSelectedInlineImg.value = false;
-    selectedImgWidth.value = '';
-    lastSelectionIndex.value = null;
+    selectedImgs.question = null;
+    selectedImgs.explanation = null;
+    lastSelectionIndices.question = null;
+    lastSelectionIndices.explanation = null;
+    selectedImgState.value = {
+        question: { active: false, width: '' },
+        explanation: { active: false, width: '' },
+    };
 };
 
 const closeModal = () => {
     isModalOpen.value = false;
-    quillInstance = null;
+    editors.question = null;
+    editors.explanation = null;
     resetEditorInlineState();
 };
 
@@ -652,6 +703,11 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                                     <span v-if="q.type === 'TKP' && q.tkp_scores" class="font-bold text-slate-400 shrink-0 ml-2">Poin: {{ q.tkp_scores[key] }}</span>
                                 </div>
                             </div>
+
+                            <div v-if="q.explanation" class="mt-4 p-4 rounded-xl bg-white border border-slate-200">
+                                <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Pembahasan</div>
+                                <div class="text-xs text-slate-700 html-content" v-html="q.explanation"></div>
+                            </div>
                         </div>
                     </div>
                 </template>
@@ -759,13 +815,13 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                             <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
                                 <label class="block text-xs font-bold text-slate-500 uppercase">Pertanyaan</label>
                                 <div class="flex items-center gap-2">
-                                    <span v-if="isUploadingInlineImage" class="text-[11px] font-semibold text-indigo-600 animate-pulse">
+                                    <span v-if="uploadingInline.question" class="text-[11px] font-semibold text-indigo-600 animate-pulse">
                                         Mengunggah gambar...
                                     </span>
                                     <button
                                         type="button"
-                                        @click="inlineImageInput?.click()"
-                                        :disabled="isUploadingInlineImage"
+                                        @click="questionInlineImageInput?.click()"
+                                        :disabled="uploadingInline.question"
                                         class="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold transition disabled:opacity-50"
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -776,18 +832,18 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                                 </div>
                             </div>
 
-                            <!-- Input File Tersembunyi untuk Insert Gambar Inline -->
+                            <!-- Input File Tersembunyi untuk Insert Gambar Inline Pertanyaan -->
                             <input
-                                ref="inlineImageInput"
+                                ref="questionInlineImageInput"
                                 type="file"
                                 accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
                                 class="hidden"
-                                @change="handleInlineImageFileChange"
+                                @change="e => handleInlineImageFileChange('question', e)"
                             />
 
                             <!-- Panel Pengaturan Gambar Ala Word (Muncul saat gambar di dalam soal diklik) -->
                             <div
-                                v-if="hasSelectedInlineImg"
+                                v-if="selectedImgState.question.active"
                                 class="mb-2 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-xl flex flex-wrap items-center gap-2 text-xs text-indigo-900"
                             >
                                 <span class="font-bold">Ukuran Gambar:</span>
@@ -795,10 +851,10 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                                     v-for="size in ['25%', '50%', '75%', '100%']"
                                     :key="size"
                                     type="button"
-                                    @click="setSelectedImgWidth(size)"
+                                    @click="setSelectedImgWidth('question', size)"
                                     :class="[
                                         'px-2 py-0.5 rounded border font-semibold transition',
-                                        selectedImgWidth === size
+                                        selectedImgState.question.width === size
                                             ? 'bg-indigo-600 text-white border-indigo-600'
                                             : 'bg-white border-indigo-200 hover:bg-indigo-100'
                                     ]"
@@ -810,21 +866,21 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                                 <span class="font-bold">Posisi:</span>
                                 <button
                                     type="button"
-                                    @click="setSelectedImgAlign('left')"
+                                    @click="setSelectedImgAlign('question', 'left')"
                                     class="px-2 py-0.5 rounded border bg-white border-indigo-200 hover:bg-indigo-100 font-semibold transition"
                                 >
                                     Kiri
                                 </button>
                                 <button
                                     type="button"
-                                    @click="setSelectedImgAlign('center')"
+                                    @click="setSelectedImgAlign('question', 'center')"
                                     class="px-2 py-0.5 rounded border bg-white border-indigo-200 hover:bg-indigo-100 font-semibold transition"
                                 >
                                     Tengah
                                 </button>
                                 <button
                                     type="button"
-                                    @click="setSelectedImgAlign('right')"
+                                    @click="setSelectedImgAlign('question', 'right')"
                                     class="px-2 py-0.5 rounded border bg-white border-indigo-200 hover:bg-indigo-100 font-semibold transition"
                                 >
                                     Kanan
@@ -832,14 +888,14 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
 
                                 <button
                                     type="button"
-                                    @click="removeSelectedImg"
+                                    @click="removeSelectedImg('question')"
                                     class="ml-auto px-2.5 py-0.5 rounded bg-rose-100 text-rose-700 hover:bg-rose-200 font-semibold transition"
                                 >
                                     Hapus Gambar
                                 </button>
                             </div>
 
-                            <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm question-word-editor">
+                            <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm word-like-editor">
                                 <QuillEditor 
                                     theme="snow" 
                                     :toolbar="[
@@ -924,29 +980,119 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                             </div>
                         </div>
 
+                        <!-- KOLOM PEMBAHASAN LENGKAP ALA MICROSOFT WORD -->
                         <div>
-                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Pembahasan Lengkap</label>
-                            <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                                <label class="block text-xs font-bold text-slate-500 uppercase">Pembahasan Lengkap</label>
+                                <div class="flex items-center gap-2">
+                                    <span v-if="uploadingInline.explanation" class="text-[11px] font-semibold text-indigo-600 animate-pulse">
+                                        Mengunggah gambar...
+                                    </span>
+                                    <button
+                                        type="button"
+                                        @click="explanationInlineImageInput?.click()"
+                                        :disabled="uploadingInline.explanation"
+                                        class="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold transition disabled:opacity-50"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        Sisipkan Gambar di Pembahasan
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Input File Tersembunyi untuk Insert Gambar Inline Pembahasan -->
+                            <input
+                                ref="explanationInlineImageInput"
+                                type="file"
+                                accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
+                                class="hidden"
+                                @change="e => handleInlineImageFileChange('explanation', e)"
+                            />
+
+                            <!-- Panel Pengaturan Gambar Ala Word (Muncul saat gambar di dalam pembahasan diklik) -->
+                            <div
+                                v-if="selectedImgState.explanation.active"
+                                class="mb-2 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-xl flex flex-wrap items-center gap-2 text-xs text-indigo-900"
+                            >
+                                <span class="font-bold">Ukuran Gambar:</span>
+                                <button
+                                    v-for="size in ['25%', '50%', '75%', '100%']"
+                                    :key="size"
+                                    type="button"
+                                    @click="setSelectedImgWidth('explanation', size)"
+                                    :class="[
+                                        'px-2 py-0.5 rounded border font-semibold transition',
+                                        selectedImgState.explanation.width === size
+                                            ? 'bg-indigo-600 text-white border-indigo-600'
+                                            : 'bg-white border-indigo-200 hover:bg-indigo-100'
+                                    ]"
+                                >
+                                    {{ size }}
+                                </button>
+
+                                <span class="h-4 w-px bg-indigo-200 mx-1"></span>
+                                <span class="font-bold">Posisi:</span>
+                                <button
+                                    type="button"
+                                    @click="setSelectedImgAlign('explanation', 'left')"
+                                    class="px-2 py-0.5 rounded border bg-white border-indigo-200 hover:bg-indigo-100 font-semibold transition"
+                                >
+                                    Kiri
+                                </button>
+                                <button
+                                    type="button"
+                                    @click="setSelectedImgAlign('explanation', 'center')"
+                                    class="px-2 py-0.5 rounded border bg-white border-indigo-200 hover:bg-indigo-100 font-semibold transition"
+                                >
+                                    Tengah
+                                </button>
+                                <button
+                                    type="button"
+                                    @click="setSelectedImgAlign('explanation', 'right')"
+                                    class="px-2 py-0.5 rounded border bg-white border-indigo-200 hover:bg-indigo-100 font-semibold transition"
+                                >
+                                    Kanan
+                                </button>
+
+                                <button
+                                    type="button"
+                                    @click="removeSelectedImg('explanation')"
+                                    class="ml-auto px-2.5 py-0.5 rounded bg-rose-100 text-rose-700 hover:bg-rose-200 font-semibold transition"
+                                >
+                                    Hapus Gambar
+                                </button>
+                            </div>
+
+                            <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm word-like-editor">
                                 <QuillEditor 
                                     theme="snow" 
                                     :toolbar="[
-                                        ['bold', 'italic', 'underline'],
+                                        ['bold', 'italic', 'underline', 'strike'],
                                         [{ 'script': 'sub'}, { 'script': 'super' }],
-                                        ['formula'],
+                                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                                        [{ 'align': [] }],
+                                        ['image', 'formula'],
                                         ['clean']
                                     ]"
                                     v-model:content="form.explanation" 
                                     contentType="html"
-                                    class="min-h-[120px] text-sm"
-                                    placeholder="Ketik pembahasan soal di sini..."
+                                    class="min-h-[160px] text-sm"
+                                    placeholder="Ketik pembahasan, rumus, klik ikon gambar, atau langsung Paste (Ctrl+V) gambar dari Word di sini..."
+                                    @ready="onExplanationEditorReady"
                                 />
                             </div>
+                            <p class="text-[11px] text-slate-400 mt-1.5">
+                                Tips: Anda juga bisa menekan <strong>Ctrl+V</strong> langsung untuk menempelkan gambar pembahasan, lalu klik gambarnya untuk mengatur ukuran & posisi.
+                            </p>
+                            <div v-if="form.errors.explanation" class="text-red-500 text-[10px] mt-1">{{ form.errors.explanation }}</div>
                         </div>
                     </form>
 
                     <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/80 rounded-b-2xl flex justify-end gap-3 shrink-0">
                         <button type="button" @click="closeModal" class="px-5 py-2 text-slate-600 font-semibold text-sm hover:bg-slate-200 rounded-xl transition-colors">Batal</button>
-                        <button @click="submit" :disabled="form.processing || isUploadingInlineImage" class="px-6 py-2 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition shadow-sm disabled:opacity-50">
+                        <button @click="submit" :disabled="form.processing || uploadingInline.question || uploadingInline.explanation" class="px-6 py-2 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition shadow-sm disabled:opacity-50">
                             {{ form.id ? 'Simpan Perubahan' : 'Tambah Soal' }}
                         </button>
                     </div>
@@ -1071,16 +1217,16 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
 :deep(.ql-container) { border: none !important; font-family: inherit; }
 :deep(.ql-editor) { min-height: 120px; word-break: break-word; }
 
-/* Tinggi khusus editor pertanyaan ala Word */
-.question-word-editor :deep(.ql-editor) {
+/* Tinggi khusus editor pertanyaan & pembahasan ala Word */
+.word-like-editor :deep(.ql-editor) {
     min-height: 180px !important;
     line-height: 1.6;
 }
-.question-word-editor :deep(.ql-editor img) {
+.word-like-editor :deep(.ql-editor img) {
     cursor: pointer;
     transition: outline 0.15s ease;
 }
-.question-word-editor :deep(.ql-editor img:hover) {
+.word-like-editor :deep(.ql-editor img:hover) {
     outline: 2px dashed #6366f1;
     outline-offset: 2px;
 }
