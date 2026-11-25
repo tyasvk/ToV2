@@ -87,8 +87,9 @@ const quillInstance = ref(null);
 const inlineImageInput = ref(null);
 const isUploadingInlineImage = ref(false);
 const selectedInlineImg = ref(null);
+const lastSelectionIndex = ref(null);
 
-// Optimasi & kompresi otomatis di browser agar lolos limit upload_max_filesize PHP (2MB) & tetap tajam
+// Optimasi & kompresi otomatis di browser agar lolos limit upload_max_filesize PHP & tetap tajam
 const optimizeImageFile = (file) => {
     return new Promise((resolve) => {
         if (!file.type.startsWith('image/') || file.type === 'image/gif' || file.size <= 1024 * 1024) {
@@ -162,11 +163,14 @@ const uploadAndInsertInlineImage = async (rawFile) => {
 
         if (res.data?.url) {
             const quill = quillInstance.value;
-            quill.focus();
-            const range = quill.getSelection(true) || { index: quill.getLength() };
+            const maxIndex = Math.max(0, quill.getLength() - 1);
+            const currentRange = quill.getSelection();
+            const rawIndex = currentRange ? currentRange.index : (lastSelectionIndex.value ?? maxIndex);
+            const insertIndex = Math.min(Math.max(0, rawIndex), maxIndex);
 
-            quill.insertEmbed(range.index, 'image', res.data.url, 'user');
-            quill.setSelection(range.index + 1, 0);
+            quill.insertEmbed(insertIndex, 'image', res.data.url, 'user');
+            quill.insertText(insertIndex + 1, '\n', 'user');
+            lastSelectionIndex.value = insertIndex + 2;
 
             setTimeout(() => {
                 const imgs = quill.root.querySelectorAll(`img[src="${res.data.url}"]`);
@@ -209,6 +213,13 @@ const onQuestionEditorReady = (quill) => {
     if (justRegistered && form.content) {
         quill.clipboard.dangerouslyPasteHTML(form.content);
     }
+
+    // Simpan posisi kursor terakhir sebelum editor kehilangan fokus
+    quill.on('selection-change', (range) => {
+        if (range) {
+            lastSelectionIndex.value = range.index;
+        }
+    });
 
     // 1. Override tombol 'image' pada toolbar Quill agar upload ke server
     const toolbar = quill.getModule('toolbar');
@@ -428,12 +439,14 @@ const handleImagePreview = (event, type, opt = null) => {
 const closeModal = () => {
     isModalOpen.value = false;
     selectedInlineImg.value = null;
+    lastSelectionIndex.value = null;
 };
 
 const openCreateModal = () => {
     form.reset();
     if (form.clearErrors) form.clearErrors(); 
     selectedInlineImg.value = null;
+    lastSelectionIndex.value = null;
     
     form.id = null;
     form.type = isSKB.value ? 'SKB' : 'TWK';
@@ -455,6 +468,7 @@ const openCreateModal = () => {
 const openEditModal = (q) => {
     if (form.clearErrors) form.clearErrors(); 
     selectedInlineImg.value = null;
+    lastSelectionIndex.value = null;
     
     form.id = q.id;
     form.type = isSKB.value ? 'SKB' : (q.type || 'TWK');
