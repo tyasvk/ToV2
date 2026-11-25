@@ -5,8 +5,37 @@ import { ref, watch, computed } from 'vue';
 import draggable from 'vuedraggable';
 import axios from 'axios';
 
-import { QuillEditor } from '@vueup/vue-quill';
+import { QuillEditor, Quill } from '@vueup/vue-quill';
 import '@vueup/vue-quill/dist/vue-quill.snow.css';
+
+// Kustomisasi Image Blot Quill agar menyimpan atribut style (ukuran & perataan ala Word) saat Edit Soal
+if (typeof window !== 'undefined' && Quill) {
+    const BaseImage = Quill.import('formats/image');
+    class WordLikeImage extends BaseImage {
+        static formats(domNode) {
+            const formats = super.formats(domNode) || {};
+            if (domNode.hasAttribute('style')) {
+                formats.style = domNode.getAttribute('style');
+            }
+            if (domNode.hasAttribute('width')) {
+                formats.width = domNode.getAttribute('width');
+            }
+            return formats;
+        }
+        format(name, value) {
+            if (name === 'style' || name === 'width') {
+                if (value) {
+                    this.domNode.setAttribute(name, value);
+                } else {
+                    this.domNode.removeAttribute(name);
+                }
+            } else {
+                super.format(name, value);
+            }
+        }
+    }
+    Quill.register(WordLikeImage, true);
+}
 
 const props = defineProps({
     tryout: Object,
@@ -43,6 +72,148 @@ const localQuestions = ref(formatQuestions(props.questions));
 const expandedId = ref(null);
 const isModalOpen = ref(false);
 const fileInput = ref(null);
+
+// --- STATE EDITOR PERTANYAAN ALA WORD (INLINE IMAGE) ---
+const quillInstance = ref(null);
+const inlineImageInput = ref(null);
+const isUploadingInlineImage = ref(false);
+const selectedInlineImg = ref(null);
+
+const uploadAndInsertInlineImage = async (file) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    if (!quillInstance.value) return;
+
+    isUploadingInlineImage.value = true;
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+        const res = await axios.post(route('admin.questions.upload-image'), formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+
+        if (res.data?.url) {
+            const quill = quillInstance.value;
+            quill.focus();
+            const range = quill.getSelection(true) || { index: quill.getLength() };
+
+            quill.insertEmbed(range.index, 'image', res.data.url, 'user');
+            quill.setSelection(range.index + 1, 0);
+
+            // Terapkan style default ala Microsoft Word pada gambar yang baru disisipkan
+            setTimeout(() => {
+                const imgs = quill.root.querySelectorAll(`img[src="${res.data.url}"]`);
+                const insertedImg = imgs[imgs.length - 1];
+                if (insertedImg) {
+                    insertedImg.style.display = 'block';
+                    insertedImg.style.maxWidth = '100%';
+                    insertedImg.style.width = '60%';
+                    insertedImg.style.height = 'auto';
+                    insertedImg.style.margin = '10px auto';
+                    insertedImg.style.borderRadius = '8px';
+                    selectedInlineImg.value = insertedImg;
+                }
+                form.content = quill.root.innerHTML;
+            }, 30);
+        }
+    } catch (error) {
+        alert(error.response?.data?.message || 'Gagal mengunggah gambar ke dalam soal. Maksimal ukuran 5MB.');
+    } finally {
+        isUploadingInlineImage.value = false;
+    }
+};
+
+const handleInlineImageFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (file) {
+        await uploadAndInsertInlineImage(file);
+    }
+    event.target.value = '';
+};
+
+const onQuestionEditorReady = (quill) => {
+    quillInstance.value = quill;
+
+    // 1. Override tombol 'image' pada toolbar Quill agar upload ke server
+    const toolbar = quill.getModule('toolbar');
+    if (toolbar) {
+        toolbar.addHandler('image', () => {
+            inlineImageInput.value?.click();
+        });
+    }
+
+    // 2. Tangkap Paste Gambar langsung dari Word / Screenshot (Ctrl+V)
+    quill.root.addEventListener('paste', async (e) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+
+        const imageItem = Array.from(items).find(item => item.type.startsWith('image/'));
+        if (imageItem) {
+            e.preventDefault();
+            e.stopPropagation();
+            const file = imageItem.getAsFile();
+            if (file) {
+                await uploadAndInsertInlineImage(file);
+            }
+        }
+    }, true);
+
+    // 3. Tangkap Drag & Drop gambar dari komputer ke area soal
+    quill.root.addEventListener('drop', async (e) => {
+        const files = e.dataTransfer?.files;
+        if (!files || files.length === 0) return;
+
+        const imageFile = Array.from(files).find(f => f.type.startsWith('image/'));
+        if (imageFile) {
+            e.preventDefault();
+            e.stopPropagation();
+            await uploadAndInsertInlineImage(imageFile);
+        }
+    }, true);
+
+    // 4. Deteksi klik pada gambar di dalam editor untuk memunculkan pengaturan ukuran & posisi
+    quill.root.addEventListener('click', (e) => {
+        if (e.target && e.target.tagName === 'IMG') {
+            selectedInlineImg.value = e.target;
+        } else {
+            selectedInlineImg.value = null;
+        }
+    });
+};
+
+const setSelectedImgWidth = (width) => {
+    if (!selectedInlineImg.value || !quillInstance.value) return;
+    selectedInlineImg.value.style.width = width;
+    selectedInlineImg.value.style.maxWidth = '100%';
+    selectedInlineImg.value.style.height = 'auto';
+    form.content = quillInstance.value.root.innerHTML;
+};
+
+const setSelectedImgAlign = (align) => {
+    if (!selectedInlineImg.value || !quillInstance.value) return;
+    selectedInlineImg.value.style.display = 'block';
+    selectedInlineImg.value.style.marginTop = '10px';
+    selectedInlineImg.value.style.marginBottom = '10px';
+
+    if (align === 'center') {
+        selectedInlineImg.value.style.marginLeft = 'auto';
+        selectedInlineImg.value.style.marginRight = 'auto';
+    } else if (align === 'right') {
+        selectedInlineImg.value.style.marginLeft = 'auto';
+        selectedInlineImg.value.style.marginRight = '0';
+    } else {
+        selectedInlineImg.value.style.marginLeft = '0';
+        selectedInlineImg.value.style.marginRight = 'auto';
+    }
+    form.content = quillInstance.value.root.innerHTML;
+};
+
+const removeSelectedImg = () => {
+    if (!selectedInlineImg.value || !quillInstance.value) return;
+    selectedInlineImg.value.remove();
+    selectedInlineImg.value = null;
+    form.content = quillInstance.value.root.innerHTML;
+};
 
 // --- STATE UNTUK GENERATOR & KELOLA BOT ---
 const isDummyModalOpen = ref(false);
@@ -178,9 +349,15 @@ const handleImagePreview = (event, type, opt = null) => {
     }
 };
 
+const closeModal = () => {
+    isModalOpen.value = false;
+    selectedInlineImg.value = null;
+};
+
 const openCreateModal = () => {
     form.reset();
     if (form.clearErrors) form.clearErrors(); 
+    selectedInlineImg.value = null;
     
     form.id = null;
     form.type = isSKB.value ? 'SKB' : 'TWK';
@@ -201,6 +378,7 @@ const openCreateModal = () => {
 
 const openEditModal = (q) => {
     if (form.clearErrors) form.clearErrors(); 
+    selectedInlineImg.value = null;
     
     form.id = q.id;
     form.type = isSKB.value ? 'SKB' : (q.type || 'TWK');
@@ -222,13 +400,13 @@ const openEditModal = (q) => {
 const submit = () => {
     if (form.id) {
         form.transform((data) => ({ ...data, _method: 'PUT' })).post(route('admin.tryouts.questions.update', [props.tryout.id, form.id]), {
-            onSuccess: () => { isModalOpen.value = false; form.reset(); },
+            onSuccess: () => { closeModal(); form.reset(); },
             forceFormData: true,
             preserveScroll: true
         });
     } else {
         form.post(route('admin.tryouts.questions.store', props.tryout.id), {
-            onSuccess: () => { isModalOpen.value = false; form.reset(); },
+            onSuccess: () => { closeModal(); form.reset(); },
             forceFormData: true,
             preserveScroll: true
         });
@@ -308,7 +486,7 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                                 <div @click="toggleAccordion(q.id)" class="cursor-pointer truncate flex items-center min-w-0">
                                     <span class="text-[10px] font-bold px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-md uppercase mr-2 shrink-0">{{ q.type }}</span>
                                     <span class="text-[9px] font-semibold px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 rounded-md mr-2 shrink-0">{{ q.sub_category || 'Umum' }}</span>
-                                    <div class="text-sm font-semibold text-slate-800 line-clamp-1 inline-block align-middle max-w-sm html-content" v-html="q.content || '[Gambar Soal]'"></div>
+                                    <div class="text-sm font-semibold text-slate-800 line-clamp-1 inline-block align-middle max-w-sm html-content-preview" v-html="q.content || '[Gambar Soal]'"></div>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2 shrink-0">
@@ -322,7 +500,7 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                                 <img :src="'/storage/' + q.image" class="h-32 rounded-lg border border-slate-200 shadow-sm" />
                             </div>
 
-                            <div class="text-sm text-slate-700 mb-4 whitespace-pre-wrap html-content" v-html="q.content"></div>
+                            <div class="text-sm text-slate-700 mb-4 html-content" v-html="q.content"></div>
                             
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <div v-for="(val, key) in (q.options || {})" :key="key" 
@@ -347,12 +525,12 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
         <Teleport to="body">
             <!-- MODAL TAMBAH/EDIT SOAL -->
             <div v-if="isModalOpen" class="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 lg:pl-[17rem]">
-                <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="isModalOpen = false"></div>
+                <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="closeModal"></div>
                 
                 <div class="relative bg-white w-full max-w-4xl rounded-2xl shadow-2xl flex flex-col max-h-[95vh] sm:max-h-[90vh] animate-in zoom-in-95 duration-200">
                     <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/80 rounded-t-2xl">
                         <h3 class="font-bold text-slate-900">{{ form.id ? 'Edit Soal' : 'Tambah Soal Baru' }}</h3>
-                        <button @click="isModalOpen = false" class="text-slate-400 hover:text-slate-600 transition-colors">
+                        <button @click="closeModal" class="text-slate-400 hover:text-slate-600 transition-colors">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
                         </button>
                     </div>
@@ -390,9 +568,9 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                                 <input v-else v-model="form.sub_category" type="text" placeholder="Misal: Hukum, Medis..." class="w-full border-slate-200 rounded-xl bg-slate-50 text-sm focus:ring-indigo-500">
                             </div>
 
-                            <!-- Gambar Soal -->
+                            <!-- Gambar Utama Soal (Opsional) -->
                             <div class="col-span-1 md:col-span-2">
-                                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Gambar Soal (Opsional)</label>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Gambar Header Soal (Opsional)</label>
                                 
                                 <div v-if="imagePreviews.question" class="mb-3">
                                     <img :src="imagePreviews.question" class="h-20 rounded-lg border border-indigo-200 object-contain shadow-sm bg-indigo-50" />
@@ -405,23 +583,112 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                             </div>
                         </div>
 
+                        <!-- KOLOM PERTANYAAN ALA MICROSOFT WORD -->
                         <div>
-                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Pertanyaan</label>
-                            <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                                <label class="block text-xs font-bold text-slate-500 uppercase">Pertanyaan</label>
+                                <div class="flex items-center gap-2">
+                                    <span v-if="isUploadingInlineImage" class="text-[11px] font-semibold text-indigo-600 animate-pulse">
+                                        Mengunggah gambar...
+                                    </span>
+                                    <button
+                                        type="button"
+                                        @click="inlineImageInput?.click()"
+                                        :disabled="isUploadingInlineImage"
+                                        class="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold transition disabled:opacity-50"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        Sisipkan Gambar di Teks
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Input File Tersembunyi untuk Insert Gambar Inline -->
+                            <input
+                                ref="inlineImageInput"
+                                type="file"
+                                accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
+                                class="hidden"
+                                @change="handleInlineImageFileChange"
+                            />
+
+                            <!-- Panel Pengaturan Gambar Ala Word (Muncul saat gambar di dalam soal diklik) -->
+                            <div
+                                v-if="selectedInlineImg"
+                                class="mb-2 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-xl flex flex-wrap items-center gap-2 text-xs text-indigo-900"
+                            >
+                                <span class="font-bold">Ukuran Gambar:</span>
+                                <button
+                                    v-for="size in ['25%', '50%', '75%', '100%']"
+                                    :key="size"
+                                    type="button"
+                                    @click="setSelectedImgWidth(size)"
+                                    :class="[
+                                        'px-2 py-0.5 rounded border font-semibold transition',
+                                        selectedInlineImg.style.width === size
+                                            ? 'bg-indigo-600 text-white border-indigo-600'
+                                            : 'bg-white border-indigo-200 hover:bg-indigo-100'
+                                    ]"
+                                >
+                                    {{ size }}
+                                </button>
+
+                                <span class="h-4 w-px bg-indigo-200 mx-1"></span>
+                                <span class="font-bold">Posisi:</span>
+                                <button
+                                    type="button"
+                                    @click="setSelectedImgAlign('left')"
+                                    class="px-2 py-0.5 rounded border bg-white border-indigo-200 hover:bg-indigo-100 font-semibold transition"
+                                >
+                                    Kiri
+                                </button>
+                                <button
+                                    type="button"
+                                    @click="setSelectedImgAlign('center')"
+                                    class="px-2 py-0.5 rounded border bg-white border-indigo-200 hover:bg-indigo-100 font-semibold transition"
+                                >
+                                    Tengah
+                                </button>
+                                <button
+                                    type="button"
+                                    @click="setSelectedImgAlign('right')"
+                                    class="px-2 py-0.5 rounded border bg-white border-indigo-200 hover:bg-indigo-100 font-semibold transition"
+                                >
+                                    Kanan
+                                </button>
+
+                                <button
+                                    type="button"
+                                    @click="removeSelectedImg"
+                                    class="ml-auto px-2.5 py-0.5 rounded bg-rose-100 text-rose-700 hover:bg-rose-200 font-semibold transition"
+                                >
+                                    Hapus Gambar
+                                </button>
+                            </div>
+
+                            <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm question-word-editor">
                                 <QuillEditor 
                                     theme="snow" 
                                     :toolbar="[
-                                        ['bold', 'italic', 'underline'],
+                                        ['bold', 'italic', 'underline', 'strike'],
                                         [{ 'script': 'sub'}, { 'script': 'super' }],
-                                        ['formula'],
+                                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                                        [{ 'align': [] }],
+                                        ['image', 'formula'],
                                         ['clean']
                                     ]"
                                     v-model:content="form.content" 
                                     contentType="html"
-                                    class="min-h-[120px] text-sm"
-                                    placeholder="Ketik soal atau rumus di sini..."
+                                    class="min-h-[160px] text-sm"
+                                    placeholder="Ketik soal, rumus, klik ikon gambar, atau langsung Paste (Ctrl+V) gambar dari Word di sini..."
+                                    @ready="onQuestionEditorReady"
                                 />
                             </div>
+                            <p class="text-[11px] text-slate-400 mt-1.5">
+                                Tips: Anda bisa menekan <strong>Ctrl+V</strong> langsung untuk menempelkan gambar dari Microsoft Word / Screenshot, lalu klik gambarnya untuk mengatur ukuran & posisi.
+                            </p>
                             <div v-if="form.errors.content" class="text-red-500 text-[10px] mt-1">{{ form.errors.content }}</div>
                         </div>
 
@@ -435,7 +702,7 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                                         <div class="w-8 h-8 shrink-0 bg-white rounded-lg flex items-center justify-center font-bold text-xs text-slate-500 shadow-sm">{{ opt.toUpperCase() }}</div>
                                         <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Teks / Rumus Pilihan {{ opt.toUpperCase() }}</div>
                                     </div>
-                                    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden w-full shadow-sm">
+                                    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden w-full shadow-sm option-editor">
                                         <QuillEditor 
                                             theme="snow" 
                                             :toolbar="[
@@ -507,8 +774,8 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                     </form>
 
                     <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/80 rounded-b-2xl flex justify-end gap-3 shrink-0">
-                        <button type="button" @click="isModalOpen = false" class="px-5 py-2 text-slate-600 font-semibold text-sm hover:bg-slate-200 rounded-xl transition-colors">Batal</button>
-                        <button @click="submit" :disabled="form.processing" class="px-6 py-2 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition shadow-sm disabled:opacity-50">
+                        <button type="button" @click="closeModal" class="px-5 py-2 text-slate-600 font-semibold text-sm hover:bg-slate-200 rounded-xl transition-colors">Batal</button>
+                        <button @click="submit" :disabled="form.processing || isUploadingInlineImage" class="px-6 py-2 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition shadow-sm disabled:opacity-50">
                             {{ form.id ? 'Simpan Perubahan' : 'Tambah Soal' }}
                         </button>
                     </div>
@@ -609,11 +876,21 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
 </template>
 
 <style scoped>
-.html-content :deep(p) { margin: 0; display: inline; }
+/* Preview ringkas 1 baris pada daftar soal */
+.html-content-preview :deep(p) { margin: 0; display: inline; }
+.html-content-preview :deep(img) {
+    max-height: 24px; width: auto; border-radius: 4px;
+    display: inline-block; vertical-align: middle; margin: 0 4px;
+}
+
+/* Tampilan penuh saat soal dibuka (accordion) */
+.html-content :deep(p) { margin-bottom: 0.5rem; }
+.html-content :deep(ul) { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 0.5rem; }
+.html-content :deep(ol) { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 0.5rem; }
 .html-content :deep(img) {
-    max-height: 120px; width: auto; border-radius: 6px;
-    display: inline-block; vertical-align: middle;
-    margin-top: 4px; margin-bottom: 4px;
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
 }
 
 :deep(.ql-toolbar) {
@@ -622,7 +899,23 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
 }
 :deep(.ql-container) { border: none !important; font-family: inherit; }
 :deep(.ql-editor) { min-height: 120px; word-break: break-word; }
-.flex-col > .bg-white > :deep(.ql-editor) { min-height: 60px !important; }
+
+/* Tinggi khusus editor pertanyaan ala Word */
+.question-word-editor :deep(.ql-editor) {
+    min-height: 180px !important;
+    line-height: 1.6;
+}
+.question-word-editor :deep(.ql-editor img) {
+    cursor: pointer;
+    transition: outline 0.15s ease;
+}
+.question-word-editor :deep(.ql-editor img:hover) {
+    outline: 2px dashed #6366f1;
+    outline-offset: 2px;
+}
+
+/* Tinggi khusus editor pilihan jawaban */
+.option-editor :deep(.ql-editor) { min-height: 60px !important; }
 
 .custom-scrollbar::-webkit-scrollbar { width: 6px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }

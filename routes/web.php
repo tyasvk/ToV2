@@ -157,6 +157,9 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
 Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
 
+    Route::post('/questions/upload-image', [QuestionManagerController::class, 'uploadImage'])
+        ->name('questions.upload-image');
+
     // User Management
     Route::resource('users', UserManagerController::class);
     Route::post('/users/{user}/add-balance', [UserManagerController::class, 'addBalance'])->name('users.add-balance');
