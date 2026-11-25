@@ -83,11 +83,14 @@ const isModalOpen = ref(false);
 const fileInput = ref(null);
 const questionImageInput = ref(null);
 
-// --- STATE EDITOR PERTANYAAN ALA WORD (INLINE IMAGE) ---
-const quillInstance = ref(null);
+// --- STATE EDITOR PERTANYAAN ALA WORD (NON-REACTIVE AGAR TIDAK TERBUNGKUS PROXY VUE) ---
+let quillInstance = null;
+let selectedInlineImg = null;
+
 const inlineImageInput = ref(null);
 const isUploadingInlineImage = ref(false);
-const selectedInlineImg = ref(null);
+const hasSelectedInlineImg = ref(false);
+const selectedImgWidth = ref('');
 const lastSelectionIndex = ref(null);
 
 // Optimasi & kompresi otomatis di browser agar lolos limit upload_max_filesize PHP & tetap tajam
@@ -146,7 +149,7 @@ const optimizeImageFile = (file) => {
 
 const uploadAndInsertInlineImage = async (rawFile) => {
     if (!rawFile || !rawFile.type.startsWith('image/')) return;
-    if (!quillInstance.value) return;
+    if (!quillInstance) return;
 
     isUploadingInlineImage.value = true;
 
@@ -163,18 +166,17 @@ const uploadAndInsertInlineImage = async (rawFile) => {
         });
 
         if (res.data?.url) {
-            const quill = quillInstance.value;
-            const maxIndex = Math.max(0, quill.getLength() - 1);
-            const currentRange = quill.getSelection();
-            const rawIndex = currentRange ? currentRange.index : (lastSelectionIndex.value ?? maxIndex);
+            const maxIndex = Math.max(0, quillInstance.getLength() - 1);
+            const currentRange = quillInstance.getSelection();
+            const rawIndex = currentRange ? currentRange.index : (lastSelectionIndex.value !== null ? lastSelectionIndex.value : maxIndex);
             const insertIndex = Math.min(Math.max(0, rawIndex), maxIndex);
 
-            quill.insertEmbed(insertIndex, 'image', res.data.url, 'user');
-            quill.insertText(insertIndex + 1, '\n', 'user');
-            lastSelectionIndex.value = insertIndex + 2;
+            quillInstance.insertEmbed(insertIndex, 'image', res.data.url, 'user');
+            lastSelectionIndex.value = insertIndex + 1;
 
             setTimeout(() => {
-                const imgs = quill.root.querySelectorAll(`img[src="${res.data.url}"]`);
+                if (!quillInstance) return;
+                const imgs = quillInstance.root.querySelectorAll(`img[src="${res.data.url}"]`);
                 const insertedImg = imgs[imgs.length - 1];
                 if (insertedImg) {
                     insertedImg.style.display = 'block';
@@ -183,9 +185,12 @@ const uploadAndInsertInlineImage = async (rawFile) => {
                     insertedImg.style.height = 'auto';
                     insertedImg.style.margin = '10px auto';
                     insertedImg.style.borderRadius = '8px';
-                    selectedInlineImg.value = insertedImg;
+
+                    selectedInlineImg = insertedImg;
+                    hasSelectedInlineImg.value = true;
+                    selectedImgWidth.value = '60%';
                 }
-                form.content = quill.root.innerHTML;
+                form.content = quillInstance.root.innerHTML;
             }, 30);
         }
     } catch (error) {
@@ -208,7 +213,7 @@ const handleInlineImageFileChange = async (event) => {
 };
 
 const onQuestionEditorReady = (quill) => {
-    quillInstance.value = quill;
+    quillInstance = quill;
     const justRegistered = registerWordLikeImage(quill.constructor);
 
     if (justRegistered && form.content) {
@@ -262,45 +267,52 @@ const onQuestionEditorReady = (quill) => {
     // 4. Deteksi klik pada gambar di dalam editor untuk memunculkan pengaturan ukuran & posisi
     quill.root.addEventListener('click', (e) => {
         if (e.target && e.target.tagName === 'IMG') {
-            selectedInlineImg.value = e.target;
+            selectedInlineImg = e.target;
+            hasSelectedInlineImg.value = true;
+            selectedImgWidth.value = e.target.style.width || '';
         } else {
-            selectedInlineImg.value = null;
+            selectedInlineImg = null;
+            hasSelectedInlineImg.value = false;
+            selectedImgWidth.value = '';
         }
     });
 };
 
 const setSelectedImgWidth = (width) => {
-    if (!selectedInlineImg.value || !quillInstance.value) return;
-    selectedInlineImg.value.style.width = width;
-    selectedInlineImg.value.style.maxWidth = '100%';
-    selectedInlineImg.value.style.height = 'auto';
-    form.content = quillInstance.value.root.innerHTML;
+    if (!selectedInlineImg || !quillInstance) return;
+    selectedInlineImg.style.width = width;
+    selectedInlineImg.style.maxWidth = '100%';
+    selectedInlineImg.style.height = 'auto';
+    selectedImgWidth.value = width;
+    form.content = quillInstance.root.innerHTML;
 };
 
 const setSelectedImgAlign = (align) => {
-    if (!selectedInlineImg.value || !quillInstance.value) return;
-    selectedInlineImg.value.style.display = 'block';
-    selectedInlineImg.value.style.marginTop = '10px';
-    selectedInlineImg.value.style.marginBottom = '10px';
+    if (!selectedInlineImg || !quillInstance) return;
+    selectedInlineImg.style.display = 'block';
+    selectedInlineImg.style.marginTop = '10px';
+    selectedInlineImg.style.marginBottom = '10px';
 
     if (align === 'center') {
-        selectedInlineImg.value.style.marginLeft = 'auto';
-        selectedInlineImg.value.style.marginRight = 'auto';
+        selectedInlineImg.style.marginLeft = 'auto';
+        selectedInlineImg.style.marginRight = 'auto';
     } else if (align === 'right') {
-        selectedInlineImg.value.style.marginLeft = 'auto';
-        selectedInlineImg.value.style.marginRight = '0';
+        selectedInlineImg.style.marginLeft = 'auto';
+        selectedInlineImg.style.marginRight = '0';
     } else {
-        selectedInlineImg.value.style.marginLeft = '0';
-        selectedInlineImg.value.style.marginRight = 'auto';
+        selectedInlineImg.style.marginLeft = '0';
+        selectedInlineImg.style.marginRight = 'auto';
     }
-    form.content = quillInstance.value.root.innerHTML;
+    form.content = quillInstance.root.innerHTML;
 };
 
 const removeSelectedImg = () => {
-    if (!selectedInlineImg.value || !quillInstance.value) return;
-    selectedInlineImg.value.remove();
-    selectedInlineImg.value = null;
-    form.content = quillInstance.value.root.innerHTML;
+    if (!selectedInlineImg || !quillInstance) return;
+    selectedInlineImg.remove();
+    selectedInlineImg = null;
+    hasSelectedInlineImg.value = false;
+    selectedImgWidth.value = '';
+    form.content = quillInstance.root.innerHTML;
 };
 
 // --- STATE UNTUK GENERATOR & KELOLA BOT ---
@@ -457,17 +469,23 @@ const removeQuestionHeaderImage = () => {
     }
 };
 
+const resetEditorInlineState = () => {
+    selectedInlineImg = null;
+    hasSelectedInlineImg.value = false;
+    selectedImgWidth.value = '';
+    lastSelectionIndex.value = null;
+};
+
 const closeModal = () => {
     isModalOpen.value = false;
-    selectedInlineImg.value = null;
-    lastSelectionIndex.value = null;
+    quillInstance = null;
+    resetEditorInlineState();
 };
 
 const openCreateModal = () => {
     form.reset();
     if (form.clearErrors) form.clearErrors(); 
-    selectedInlineImg.value = null;
-    lastSelectionIndex.value = null;
+    resetEditorInlineState();
     
     form.id = null;
     form.type = isSKB.value ? 'SKB' : 'TWK';
@@ -490,8 +508,7 @@ const openCreateModal = () => {
 
 const openEditModal = (q) => {
     if (form.clearErrors) form.clearErrors(); 
-    selectedInlineImg.value = null;
-    lastSelectionIndex.value = null;
+    resetEditorInlineState();
     
     form.id = q.id;
     form.type = isSKB.value ? 'SKB' : (q.type || 'TWK');
@@ -766,7 +783,7 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
 
                             <!-- Panel Pengaturan Gambar Ala Word (Muncul saat gambar di dalam soal diklik) -->
                             <div
-                                v-if="selectedInlineImg"
+                                v-if="hasSelectedInlineImg"
                                 class="mb-2 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-xl flex flex-wrap items-center gap-2 text-xs text-indigo-900"
                             >
                                 <span class="font-bold">Ukuran Gambar:</span>
@@ -777,7 +794,7 @@ const toggleAccordion = (id) => { expandedId.value = expandedId.value === id ? n
                                     @click="setSelectedImgWidth(size)"
                                     :class="[
                                         'px-2 py-0.5 rounded border font-semibold transition',
-                                        selectedInlineImg.style.width === size
+                                        selectedImgWidth === size
                                             ? 'bg-indigo-600 text-white border-indigo-600'
                                             : 'bg-white border-indigo-200 hover:bg-indigo-100'
                                     ]"
