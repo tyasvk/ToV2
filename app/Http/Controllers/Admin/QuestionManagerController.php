@@ -25,18 +25,18 @@ class QuestionManagerController extends Controller
     /**
      * Upload gambar inline untuk rich text editor pada kolom pertanyaan.
      */
-    public function uploadImage(Request $request)
-    {
-        $request->validate([
-            'image' => ['required', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:5120'], // Maks 5MB
-        ]);
+public function uploadImage(Request $request)
+{
+    $request->validate([
+        'image' => ['required', 'file', 'mimes:jpeg,png,jpg,gif,webp', 'max:10240'], // Maks 10MB
+    ]);
 
-        $path = $request->file('image')->store('questions/inline', 'public');
+    $path = $request->file('image')->store('questions/inline', 'public');
 
-        return response()->json([
-            'url' => Storage::url($path),
-        ]);
-    }
+    return response()->json([
+        'url' => '/storage/' . $path,
+    ]);
+}
 
     public function store(Request $request, Tryout $tryout)
     {

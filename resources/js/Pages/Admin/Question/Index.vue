@@ -88,17 +88,76 @@ const inlineImageInput = ref(null);
 const isUploadingInlineImage = ref(false);
 const selectedInlineImg = ref(null);
 
-const uploadAndInsertInlineImage = async (file) => {
-    if (!file || !file.type.startsWith('image/')) return;
+// Optimasi & kompresi otomatis di browser agar lolos limit upload_max_filesize PHP (2MB) & tetap tajam
+const optimizeImageFile = (file) => {
+    return new Promise((resolve) => {
+        if (!file.type.startsWith('image/') || file.type === 'image/gif' || file.size <= 1024 * 1024) {
+            resolve(file);
+            return;
+        }
+
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+
+        img.onload = () => {
+            URL.revokeObjectURL(objectUrl);
+            const maxDim = 1600;
+            let { width, height } = img;
+
+            if (width > maxDim || height > maxDim) {
+                if (width > height) {
+                    height = Math.round((height * maxDim) / width);
+                    width = maxDim;
+                } else {
+                    width = Math.round((width * maxDim) / height);
+                    height = maxDim;
+                }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            canvas.toBlob(
+                (blob) => {
+                    if (blob && blob.size < file.size) {
+                        resolve(new File([blob], 'question-image.webp', { type: 'image/webp' }));
+                    } else {
+                        resolve(file);
+                    }
+                },
+                'image/webp',
+                0.85
+            );
+        };
+
+        img.onerror = () => {
+            URL.revokeObjectURL(objectUrl);
+            resolve(file);
+        };
+
+        img.src = objectUrl;
+    });
+};
+
+const uploadAndInsertInlineImage = async (rawFile) => {
+    if (!rawFile || !rawFile.type.startsWith('image/')) return;
     if (!quillInstance.value) return;
 
     isUploadingInlineImage.value = true;
-    const formData = new FormData();
-    formData.append('image', file);
 
     try {
-        const res = await axios.post(route('admin.questions.upload-image'), formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
+        const processedFile = await optimizeImageFile(rawFile);
+        const formData = new FormData();
+        formData.append('image', processedFile, processedFile.name || 'clipboard.png');
+
+        const res = await axios.post('/admin/questions/upload-image', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+                'Accept': 'application/json',
+            }
         });
 
         if (res.data?.url) {
@@ -125,7 +184,11 @@ const uploadAndInsertInlineImage = async (file) => {
             }, 30);
         }
     } catch (error) {
-        alert(error.response?.data?.message || 'Gagal mengunggah gambar ke dalam soal. Maksimal ukuran 5MB.');
+        const serverMsg =
+            error.response?.data?.errors?.image?.[0] ||
+            error.response?.data?.message ||
+            (error.response?.status ? `HTTP Error ${error.response.status}` : error.message);
+        alert(`Gagal mengunggah gambar: ${serverMsg}`);
     } finally {
         isUploadingInlineImage.value = false;
     }
@@ -143,7 +206,6 @@ const onQuestionEditorReady = (quill) => {
     quillInstance.value = quill;
     const justRegistered = registerWordLikeImage(quill.constructor);
 
-    // Jika sedang mode Edit dan blot baru terdaftar saat modal pertama kali dibuka, muat ulang HTML agar style gambar terbaca
     if (justRegistered && form.content) {
         quill.clipboard.dangerouslyPasteHTML(form.content);
     }
