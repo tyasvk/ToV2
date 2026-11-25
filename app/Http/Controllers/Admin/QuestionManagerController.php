@@ -25,29 +25,29 @@ class QuestionManagerController extends Controller
     /**
      * Upload gambar inline untuk rich text editor pada kolom pertanyaan.
      */
-public function uploadImage(Request $request)
-{
-    $request->validate([
-        'image' => ['required', 'file', 'mimes:jpeg,png,jpg,gif,webp', 'max:10240'], // Maks 10MB
-    ]);
+    public function uploadImage(Request $request)
+    {
+        $request->validate([
+            'image' => ['required', 'file', 'mimes:jpeg,png,jpg,gif,webp', 'max:10240'], // Maks 10MB
+        ]);
 
-    $path = $request->file('image')->store('questions/inline', 'public');
+        $path = $request->file('image')->store('questions/inline', 'public');
 
-    return response()->json([
-        'url' => '/storage/' . $path,
-    ]);
-}
+        return response()->json([
+            'url' => '/storage/' . $path,
+        ]);
+    }
 
     public function store(Request $request, Tryout $tryout)
     {
         $rules = [
             'content'         => 'nullable|string',
-            'image'           => 'nullable|image|max:2048',
+            'image'           => 'nullable|image|max:5120',
             'options'         => 'required|array',
             'options.*'       => 'nullable|string',
-            'option_images.*' => 'nullable|image|max:2048', 
+            'option_images.*' => 'nullable|image|max:5120', 
             'explanation'     => 'nullable|string',
-            'sub_category'    => 'nullable|string', // Tambahan Analisis Materi SKB
+            'sub_category'    => 'nullable|string',
         ];
 
         // Validasi dinamis SKB vs SKD
@@ -64,7 +64,7 @@ public function uploadImage(Request $request)
 
         $request->validate($rules);
 
-        $data = $request->except(['option_images', 'existing_option_images']);
+        $data = $request->except(['option_images', 'existing_option_images', 'remove_image']);
         $data['content'] = $request->content ?? '';
 
         // Otomatis assign type SKB jika kategori adalah skb
@@ -107,25 +107,14 @@ public function uploadImage(Request $request)
     {
         $rules = [
             'content'         => 'nullable|string',
-            'image'           => 'nullable|image|max:2048',
+            'image'           => 'nullable|image|max:5120',
+            'remove_image'    => 'nullable|boolean',
             'options'         => 'required|array',
             'options.*'       => 'nullable|string', 
-            'option_images.*' => 'nullable|image|max:2048',
+            'option_images.*' => 'nullable|image|max:5120',
             'explanation'     => 'nullable|string',
-            'sub_category'    => 'nullable|string', // Tambahan Analisis Materi SKB
+            'sub_category'    => 'nullable|string',
         ];
-
-        if ($request->hasFile('image')) {
-    if ($question->image) {
-        Storage::disk('public')->delete($question->image);
-    }
-    $data['image'] = $request->file('image')->store('questions', 'public');
-} elseif ($request->boolean('remove_image')) {
-    if ($question->image) {
-        Storage::disk('public')->delete($question->image);
-    }
-    $data['image'] = null;
-}
 
         // Validasi dinamis SKB vs SKD
         if ($tryout->category === 'skb') {
@@ -141,7 +130,7 @@ public function uploadImage(Request $request)
 
         $request->validate($rules);
 
-        $data = $request->except(['option_images', 'existing_option_images']);
+        $data = $request->except(['option_images', 'existing_option_images', 'remove_image']);
         $data['content'] = $request->content ?? '';
 
         // Otomatis assign type SKB jika kategori adalah skb
@@ -158,11 +147,17 @@ public function uploadImage(Request $request)
         }
         $data['options'] = $options;
 
+        // Kelola ganti atau hapus Gambar Header Soal
         if ($request->hasFile('image')) {
             if ($question->image && Storage::disk('public')->exists($question->image)) {
                 Storage::disk('public')->delete($question->image);
             }
             $data['image'] = $request->file('image')->store('questions', 'public');
+        } elseif ($request->boolean('remove_image')) {
+            if ($question->image && Storage::disk('public')->exists($question->image)) {
+                Storage::disk('public')->delete($question->image);
+            }
+            $data['image'] = null;
         } else {
             unset($data['image']);
         }
@@ -274,7 +269,6 @@ public function uploadImage(Request $request)
                     'correct_answer' => $correctAnswer,
                     'tkp_scores'     => $tkpScores,
                     'explanation'    => $row[8] ?? '',
-                    // Baris di bawah jika CSV Anda kelak menambahkan kolom ke-9 sebagai Sub Kategori
                     'sub_category'   => $row[9] ?? null, 
                     'order'          => $maxOrder
                 ]);
