@@ -57,7 +57,7 @@ const isSKB = computed(() => props.tryout?.category === 'skb');
 // --- DAFTAR MATERI SUBTES SKD BKN ---
 const materiOptions = {
     TWK: ['Empat Konsensus Kebangsaan', 'Nasionalisme', 'Bela Negara', 'Integritas', 'Bahasa Indonesia'],
-    TIU: ['Penalaran Induktif', 'Silogisme', 'Analitis', 'Berhitung', 'Deret Angka', 'Perbandingan Kuantitatif', 'Soal Cerita', 'Analogi Gambar', 'Ketidaksamaan Gambar', 'Serial Gambar'],
+    TIU: ['Penalaran Induktif', 'Silogisme', 'Analitis', 'Berhitung', 'Deret Angka', 'Perbandingan Kuantitatif', 'Soal Cerita', 'Analogi Gambar', 'Penalaran Matriks', 'Serial Gambar'],
     TKP: ['Pelayanan Publik', 'Profesionalisme', 'Jejaring Kerja', 'Sosial Budaya', 'Teknologi Informasi dan Komunikasi', 'Anti Radikalisme']
 };
 
