@@ -1,41 +1,57 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, useForm, Link, router } from '@inertiajs/vue3';
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, onMounted } from 'vue';
 import draggable from 'vuedraggable';
 import axios from 'axios';
 
-import { QuillEditor, Quill } from '@vueup/vue-quill';
+import { QuillEditor, loadQuill } from '@vueup/vue-quill';
 import '@vueup/vue-quill/dist/vue-quill.snow.css';
 
-// Kustomisasi Image Blot Quill agar menyimpan atribut style (ukuran & perataan ala Word) saat Edit Soal
-if (typeof window !== 'undefined' && Quill) {
-    const BaseImage = Quill.import('formats/image');
-    class WordLikeImage extends BaseImage {
-        static formats(domNode) {
-            const formats = super.formats(domNode) || {};
-            if (domNode.hasAttribute('style')) {
-                formats.style = domNode.getAttribute('style');
-            }
-            if (domNode.hasAttribute('width')) {
-                formats.width = domNode.getAttribute('width');
-            }
-            return formats;
-        }
-        format(name, value) {
-            if (name === 'style' || name === 'width') {
-                if (value) {
-                    this.domNode.setAttribute(name, value);
-                } else {
-                    this.domNode.removeAttribute(name);
+// Daftarkan ekstensi gambar ala Word setelah Quill dimuat di browser
+let isQuillBlotRegistered = false;
+const registerWordLikeImage = (QuillClass) => {
+    if (!QuillClass || isQuillBlotRegistered) return;
+    try {
+        const BaseImage = QuillClass.import('formats/image');
+        class WordLikeImage extends BaseImage {
+            static formats(domNode) {
+                const formats = super.formats(domNode) || {};
+                if (domNode.hasAttribute('style')) {
+                    formats.style = domNode.getAttribute('style');
                 }
-            } else {
-                super.format(name, value);
+                if (domNode.hasAttribute('width')) {
+                    formats.width = domNode.getAttribute('width');
+                }
+                return formats;
+            }
+            format(name, value) {
+                if (name === 'style' || name === 'width') {
+                    if (value) {
+                        this.domNode.setAttribute(name, value);
+                    } else {
+                        this.domNode.removeAttribute(name);
+                    }
+                } else {
+                    super.format(name, value);
+                }
             }
         }
+        QuillClass.register(WordLikeImage, true);
+        isQuillBlotRegistered = true;
+    } catch (e) {
+        console.warn('Gagal mendaftarkan WordLikeImage:', e);
     }
-    Quill.register(WordLikeImage, true);
-}
+};
+
+onMounted(async () => {
+    try {
+        const QuillClass = await loadQuill();
+        registerWordLikeImage(QuillClass);
+    } catch (e) {
+        console.warn('Gagal memuat Quill:', e);
+    }
+});
 
 const props = defineProps({
     tryout: Object,
@@ -133,6 +149,7 @@ const handleInlineImageFileChange = async (event) => {
 
 const onQuestionEditorReady = (quill) => {
     quillInstance.value = quill;
+    registerWordLikeImage(quill.constructor);
 
     // 1. Override tombol 'image' pada toolbar Quill agar upload ke server
     const toolbar = quill.getModule('toolbar');
