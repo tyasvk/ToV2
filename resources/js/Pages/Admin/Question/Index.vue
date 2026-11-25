@@ -56,8 +56,8 @@ const isSKB = computed(() => props.tryout?.category === 'skb');
 
 // --- DAFTAR MATERI SUBTES SKD BKN ---
 const materiOptions = {
-    TWK: ['Pilar Negara', 'Nasionalisme', 'Bela Negara', 'Integritas', 'Bahasa Indonesia'],
-    TIU: ['Analogi', 'Silogisme', 'Analitis', 'Berhitung', 'Deret Angka', 'Perbandingan Kuantitatif', 'Soal Cerita', 'Analogi Gambar', 'Ketidaksamaan Gambar', 'Serial Gambar'],
+    TWK: ['Empat Konsensus Kebangsaan', 'Nasionalisme', 'Bela Negara', 'Integritas', 'Bahasa Indonesia'],
+    TIU: ['Penalaran Induktif', 'Silogisme', 'Analitis', 'Berhitung', 'Deret Angka', 'Perbandingan Kuantitatif', 'Soal Cerita', 'Analogi Gambar', 'Ketidaksamaan Gambar', 'Serial Gambar'],
     TKP: ['Pelayanan Publik', 'Profesionalisme', 'Jejaring Kerja', 'Sosial Budaya', 'Teknologi Informasi dan Komunikasi', 'Anti Radikalisme']
 };
 
@@ -418,7 +418,7 @@ const handleDragEnd = () => {
 const form = useForm({
     id: null,
     type: isSKB.value ? 'SKB' : 'TWK',
-    sub_category: isSKB.value ? '' : 'Pilar Negara',
+    sub_category: isSKB.value ? '' : 'Empat Konsensus Kebangsaan',
     content: '',
     image: null,
     remove_image: false,
@@ -489,7 +489,7 @@ const openCreateModal = () => {
     
     form.id = null;
     form.type = isSKB.value ? 'SKB' : 'TWK';
-    form.sub_category = isSKB.value ? '' : 'Pilar Negara';
+    form.sub_category = isSKB.value ? '' : 'Empat Konsensus Kebangsaan';
     form.content = '';
     form.image = null;
     form.remove_image = false;
@@ -531,7 +531,11 @@ const openEditModal = (q) => {
 
 const submit = () => {
     if (form.id) {
-        form.transform((data) => ({ ...data, _method: 'PUT' })).post(route('admin.tryouts.questions.update', [props.tryout.id, form.id]), {
+        form.transform((data) => ({
+            ...data,
+            remove_image: data.remove_image ? 1 : 0,
+            _method: 'PUT',
+        })).post(route('admin.tryouts.questions.update', [props.tryout.id, form.id]), {
             onSuccess: () => { closeModal(); form.reset(); },
             forceFormData: true,
             preserveScroll: true
